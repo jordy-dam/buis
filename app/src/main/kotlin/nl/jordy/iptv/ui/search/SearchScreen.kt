@@ -38,6 +38,7 @@ import nl.jordy.iptv.ui.components.ChannelTile
 import nl.jordy.iptv.ui.components.PosterTile
 import nl.jordy.iptv.ui.components.TvTextField
 import nl.jordy.iptv.ui.components.lastInRow
+import nl.jordy.iptv.ui.theme.Rows
 import nl.jordy.iptv.ui.theme.TextSecondary
 import javax.inject.Inject
 
@@ -71,12 +72,13 @@ fun SearchScreen(
                 { vm.query.value = it },
                 Modifier.width(560.dp),
                 imeAction = ImeAction.Search,
+                editOnFirstFocus = true,
             )
         }
         val r: SearchResults? = results
         when {
             query.isBlank() -> item {
-                Text("Druk OK op het zoekveld en typ een paar letters. Voorkeurslanden staan bovenaan.", style = MaterialTheme.typography.bodyLarge, color = TextSecondary)
+                Text("Typ een paar letters van een zender, film of serie. Voorkeurslanden staan bovenaan.", style = MaterialTheme.typography.bodyLarge, color = TextSecondary)
             }
             r == null -> Unit
             r.isEmpty -> item { Text("Niets gevonden voor \"$query\".", style = MaterialTheme.typography.bodyLarge, color = TextSecondary) }
@@ -87,7 +89,6 @@ fun SearchScreen(
                         ChannelTile(
                             name = c.name,
                             logoUrl = c.logoUrl,
-                            nowPlaying = null,
                             badges = c.badges.split(",").filter { it.isNotEmpty() },
                             onClick = { onPlay(PlayerRoute(PlayerRoute.Kind.LIVE, c.streamId, c.name, categoryId = c.categoryId)) },
                             onLongClick = {},
@@ -112,8 +113,8 @@ private fun PosterRow(title: String, items: List<Triple<Int, String, String?>>, 
     Column {
         Text(title, style = MaterialTheme.typography.titleLarge)
         LazyRow(
-            contentPadding = PaddingValues(horizontal = 12.dp, vertical = 16.dp),
-            horizontalArrangement = Arrangement.spacedBy(20.dp),
+            contentPadding = Rows.tilePadding,
+            horizontalArrangement = Arrangement.spacedBy(Rows.tileGap),
             modifier = Modifier.focusRestorer(),
         ) {
             itemsIndexed(items, key = { _, it -> it.first }) { i, (id, name, image) ->

@@ -149,7 +149,10 @@ fun SeriesDetailScreen(onPlay: (PlayerRoute) -> Unit, vm: SeriesDetailViewModel 
         },
         below = {
             if (seasons.size > 1) {
-                LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.focusRestorer()) {
+                // Coming down from the buttons lands on the season being shown, not the nearest tab.
+                val seasonFocus = remember(seasons) { seasons.associateWith { FocusRequester() } }
+                val shownFocus = seasonFocus[shownSeason] ?: FocusRequester.Default
+                LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.focusRestorer(shownFocus)) {
                     items(seasons) { n ->
                         val last = n == seasons.last()
                         // Focusing a season shows it, so the d-pad never needs an extra OK.
@@ -157,7 +160,8 @@ fun SeriesDetailScreen(onPlay: (PlayerRoute) -> Unit, vm: SeriesDetailViewModel 
                             "Seizoen $n",
                             selected = n == shownSeason,
                             onClick = { season = n },
-                            modifier = Modifier.width(160.dp).lastInRow(last).onFocusChanged { if (it.isFocused) season = n },
+                            modifier = Modifier.width(160.dp).focusRequester(seasonFocus.getValue(n)).lastInRow(last)
+                                .onFocusChanged { if (it.isFocused) season = n },
                         )
                     }
                 }

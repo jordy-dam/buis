@@ -4,6 +4,7 @@ import android.util.LruCache
 import kotlinx.coroutines.sync.Semaphore
 import kotlinx.coroutines.sync.withPermit
 import nl.jordy.iptv.data.auth.CredentialStore
+import nl.jordy.iptv.data.db.AppDatabase
 import nl.jordy.iptv.data.xtream.EpgEntry
 import nl.jordy.iptv.data.xtream.XtreamClient
 import nl.jordy.iptv.data.xtream.XtreamParser
@@ -11,13 +12,15 @@ import javax.inject.Inject
 import javax.inject.Singleton
 
 /**
- * Short EPG per channel, fetched only for channels on screen and cached for a few minutes.
- * The full XMLTV guide is phase 2.
+ * What's on a channel. The full guide in Room ([nl.jordy.iptv.data.epg.EpgGuide]) comes first;
+ * channels it doesn't cover fall back to the provider's short EPG, fetched only for channels on
+ * screen and cached for a few minutes.
  */
 @Singleton
 class EpgRepository @Inject constructor(
     private val client: XtreamClient,
     private val credentials: CredentialStore,
+    private val db: AppDatabase,
 ) {
     private class Cached(val entries: List<EpgEntry>, val fetchedAt: Long)
 
@@ -26,13 +29,15 @@ class EpgRepository @Inject constructor(
     private val limiter = Semaphore(4)
 
     suspend fun nowAndNext(streamId: Int, nowSec: Long = System.currentTimeMillis() / 1000): Pair<EpgEntry?, EpgEntry?> {
-        val entries = entries(streamId)
+        val guide = db.epg().upcoming(streamId, nowSec).map { EpgEntry(it.title, it.description, it.start, it.stop) }
+        val entries = guide.ifEmpty { entries(streamId) }
         val nowIndex = entries.indexOfFirst { nowSec in it.start until it.stop }
         if (nowIndex < 0) return null to entries.firstOrNull { it.start > nowSec }
         return entries[nowIndex] to entries.getOrNull(nowIndex + 1)
     }
 
     fun clearCache() = cache.evictAll()
+
 
     private suspend fun entries(streamId: Int): List<EpgEntry> {
         cache.get(streamId)?.takeIf { System.currentTimeMillis() - it.fetchedAt < TTL_MS }?.let { return it.entries }

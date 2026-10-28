@@ -19,10 +19,17 @@ import androidx.sqlite.db.SupportSQLiteDatabase
         PlaybackPositionEntity::class,
         SyncInfoEntity::class,
         SearchEntity::class,
+        EpgProgrammeEntity::class,
+        EpgChannelEntity::class,
+        EpgInfoEntity::class,
     ],
-    version = 3,
+    version = 4,
     exportSchema = true,
-    autoMigrations = [AutoMigration(from = 1, to = 2, spec = AppDatabase.CatalogResync::class)],
+    autoMigrations = [
+        AutoMigration(from = 1, to = 2, spec = AppDatabase.CatalogResync::class),
+        // Guide tables only; filled by the first guide refresh.
+        AutoMigration(from = 3, to = 4),
+    ],
 )
 abstract class AppDatabase : RoomDatabase() {
     abstract fun catalog(): CatalogDao
@@ -32,6 +39,7 @@ abstract class AppDatabase : RoomDatabase() {
     abstract fun playback(): PlaybackDao
     abstract fun syncInfo(): SyncInfoDao
     abstract fun search(): SearchDao
+    abstract fun epg(): EpgDao
 
     /**
      * The catalog is a cache of the provider: after a schema change it's emptied and the next

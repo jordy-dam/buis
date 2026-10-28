@@ -41,3 +41,9 @@
 **Why:** Jordy's scope for 2b. The kids profile was a proposal: it costs one column and a filter, and without the management lock a child could simply switch it off.
 **Alternatives rejected:** Profile management inside Instellingen (a kids profile could reach it); photo or emoji avatars (emoji ignore the theme); ratings, hiding/reordering categories and the EPG grid in 2b (stay in the backlog).
 **Revisit if:** the household wants per-profile category hiding, or the adult name match misses the real provider's categories.
+
+## 2026-10-28 — Phase 2c "kijken": guide in the list, compact rows, rail that steps back
+**Decision:** Follows the UX review (`docs/reviews/2026-10-28-ux-review-2b.md`). Channel rows are one line of 48dp with number, logo, name, `NU · title` and a 2dp progress bar; the focused channel's time slot and "Straks" sit in a fixed strip above the list (rows don't grow on focus). The rail collapses to 72dp icons while focus is in the content, and a tab opens after focus rests 150 ms on it or at once on OK/Right. Zoeken is the first rail item and opens the keyboard on entry. Posters are 104dp with one shared vertical rhythm (`Rows` in `Theme.kt`). Home shows title and time left under the focused "Verder kijken" tile. Films and Series lose their page titles.
+**Why:** Jordy found cards and sections too big on the tv and couldn't see what's on a channel. These are the review's two injunctions plus four of its orders.
+**Alternatives rejected:** A row that expands on focus (the list jumps); an EPG grid now (the list with now/next covers choosing a channel; the grid stays in the backlog); service rows in Films/Series before measuring the real category names.
+**Revisit if:** the 48dp rows are hard to read at Jordy's viewing distance, or the rail collapse feels jumpy on the TCL.

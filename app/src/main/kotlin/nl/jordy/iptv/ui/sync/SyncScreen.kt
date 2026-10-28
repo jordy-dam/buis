@@ -29,6 +29,7 @@ import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import nl.jordy.iptv.data.auth.CredentialStore
 import nl.jordy.iptv.data.db.AppDatabase
+import nl.jordy.iptv.data.epg.EpgGuide
 import nl.jordy.iptv.data.profile.ProfileRepository
 import nl.jordy.iptv.data.sync.CatalogSync
 import nl.jordy.iptv.data.xtream.ContentType
@@ -56,6 +57,7 @@ class SyncViewModel @Inject constructor(
     private val credentials: CredentialStore,
     private val db: AppDatabase,
     private val profiles: ProfileRepository,
+    private val guide: EpgGuide,
 ) : ViewModel() {
     private val _state = MutableStateFlow(SyncState())
     val state = _state.asStateFlow()
@@ -71,6 +73,8 @@ class SyncViewModel @Inject constructor(
             try {
                 sync.run(c) { p -> _state.update { it.copy(current = p.type, counts = it.counts + (p.type to p.items)) } }
                 _state.update { it.copy(done = true, current = null) }
+                // New channels may have new EPG ids: rebuild the guide with them.
+                guide.refresh()
             } catch (e: Exception) {
                 val hasCatalog = db.syncInfo().get() != null
                 _state.update { it.copy(error = "Ophalen mislukt: ${e.message ?: e.javaClass.simpleName}", current = null, canSkip = hasCatalog) }

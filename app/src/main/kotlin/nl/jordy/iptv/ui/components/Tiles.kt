@@ -20,6 +20,10 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyListScope
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.produceState
+import kotlinx.coroutines.delay
+import nl.jordy.iptv.data.xtream.EpgEntry
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.input.key.onPreviewKeyEvent
@@ -45,6 +49,7 @@ import nl.jordy.iptv.data.settings.FilteredCategories
 import nl.jordy.iptv.ui.theme.Accent
 import nl.jordy.iptv.ui.theme.SurfaceColor
 import nl.jordy.iptv.ui.theme.SurfaceRaised
+import nl.jordy.iptv.ui.theme.TextPrimary
 import nl.jordy.iptv.ui.theme.TextSecondary
 
 private val tileShape = RoundedCornerShape(10.dp)
@@ -81,7 +86,7 @@ fun PosterTile(
     onClick: () -> Unit,
     onLongClick: () -> Unit,
     modifier: Modifier = Modifier,
-    width: Dp = 120.dp,
+    width: Dp = 104.dp,
     favorite: Boolean = false,
     progress: Float? = null,
 ) {
@@ -96,14 +101,14 @@ fun PosterTile(
         colors = CardDefaults.colors(containerColor = SurfaceColor),
     ) {
         Box(Modifier.fillMaxSize()) {
+            // Fallback when there's no artwork (or it's broken): looks like a title card, not an error.
             Text(
                 title,
-                style = MaterialTheme.typography.bodyMedium,
-                color = TextSecondary,
-                textAlign = TextAlign.Center,
-                maxLines = 4,
+                style = MaterialTheme.typography.titleSmall,
+                color = TextPrimary,
+                maxLines = 3,
                 overflow = TextOverflow.Ellipsis,
-                modifier = Modifier.align(Alignment.Center).padding(12.dp),
+                modifier = Modifier.align(Alignment.BottomStart).padding(10.dp),
             )
             if (imageUrl != null) {
                 AsyncImage(model = imageUrl, contentDescription = title, contentScale = ContentScale.Crop, modifier = Modifier.fillMaxSize())
@@ -115,51 +120,88 @@ fun PosterTile(
 }
 
 /**
- * Compact channel row: 16:9 logo plate (logos are often transparent PNGs), name on up to two lines
- * (event channels put the programme in the name), labels, and now-playing when there is a guide.
+ * One-line channel row, 48dp, so about eleven fit on screen: number, logo plate (logos are often
+ * transparent PNGs), name, what's on now, labels, and a thin progress bar along the bottom.
+ * Fixed height on purpose: a row that grows on focus makes the whole list jump.
  */
 @Composable
 fun ChannelTile(
     name: String,
     logoUrl: String?,
-    nowPlaying: String?,
     onClick: () -> Unit,
     onLongClick: () -> Unit,
     modifier: Modifier = Modifier,
+    number: Int? = null,
+    now: EpgEntry? = null,
     favorite: Boolean = false,
     badges: List<String> = emptyList(),
 ) {
     Surface(
         onClick = onClick,
         onLongClick = onLongClick,
-        modifier = modifier.fillMaxWidth().heightIn(min = 64.dp).onMenuKey(onLongClick),
-        shape = ClickableSurfaceDefaults.shape(tileShape),
-        scale = ClickableSurfaceDefaults.scale(focusedScale = 1.03f),
-        border = ClickableSurfaceDefaults.border(focusedBorder = Focus.border),
+        modifier = modifier.fillMaxWidth().height(48.dp).onMenuKey(onLongClick),
+        shape = ClickableSurfaceDefaults.shape(RoundedCornerShape(8.dp)),
+        scale = ClickableSurfaceDefaults.scale(focusedScale = 1.02f),
+        border = ClickableSurfaceDefaults.border(focusedBorder = Border(BorderStroke(2.dp, Accent), shape = RoundedCornerShape(8.dp))),
         glow = ClickableSurfaceDefaults.glow(focusedGlow = Focus.glow),
         colors = ClickableSurfaceDefaults.colors(containerColor = SurfaceColor, focusedContainerColor = SurfaceRaised),
     ) {
-        Row(Modifier.fillMaxWidth().padding(horizontal = 10.dp, vertical = 8.dp), verticalAlignment = Alignment.CenterVertically) {
-            Box(
-                Modifier.height(48.dp).aspectRatio(16f / 9f).background(SurfaceRaised, RoundedCornerShape(6.dp)),
-                contentAlignment = Alignment.Center,
-            ) {
-                Text(name.take(2).uppercase(), style = MaterialTheme.typography.titleMedium, color = TextSecondary)
-                if (logoUrl != null) {
-                    AsyncImage(model = logoUrl, contentDescription = null, contentScale = ContentScale.Fit, modifier = Modifier.fillMaxSize().padding(6.dp))
+        Box(Modifier.fillMaxSize()) {
+            Row(Modifier.fillMaxSize().padding(horizontal = 8.dp), verticalAlignment = Alignment.CenterVertically) {
+                if (number != null) {
+                    Text("$number", style = MaterialTheme.typography.bodyMedium, color = TextSecondary, textAlign = TextAlign.End, modifier = Modifier.width(36.dp))
+                    Spacer(Modifier.width(10.dp))
                 }
-            }
-            Spacer(Modifier.width(14.dp))
-            Column(Modifier.weight(1f)) {
-                Text(name, style = MaterialTheme.typography.titleMedium, maxLines = 2, overflow = TextOverflow.Ellipsis)
-                if (nowPlaying != null) {
-                    Text(nowPlaying, style = MaterialTheme.typography.bodyMedium, color = TextSecondary, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                Box(Modifier.height(32.dp).aspectRatio(16f / 9f).background(SurfaceRaised, RoundedCornerShape(4.dp)), contentAlignment = Alignment.Center) {
+                    Text(name.take(2).uppercase(), style = MaterialTheme.typography.labelLarge, color = TextSecondary)
+                    if (logoUrl != null) {
+                        AsyncImage(model = logoUrl, contentDescription = null, contentScale = ContentScale.Fit, modifier = Modifier.fillMaxSize().padding(3.dp))
+                    }
                 }
+                Spacer(Modifier.width(12.dp))
+                Text(
+                    name,
+                    style = MaterialTheme.typography.titleMedium,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                    modifier = Modifier.weight(if (now != null) 0.45f else 1f, fill = now == null),
+                )
+                if (now != null) {
+                    Text(
+                        "  NU · ${now.title}",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = TextSecondary,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                        modifier = Modifier.weight(0.55f),
+                    )
+                }
+                badges.forEach { Badge(it, Modifier.padding(start = 6.dp)) }
+                if (favorite) FavoriteBadge(Modifier.padding(start = 6.dp))
             }
-            badges.forEach { Badge(it, Modifier.padding(start = 6.dp)) }
-            if (favorite) FavoriteBadge(Modifier.padding(start = 6.dp))
+            if (now != null) ProgressBar(now.progress(), Modifier.align(Alignment.BottomCenter), thickness = 2.dp)
         }
     }
+}
+
+/** How far the programme is, 0..1, at this moment. */
+fun EpgEntry.progress(nowSec: Long = System.currentTimeMillis() / 1000): Float =
+    if (stop <= start) 0f else ((nowSec - start).toFloat() / (stop - start)).coerceIn(0f, 1f)
+
+/**
+ * What's on [streamId] now and next, loaded once the row has settled on screen and refreshed
+ * every minute, so titles roll over and progress bars move.
+ */
+@Composable
+fun rememberNowAndNext(streamId: Int, load: suspend (Int) -> Pair<EpgEntry?, EpgEntry?>): Pair<EpgEntry?, EpgEntry?> {
+    val value by produceState<Pair<EpgEntry?, EpgEntry?>>(null to null, streamId) {
+        delay(150) // only for rows that stay on screen while scrolling
+        while (true) {
+            value = load(streamId)
+            delay(60_000 - System.currentTimeMillis() % 60_000)
+        }
+    }
+    return value
 }
 
 /** Small label such as "4K", "Multi" or "Terugkijken". */
@@ -212,9 +254,9 @@ fun FavoriteBadge(modifier: Modifier = Modifier) {
 }
 
 @Composable
-fun ProgressBar(fraction: Float, modifier: Modifier = Modifier) {
-    Box(modifier.fillMaxWidth().height(5.dp).background(SurfaceRaised)) {
-        Box(Modifier.fillMaxWidth(fraction.coerceIn(0f, 1f)).height(5.dp).background(Accent))
+fun ProgressBar(fraction: Float, modifier: Modifier = Modifier, thickness: Dp = 5.dp) {
+    Box(modifier.fillMaxWidth().height(thickness).background(SurfaceRaised)) {
+        Box(Modifier.fillMaxWidth(fraction.coerceIn(0f, 1f)).height(thickness).background(Accent))
     }
 }
 

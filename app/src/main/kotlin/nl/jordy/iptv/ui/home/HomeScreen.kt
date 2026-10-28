@@ -3,6 +3,12 @@ package nl.jordy.iptv.ui.home
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.padding
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.focus.onFocusChanged
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
@@ -30,18 +36,21 @@ import nl.jordy.iptv.data.db.FavoriteEntity
 import nl.jordy.iptv.data.db.MovieEntity
 import nl.jordy.iptv.data.db.PlaybackPositionEntity
 import nl.jordy.iptv.data.profile.ProfileRepository
+import nl.jordy.iptv.data.repo.EpgRepository
 import nl.jordy.iptv.data.repo.LibraryRepository
+import nl.jordy.iptv.ui.components.rememberNowAndNext
 import nl.jordy.iptv.data.xtream.ContentType
 import nl.jordy.iptv.data.xtream.NameParser
 import nl.jordy.iptv.ui.PlayerRoute
 import nl.jordy.iptv.ui.components.ChannelTile
 import nl.jordy.iptv.ui.components.PosterTile
 import nl.jordy.iptv.ui.components.lastInRow
+import nl.jordy.iptv.ui.theme.Rows
 import nl.jordy.iptv.ui.theme.TextSecondary
 import javax.inject.Inject
 
 /** A "Verder kijken" tile: a film or an episode, ready to resume. */
-data class ContinueItem(val key: String, val title: String, val imageUrl: String?, val progress: Float, val play: PlayerRoute)
+data class ContinueItem(val key: String, val title: String, val imageUrl: String?, val progress: Float, val remainingMs: Long, val play: PlayerRoute)
 
 data class HomeState(
     val continueWatching: List<ContinueItem> = emptyList(),
@@ -56,7 +65,9 @@ class HomeViewModel @Inject constructor(
     private val db: AppDatabase,
     library: LibraryRepository,
     profiles: ProfileRepository,
+    private val epg: EpgRepository,
 ) : ViewModel() {
+    suspend fun nowAndNext(streamId: Int) = epg.nowAndNext(streamId)
 
     private val continueWatching = library.recentPositions(ROW_SIZE).map { positions -> positions.mapNotNull { resolve(it) } }
 
@@ -72,15 +83,16 @@ class HomeViewModel @Inject constructor(
     /** Null when the item is gone from the catalog, or an episode whose series was never opened here. */
     private suspend fun resolve(p: PlaybackPositionEntity): ContinueItem? {
         val progress = if (p.durationMs > 0) p.positionMs.toFloat() / p.durationMs else 0f
+        val left = (p.durationMs - p.positionMs).coerceAtLeast(0)
         return when (p.type) {
             ContentType.MOVIE -> db.catalog().movie(p.itemId)?.let { m ->
-                ContinueItem("m${m.streamId}", m.name, m.posterUrl, progress, PlayerRoute(PlayerRoute.Kind.MOVIE, m.streamId, m.name, m.containerExtension))
+                ContinueItem("m${m.streamId}", m.name, m.posterUrl, progress, left, PlayerRoute(PlayerRoute.Kind.MOVIE, m.streamId, m.name, m.containerExtension))
             }
             ContentType.SERIES -> {
                 val e = db.episodes().episode(p.itemId) ?: return null
                 val s = db.catalog().series(e.seriesId)
                 val title = "${s?.name ?: e.title} · S${e.season} A${e.number}"
-                ContinueItem("e${e.episodeId}", title, s?.coverUrl ?: e.imageUrl, progress, PlayerRoute(PlayerRoute.Kind.EPISODE, e.episodeId, title, e.containerExtension))
+                ContinueItem("e${e.episodeId}", title, s?.coverUrl ?: e.imageUrl, progress, left, PlayerRoute(PlayerRoute.Kind.EPISODE, e.episodeId, title, e.containerExtension))
             }
             ContentType.LIVE -> null
         }
@@ -97,7 +109,8 @@ class HomeViewModel @Inject constructor(
 fun HomeScreen(onPlay: (PlayerRoute) -> Unit, onOpenMovie: (Int) -> Unit, vm: HomeViewModel = hiltViewModel()) {
     val loaded by vm.state.collectAsStateWithLifecycle()
     val s = loaded ?: return
-    LazyColumn(contentPadding = PaddingValues(bottom = 48.dp), verticalArrangement = Arrangement.spacedBy(28.dp)) {
+    var focusedContinue by remember { mutableStateOf<ContinueItem?>(null) }
+    LazyColumn(contentPadding = PaddingValues(bottom = 48.dp), verticalArrangement = Arrangement.spacedBy(Rows.sectionGap)) {
         if (s.isEmpty) {
             item {
                 Text(
@@ -111,8 +124,8 @@ fun HomeScreen(onPlay: (PlayerRoute) -> Unit, onOpenMovie: (Int) -> Unit, vm: Ho
             item(key = "continue") {
                 Text("Verder kijken", style = MaterialTheme.typography.titleLarge)
                 LazyRow(
-                    contentPadding = PaddingValues(horizontal = 12.dp, vertical = 16.dp),
-                    horizontalArrangement = Arrangement.spacedBy(20.dp),
+                    contentPadding = Rows.tilePadding,
+                    horizontalArrangement = Arrangement.spacedBy(Rows.tileGap),
                     modifier = Modifier.focusRestorer(),
                 ) {
                     items(s.continueWatching, key = { it.key }) { c ->
@@ -122,17 +135,27 @@ fun HomeScreen(onPlay: (PlayerRoute) -> Unit, onOpenMovie: (Int) -> Unit, vm: Ho
                             progress = c.progress,
                             onClick = { onPlay(c.play) },
                             onLongClick = {},
-                            modifier = Modifier.lastInRow(c == s.continueWatching.last()),
+                            modifier = Modifier.lastInRow(c == s.continueWatching.last())
+                                .onFocusChanged { if (it.isFocused) focusedContinue = c else if (focusedContinue == c) focusedContinue = null },
                         )
                     }
                 }
+                // What the focused tile is, even when its artwork has no title. Always one line high, so nothing jumps.
+                Text(
+                    focusedContinue?.let { "${it.title} · nog ${remaining(it.remainingMs)}" } ?: " ",
+                    style = MaterialTheme.typography.bodyLarge,
+                    color = TextSecondary,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                    modifier = Modifier.padding(start = 12.dp),
+                )
             }
         }
         if (s.channels.isNotEmpty()) {
             item(key = "channels") {
                 Text("Favoriete zenders", style = MaterialTheme.typography.titleLarge)
                 LazyRow(
-                    contentPadding = PaddingValues(horizontal = 12.dp, vertical = 16.dp),
+                    contentPadding = Rows.tilePadding,
                     horizontalArrangement = Arrangement.spacedBy(16.dp),
                     modifier = Modifier.focusRestorer(),
                 ) {
@@ -140,11 +163,11 @@ fun HomeScreen(onPlay: (PlayerRoute) -> Unit, onOpenMovie: (Int) -> Unit, vm: Ho
                         ChannelTile(
                             name = NameParser.parse(f.name).title,
                             logoUrl = f.imageUrl,
-                            nowPlaying = null,
+                            now = rememberNowAndNext(f.itemId, vm::nowAndNext).first,
                             // Zapping from here goes through the favourite channels, as on Favorieten.
                             onClick = { onPlay(PlayerRoute(PlayerRoute.Kind.LIVE, f.itemId, f.name, categoryId = PlayerRoute.FAVORITES_CATEGORY)) },
                             onLongClick = {},
-                            modifier = Modifier.width(320.dp).lastInRow(f == s.channels.last()),
+                            modifier = Modifier.width(420.dp).lastInRow(f == s.channels.last()),
                         )
                     }
                 }
@@ -154,8 +177,8 @@ fun HomeScreen(onPlay: (PlayerRoute) -> Unit, onOpenMovie: (Int) -> Unit, vm: Ho
             item(key = "recent") {
                 Text("Recent toegevoegd", style = MaterialTheme.typography.titleLarge)
                 LazyRow(
-                    contentPadding = PaddingValues(horizontal = 12.dp, vertical = 16.dp),
-                    horizontalArrangement = Arrangement.spacedBy(20.dp),
+                    contentPadding = Rows.tilePadding,
+                    horizontalArrangement = Arrangement.spacedBy(Rows.tileGap),
                     modifier = Modifier.focusRestorer(),
                 ) {
                     items(s.recent, key = { it.streamId }) { m ->
@@ -171,4 +194,10 @@ fun HomeScreen(onPlay: (PlayerRoute) -> Unit, onOpenMovie: (Int) -> Unit, vm: Ho
             }
         }
     }
+}
+
+/** "1 u 56 min", "12 min", "1 min". */
+private fun remaining(ms: Long): String {
+    val min = ((ms + 59_999) / 60_000).coerceAtLeast(1)
+    return if (min >= 60) "${min / 60} u ${min % 60} min" else "$min min"
 }

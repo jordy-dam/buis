@@ -4,6 +4,7 @@ import com.sun.net.httpserver.HttpExchange
 import com.sun.net.httpserver.HttpServer
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonArray
+import kotlinx.serialization.json.JsonNull
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.buildJsonArray
@@ -103,6 +104,10 @@ private fun route(ex: HttpExchange, cfg: Config, catalog: Catalog) {
             }
             sendJson(ex, body.replace("{base}", base))
         }
+        path == "/xmltv.php" -> {
+            if (query["username"] != USER || query["password"] != PASS) return send(ex, 401, "text/plain", ByteArray(0))
+            send(ex, 200, "application/xml", catalog.xmltv().toByteArray())
+        }
 
         path.startsWith("/img/") -> sendFile(ex, File(cfg.mediaDir, "img/" + path.removePrefix("/img/")), "image/png", cfg.mediaDir)
 
@@ -170,6 +175,13 @@ private class Catalog(private val cfg: Config) {
                     put("category_id", (100 + i % liveCatNames.size).toString())
                 })
             }
+            // The fixture's "NPO 2 HD" has no EPG id; this sibling has one, so the app can borrow it.
+            add(buildJsonObject {
+                put("name", "NPO 2")
+                put("stream_id", 2001)
+                put("epg_channel_id", "npo2.nl")
+                put("category_id", "100")
+            })
         }),
         categoryId,
     )
@@ -271,6 +283,36 @@ private class Catalog(private val cfg: Config) {
                 }
             })
         }.toString()
+    }
+
+    /**
+     * The full guide: 30-minute slots from two hours ago to a day ahead for every channel with an
+     * EPG id, same titles as [shortEpg], times with an offset as real XMLTV has them.
+     */
+    fun xmltv(): String {
+        val slot = 30 * 60L
+        val first = System.currentTimeMillis() / 1000 / slot * slot - 4 * slot
+        val fmt = java.time.format.DateTimeFormatter.ofPattern("yyyyMMddHHmmss Z").withZone(java.time.ZoneId.of("Europe/Amsterdam"))
+        fun t(sec: Long) = fmt.format(java.time.Instant.ofEpochSecond(sec))
+        val ids = json.parseToJsonElement(liveStreams(null)).jsonArray.mapNotNull { el ->
+            val o = el as? JsonObject ?: return@mapNotNull null
+            val epg = (o["epg_channel_id"] as? JsonPrimitive)?.takeUnless { it is JsonNull }?.content ?: return@mapNotNull null
+            val sid = (o["stream_id"] as? JsonPrimitive)?.content?.toIntOrNull() ?: 0
+            epg to sid
+        }.distinctBy { it.first }
+        return buildString {
+            append("<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n<tv>\n")
+            ids.forEach { (id, _) -> append("<channel id=\"$id\"><display-name>$id</display-name></channel>\n") }
+            ids.forEach { (id, sid) ->
+                repeat(52) { i ->
+                    val from = first + i * slot
+                    val title = listOf("Journaal", "Weerbericht", "Documentaire", "Talkshow", "Film", "Sport")[(sid + i) % 6] + " $sid"
+                    append("<programme start=\"${t(from)}\" stop=\"${t(from + slot)}\" channel=\"$id\">")
+                    append("<title lang=\"nl\">$title</title><desc lang=\"nl\">Programma-informatie voor kanaal $sid.</desc></programme>\n")
+                }
+            }
+            append("</tv>\n")
+        }
     }
 
     private fun generatedCategories(firstId: Int, names: List<String>) = buildJsonArray {

@@ -4,6 +4,11 @@ import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.focusGroup
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.ui.text.style.TextOverflow
+import nl.jordy.iptv.data.xtream.EpgEntry
+import nl.jordy.iptv.ui.components.rememberNowAndNext
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxHeight
@@ -16,7 +21,6 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.ExperimentalComposeUiApi
@@ -40,7 +44,6 @@ import androidx.tv.material3.MaterialTheme
 import androidx.tv.material3.Text
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.ExperimentalCoroutinesApi
-import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
@@ -106,15 +109,7 @@ class LiveViewModel @Inject constructor(
 
     fun select(categoryId: String) { explicitCategory.value = categoryId }
 
-    suspend fun nowPlaying(streamId: Int): String? {
-        val (now, next) = epg.nowAndNext(streamId)
-        val fmt = DateTimeFormatter.ofPattern("HH:mm").withZone(ZoneId.systemDefault())
-        return when {
-            now != null -> now.title
-            next != null -> "${fmt.format(Instant.ofEpochSecond(next.start))} ${next.title}"
-            else -> null
-        }
-    }
+    suspend fun nowAndNext(streamId: Int) = epg.nowAndNext(streamId)
 
     fun toggleFavorite(c: LiveChannelEntity) = viewModelScope.launch {
         library.toggleFavorite(ContentType.LIVE, c.streamId, c.name, c.logoUrl)
@@ -136,6 +131,7 @@ fun LiveScreen(onPlay: (PlayerRoute) -> Unit, vm: LiveViewModel = hiltViewModel(
     val categoryFocus = remember { FocusRequester() }
     val channelFocus = remember { FocusRequester() }
     var channelsHaveFocus by remember { mutableStateOf(false) }
+    var focusedChannel by remember { mutableStateOf<LiveChannelEntity?>(null) }
 
     // Inside the channel list, Back first returns to the categories; the shell handles the next Back.
     BackHandler(enabled = channelsHaveFocus) { categoryFocus.requestFocus() }
@@ -155,24 +151,23 @@ fun LiveScreen(onPlay: (PlayerRoute) -> Unit, vm: LiveViewModel = hiltViewModel(
             onClick = { channelFocus.requestFocus() },
             filter = filtered,
             onToggleFilter = vm::toggleShowAll,
-            modifier = Modifier.width(280.dp).fillMaxHeight().focusRequester(categoryFocus),
+            modifier = Modifier.width(240.dp).fillMaxHeight().focusRequester(categoryFocus),
         )
+        Column(Modifier.padding(start = 16.dp).fillMaxSize()) {
+        // "Straks" and the time slot of the focused channel, in a fixed strip: rows never grow.
+        NowNextStrip(focusedChannel?.takeIf { channelsHaveFocus }, vm::nowAndNext)
         LazyColumn(
             modifier = Modifier
-                .padding(start = 24.dp)
                 .fillMaxSize()
                 .focusRequester(channelFocus)
                 .focusRestorer()
                 .onFocusChanged { channelsHaveFocus = it.hasFocus },
-            contentPadding = PaddingValues(top = 8.dp, bottom = 48.dp, start = 8.dp, end = 8.dp),
-            verticalArrangement = Arrangement.spacedBy(6.dp),
+            contentPadding = PaddingValues(top = 4.dp, bottom = 48.dp, start = 4.dp, end = 8.dp),
+            verticalArrangement = Arrangement.spacedBy(4.dp),
         ) {
             items(channels.itemCount, key = channels.itemKey { "${it.categoryId}/${it.streamId}" }) { index ->
                 val channel = channels[index] ?: return@items
-                val nowPlaying by produceState<String?>(null, channel.streamId) {
-                    delay(150) // only for rows that stay on screen while scrolling
-                    value = vm.nowPlaying(channel.streamId)
-                }
+                val (now, _) = rememberNowAndNext(channel.streamId, vm::nowAndNext)
                 val itemFocus = remember { FocusRequester() }
                 LaunchedEffect(Unit) {
                     // One-shot: only right after returning from the player, never when switching tabs.
@@ -184,7 +179,8 @@ fun LiveScreen(onPlay: (PlayerRoute) -> Unit, vm: LiveViewModel = hiltViewModel(
                 ChannelTile(
                     name = channel.name,
                     logoUrl = channel.logoUrl,
-                    nowPlaying = nowPlaying,
+                    number = index + 1,
+                    now = now,
                     favorite = channel.streamId in favorites,
                     badges = channel.badges.split(",").filter { it.isNotEmpty() } + listOfNotNull("Terugkijken".takeIf { channel.catchup }),
                     onClick = {
@@ -192,8 +188,34 @@ fun LiveScreen(onPlay: (PlayerRoute) -> Unit, vm: LiveViewModel = hiltViewModel(
                         onPlay(PlayerRoute(PlayerRoute.Kind.LIVE, channel.streamId, channel.name, categoryId = channel.categoryId))
                     },
                     onLongClick = { vm.toggleFavorite(channel) },
-                    modifier = Modifier.focusRequester(itemFocus),
+                    modifier = Modifier.focusRequester(itemFocus).onFocusChanged { if (it.isFocused) focusedChannel = channel },
                 )
+            }
+        }
+        }
+    }
+}
+
+/** Two lines above the channel list: the focused channel's programme now, and what's next. */
+@Composable
+private fun NowNextStrip(channel: LiveChannelEntity?, load: suspend (Int) -> Pair<EpgEntry?, EpgEntry?>) {
+    val fmt = remember { DateTimeFormatter.ofPattern("HH:mm").withZone(ZoneId.systemDefault()) }
+    fun time(sec: Long) = fmt.format(Instant.ofEpochSecond(sec))
+    val (now, next) = if (channel != null) rememberNowAndNext(channel.streamId, load) else null to null
+    Column(Modifier.fillMaxWidth().height(52.dp).padding(start = 12.dp, top = 2.dp)) {
+        when {
+            channel == null -> Text("Kies een zender", style = MaterialTheme.typography.bodyLarge, color = TextSecondary)
+            now == null && next == null -> Text(channel.name, style = MaterialTheme.typography.titleMedium, maxLines = 1)
+            else -> {
+                Text(
+                    now?.let { "${time(it.start)}–${time(it.stop)}  ${it.title}" } ?: channel.name,
+                    style = MaterialTheme.typography.titleMedium,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
+                next?.let {
+                    Text("Straks ${time(it.start)}  ${it.title}", style = MaterialTheme.typography.bodyMedium, color = TextSecondary, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                }
             }
         }
     }

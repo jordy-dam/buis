@@ -56,12 +56,15 @@ fun TvTextField(
     keyboardType: KeyboardType = KeyboardType.Text,
     imeAction: ImeAction = ImeAction.Next,
     onImeAction: () -> Unit = {},
+    /** Open the keyboard the first time the field gets focus (search), instead of waiting for OK. */
+    editOnFirstFocus: Boolean = false,
 ) {
     val keyboard = LocalSoftwareKeyboardController.current
     val outer = remember { FocusRequester() }
     val inner = remember { FocusRequester() }
     var editing by remember { mutableStateOf(false) }
     var outerFocused by remember { mutableStateOf(false) }
+    var focusedBefore by remember { mutableStateOf(false) }
 
     LaunchedEffect(editing) {
         if (editing) {
@@ -74,7 +77,11 @@ fun TvTextField(
         Text(label, style = MaterialTheme.typography.labelLarge, color = TextSecondary, modifier = Modifier.padding(bottom = 4.dp))
         Surface(
             onClick = { editing = true },
-            modifier = Modifier.fillMaxWidth().focusRequester(outer).onFocusChanged { outerFocused = it.hasFocus },
+            modifier = Modifier.fillMaxWidth().focusRequester(outer).onFocusChanged {
+                outerFocused = it.hasFocus
+                if (it.isFocused && editOnFirstFocus && !focusedBefore) editing = true
+                if (it.hasFocus) focusedBefore = true
+            },
             shape = ClickableSurfaceDefaults.shape(RoundedCornerShape(8.dp)),
             scale = ClickableSurfaceDefaults.scale(focusedScale = 1f),
             border = ClickableSurfaceDefaults.border(

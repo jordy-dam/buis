@@ -75,6 +75,13 @@ interface CatalogDao {
     @Query("SELECT id FROM category WHERE type = :type AND adult = 1")
     suspend fun adultCategoryIds(type: ContentType): List<String>
 
+    /** Live streams in the given countries with what the guide needs: cleaned name and EPG id. */
+    @Query(
+        "SELECT l.streamId, l.name, l.epgChannelId, c.country FROM live_channel l " +
+            "JOIN category c ON c.type = 'LIVE' AND c.id = l.categoryId WHERE c.country IN (:countries) GROUP BY l.streamId",
+    )
+    suspend fun liveForGuide(countries: List<String>): List<LiveGuideRow>
+
     @Query("SELECT COUNT(*) FROM live_channel") suspend fun liveCount(): Int
     @Query("SELECT COUNT(*) FROM movie") suspend fun movieCount(): Int
     @Query("SELECT COUNT(*) FROM series") suspend fun seriesCount(): Int
@@ -152,4 +159,25 @@ interface SearchDao {
 interface SyncInfoDao {
     @Upsert suspend fun upsert(item: SyncInfoEntity)
     @Query("SELECT * FROM sync_info WHERE id = 0") suspend fun get(): SyncInfoEntity?
+}
+
+data class LiveGuideRow(val streamId: Int, val name: String, val epgChannelId: String?, val country: String?)
+
+@Dao
+interface EpgDao {
+    @Insert suspend fun insertProgrammes(items: List<EpgProgrammeEntity>)
+    @Insert suspend fun insertChannels(items: List<EpgChannelEntity>)
+    @Upsert suspend fun upsertInfo(info: EpgInfoEntity)
+    @Query("DELETE FROM epg_programme") suspend fun clearProgrammes()
+    @Query("DELETE FROM epg_channel") suspend fun clearChannels()
+    @Query("SELECT * FROM epg_info WHERE id = 0") suspend fun info(): EpgInfoEntity?
+    @Query("SELECT * FROM epg_info WHERE id = 0") fun observeInfo(): Flow<EpgInfoEntity?>
+
+    /** The programme on now (if any) and the ones after it, for one stream. */
+    @Query(
+        "SELECT p.* FROM epg_programme p JOIN epg_channel c ON c.channelId = p.channelId " +
+            "WHERE c.streamId = :streamId AND p.stop > :now ORDER BY p.start LIMIT :limit",
+    )
+    suspend fun upcoming(streamId: Int, now: Long, limit: Int = 2): List<EpgProgrammeEntity>
+
 }

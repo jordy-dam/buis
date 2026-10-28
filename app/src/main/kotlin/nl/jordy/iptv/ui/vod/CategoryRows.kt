@@ -26,6 +26,7 @@ import kotlinx.coroutines.flow.Flow
 import nl.jordy.iptv.data.settings.FilteredCategories
 import nl.jordy.iptv.ui.components.filterToggle
 import nl.jordy.iptv.ui.components.lastInRow
+import nl.jordy.iptv.ui.theme.Rows
 import nl.jordy.iptv.ui.theme.TextSecondary
 
 /** Remembers which tile was opened, so Back from the detail screen lands on it again. */
@@ -40,7 +41,6 @@ class FocusMemory {
 @OptIn(ExperimentalComposeUiApi::class)
 @Composable
 fun <T : Any> CategoryRows(
-    title: String,
     filter: FilteredCategories?,
     onToggleFilter: () -> Unit,
     rowItems: (String) -> Flow<PagingData<T>>,
@@ -52,20 +52,20 @@ fun <T : Any> CategoryRows(
     LazyColumn(
         modifier = Modifier.fillMaxSize(),
         contentPadding = PaddingValues(bottom = 48.dp),
-        verticalArrangement = Arrangement.spacedBy(28.dp),
+        verticalArrangement = Arrangement.spacedBy(Rows.sectionGap),
     ) {
-        item { Text(title, style = MaterialTheme.typography.headlineMedium) }
+        // No page title: the rail already says Films or Series, and providers often name their
+        // first category the same.
         if (categories.isEmpty()) {
             item { Text("Niets gevonden bij deze provider.", style = MaterialTheme.typography.bodyLarge, color = TextSecondary) }
         }
         items(categories, key = { it.id }) { cat ->
             val paged = remember(cat.id) { rowItems(cat.id) }.collectAsLazyPagingItems()
             Column {
-                Text(cat.name, style = MaterialTheme.typography.titleLarge, modifier = Modifier.padding(bottom = 12.dp))
+                Text(cat.name, style = MaterialTheme.typography.titleLarge)
                 LazyRow(
-                    // Room for the 1.1 focus scale, so the focused tile isn't clipped.
-                    contentPadding = PaddingValues(horizontal = 12.dp, vertical = 16.dp),
-                    horizontalArrangement = Arrangement.spacedBy(20.dp),
+                                        contentPadding = Rows.tilePadding,
+                    horizontalArrangement = Arrangement.spacedBy(Rows.tileGap),
                     modifier = Modifier.focusRestorer(),
                 ) {
                     items(paged.itemCount, key = paged.itemKey { itemKey(it) }) { index ->

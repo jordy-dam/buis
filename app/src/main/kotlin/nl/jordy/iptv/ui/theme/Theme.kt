@@ -1,6 +1,7 @@
 package nl.jordy.iptv.ui.theme
 
 import android.graphics.Typeface
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -24,6 +25,15 @@ val TextSecondary = Color(0xFFA9B3BC)
 
 /** TV overscan safe area. */
 val SafeArea = 48.dp
+
+/** One vertical rhythm for every screen of rows, so nothing reads as big and loose. */
+object Rows {
+    /** Between sections (a header plus its row). */
+    val sectionGap = 16.dp
+    /** Around a row of tiles: enough room for the 1.1 focus scale, no more. */
+    val tilePadding = PaddingValues(horizontal = 12.dp, vertical = 8.dp)
+    val tileGap = 16.dp
+}
 
 private val colors = darkColorScheme(
     primary = Accent,

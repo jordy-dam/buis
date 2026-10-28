@@ -160,3 +160,35 @@ data class SearchEntity(
     val categoryId: String,
     val country: String?,
 )
+
+/**
+ * The provider's full guide (XMLTV), only for channels in the household's countries and only
+ * from two hours ago to a day and a half ahead. Replaced as a whole on every refresh.
+ */
+@Entity(tableName = "epg_programme", primaryKeys = ["channelId", "start"], indices = [Index("stop")])
+data class EpgProgrammeEntity(
+    val channelId: String,
+    /** Epoch seconds; [stop] is exclusive. */
+    val start: Long,
+    val stop: Long,
+    val title: String,
+    val description: String?,
+)
+
+/**
+ * Which guide channel a live stream uses: its own EPG id, or that of a sibling with the same
+ * cleaned name in the same country ("NPO 1 HD" without an id uses the id of "NPO 1").
+ */
+@Entity(tableName = "epg_channel")
+data class EpgChannelEntity(
+    @PrimaryKey val streamId: Int,
+    val channelId: String,
+)
+
+@Entity(tableName = "epg_info")
+data class EpgInfoEntity(
+    @PrimaryKey val id: Int = 0,
+    val refreshedAt: Long,
+    /** Live streams that have a guide after this refresh. */
+    val streams: Int,
+)

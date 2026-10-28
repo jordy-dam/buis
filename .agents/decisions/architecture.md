@@ -53,3 +53,9 @@
 **Why:** It keeps children out of a parent's profile. Four digits can be brute-forced by anyone holding the database file, which on an unrooted tv nobody has; a slow KDF would add nothing real.
 **Alternatives rejected:** PBKDF2/Argon2 (no gain at 10,000 possible PINs); a master PIN (one more thing to forget).
 **Revisit if:** a profile ever protects something more sensitive than what a child may watch.
+
+## 2026-10-28 — Full guide in Room, refreshed on app start; aliases for channels without an EPG id
+**Decision:** The provider's `xmltv.php` is downloaded when the shell starts and the last refresh is older than 20 h, after every catalog sync, and on "Gids vernieuwen". It's parsed as a stream (`XmltvGuide.read`), keeping only channels in the household's preferred countries (union over profiles) and programmes from now − 2 h to now + 36 h, then swapped into Room in one transaction (`epg_programme`, `epg_channel`, `epg_info`; schema 4, AutoMigration). A stream without an EPG id borrows the id of a stream with the same cleaned name in the same country. `EpgRepository.nowAndNext` reads Room first and falls back to the short EPG.
+**Why:** The short EPG per channel came back empty on the real provider; the full guide covers 98% of the Dutch channels that have an id (measured on the tv: 67 MB, 27 s). Parsing to a list and then one transaction keeps the database free for other writes during the slow download, and the screens never see half a guide. Aliases cover HD/FHD/4K duplicates, which make up much of the 55% of Dutch streams without an id.
+**Alternatives rejected:** WorkManager for a nightly job (new dependency; the app only matters while it's open); keeping the whole guide (200k programmes for channels nobody here watches); matching on display names inside the XMLTV (too fuzzy across providers).
+**Revisit if:** the download hurts on the tv (then refresh in the background less often or stream into Room), or coverage stays low after aliasing.

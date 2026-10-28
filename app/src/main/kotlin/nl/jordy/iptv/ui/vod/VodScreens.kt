@@ -74,7 +74,7 @@ fun MoviesScreen(onOpenMovie: (Int) -> Unit, vm: MoviesViewModel = hiltViewModel
     val categories by vm.categories.collectAsStateWithLifecycle()
     val favorites by vm.favorites.collectAsStateWithLifecycle()
     val progress by vm.progress.collectAsStateWithLifecycle()
-    CategoryRows("Films", categories, vm::toggleShowAll, vm::row, { it.streamId }, vm.focusMemory) { movie, categoryId, modifier ->
+    CategoryRows(categories, vm::toggleShowAll, vm::row, { it.streamId }, vm.focusMemory) { movie, categoryId, modifier ->
         PosterTile(
             title = movie.name,
             imageUrl = movie.posterUrl,
@@ -94,7 +94,7 @@ fun MoviesScreen(onOpenMovie: (Int) -> Unit, vm: MoviesViewModel = hiltViewModel
 fun SeriesScreen(onOpenSeries: (Int) -> Unit, vm: SeriesViewModel = hiltViewModel()) {
     val categories by vm.categories.collectAsStateWithLifecycle()
     val favorites by vm.favorites.collectAsStateWithLifecycle()
-    CategoryRows("Series", categories, vm::toggleShowAll, vm::row, { it.seriesId }, vm.focusMemory) { series, categoryId, modifier ->
+    CategoryRows(categories, vm::toggleShowAll, vm::row, { it.seriesId }, vm.focusMemory) { series, categoryId, modifier ->
         PosterTile(
             title = series.name,
             imageUrl = series.coverUrl,

@@ -8,9 +8,11 @@ import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import kotlinx.coroutines.flow.SharingStarted
+import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import nl.jordy.iptv.BuildConfig
+import nl.jordy.iptv.data.epg.EpgGuide
 import nl.jordy.iptv.data.epg.XmltvProbe
 import nl.jordy.iptv.data.settings.CountryFilter
 import nl.jordy.iptv.data.profile.ProfileRepository
@@ -85,12 +87,28 @@ class SettingsViewModel @Inject constructor(
     private val db: AppDatabase,
     private val library: LibraryRepository,
     private val epg: EpgRepository,
+    private val guide: EpgGuide,
 ) : ViewModel() {
     private val _state = MutableStateFlow(SettingsState())
     val state = _state.asStateFlow()
 
     val prefs = profiles.prefs.stateIn(viewModelScope, SharingStarted.Eagerly, UserPrefs())
     val profileName = profiles.current.map { it?.name.orEmpty() }.stateIn(viewModelScope, SharingStarted.Eagerly, "")
+
+    /** "Bijgewerkt 21:04 · 528 zenders", or what's going on with the guide right now. */
+    val guideStatus = combine(guide.status, guide.info) { status, info ->
+        when (status) {
+            EpgGuide.Status.Running -> "Gids ophalen…"
+            is EpgGuide.Status.Failed -> "Ophalen mislukt (${status.reason}). Probeer het later opnieuw."
+            EpgGuide.Status.Idle -> info?.let {
+                val nl = Locale.forLanguageTag("nl-NL")
+                val at = DateTimeFormatter.ofPattern("d MMMM HH:mm", nl).withZone(ZoneId.systemDefault()).format(Instant.ofEpochMilli(it.refreshedAt))
+                "Bijgewerkt $at · ${NumberFormat.getIntegerInstance(nl).format(it.streams)} zenders met gids"
+            } ?: "Nog niet opgehaald."
+        }
+    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), "")
+
+    fun refreshGuide() = guide.refresh()
 
     /** Countries this provider actually has, for the picker. */
     val countries = MutableStateFlow<List<String>>(emptyList())
@@ -157,6 +175,7 @@ fun SettingsScreen(onRefreshCatalog: () -> Unit, onLoggedOut: () -> Unit, vm: Se
     val profileName by vm.profileName.collectAsStateWithLifecycle()
     val countries by vm.countries.collectAsStateWithLifecycle()
     val epgCheck by vm.epgCheck.collectAsStateWithLifecycle()
+    val guideStatus by vm.guideStatus.collectAsStateWithLifecycle()
     var confirmLogout by remember { mutableStateOf(false) }
     var pickCountries by remember { mutableStateOf(false) }
 
@@ -190,6 +209,7 @@ fun SettingsScreen(onRefreshCatalog: () -> Unit, onLoggedOut: () -> Unit, vm: Se
             state.lastSync?.let { "Bijgewerkt $it · ${state.counts}" } ?: "Nog nooit opgehaald.",
             onClick = onRefreshCatalog,
         )
+        SettingRow("Gids vernieuwen", guideStatus, onClick = vm::refreshGuide)
 
         SettingRow("Server", value = state.server)
         SettingRow("Gebruiker", value = state.username)

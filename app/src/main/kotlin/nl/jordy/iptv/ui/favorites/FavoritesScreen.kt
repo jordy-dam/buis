@@ -24,17 +24,22 @@ import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import nl.jordy.iptv.data.db.FavoriteEntity
 import nl.jordy.iptv.data.xtream.NameParser
+import nl.jordy.iptv.data.repo.EpgRepository
 import nl.jordy.iptv.data.repo.LibraryRepository
+import nl.jordy.iptv.ui.components.rememberNowAndNext
 import nl.jordy.iptv.data.xtream.ContentType
 import nl.jordy.iptv.ui.PlayerRoute
 import nl.jordy.iptv.ui.components.ChannelTile
 import nl.jordy.iptv.ui.components.PosterTile
 import nl.jordy.iptv.ui.components.lastInRow
+import nl.jordy.iptv.ui.theme.Rows
 import nl.jordy.iptv.ui.theme.TextSecondary
 import javax.inject.Inject
 
 @HiltViewModel
-class FavoritesViewModel @Inject constructor(private val library: LibraryRepository) : ViewModel() {
+class FavoritesViewModel @Inject constructor(private val library: LibraryRepository, private val epg: EpgRepository) : ViewModel() {
+    suspend fun nowAndNext(streamId: Int) = epg.nowAndNext(streamId)
+
     val favorites = library.favorites().stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), null)
 
     fun remove(f: FavoriteEntity) = viewModelScope.launch { library.toggleFavorite(f.type, f.itemId, f.name, f.imageUrl) }
@@ -51,7 +56,7 @@ fun FavoritesScreen(
 ) {
     val all by vm.favorites.collectAsStateWithLifecycle()
     val favorites = all ?: return
-    LazyColumn(contentPadding = PaddingValues(bottom = 48.dp), verticalArrangement = Arrangement.spacedBy(28.dp)) {
+    LazyColumn(contentPadding = PaddingValues(bottom = 48.dp), verticalArrangement = Arrangement.spacedBy(Rows.sectionGap)) {
         item { Text("Favorieten", style = MaterialTheme.typography.headlineMedium) }
         if (favorites.isEmpty()) {
             item {
@@ -70,7 +75,7 @@ fun FavoritesScreen(
                     // Favourites from before 2a hold raw provider names.
                     name = NameParser.parse(f.name).title,
                     logoUrl = f.imageUrl,
-                    nowPlaying = null,
+                    now = rememberNowAndNext(f.itemId, vm::nowAndNext).first,
                     favorite = true,
                     // Zapping from a favourite goes through the favourite channels.
                     onClick = { onPlay(PlayerRoute(PlayerRoute.Kind.LIVE, f.itemId, f.name, categoryId = PlayerRoute.FAVORITES_CATEGORY)) },
@@ -85,8 +90,8 @@ fun FavoritesScreen(
                 item(key = "row/$type") {
                     Text(label, style = MaterialTheme.typography.titleLarge)
                     LazyRow(
-                        contentPadding = PaddingValues(horizontal = 12.dp, vertical = 16.dp),
-                        horizontalArrangement = Arrangement.spacedBy(20.dp),
+                        contentPadding = Rows.tilePadding,
+                        horizontalArrangement = Arrangement.spacedBy(Rows.tileGap),
                         modifier = Modifier.focusRestorer(),
                     ) {
                         items(items, key = { it.itemId }) { f ->

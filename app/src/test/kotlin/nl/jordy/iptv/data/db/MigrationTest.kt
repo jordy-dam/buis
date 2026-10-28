@@ -69,6 +69,23 @@ class MigrationTest {
         }
     }
 
+    @Test
+    fun `3 to 4 adds the guide tables and keeps every profile's data`() {
+        helper.createDatabase(DB, 3).use { db ->
+            db.execSQL("INSERT INTO profile (id, name, avatar, pinHash, preferredCountries, onlyPreferred, kids, lastUsedAt, createdAt) VALUES (1, 'Anna', 0, NULL, 'NL', 1, 0, 5, 1)")
+            db.execSQL("INSERT INTO profile (id, name, avatar, pinHash, preferredCountries, onlyPreferred, kids, lastUsedAt, createdAt) VALUES (2, 'Bas', 1, NULL, 'BE', 1, 1, 4, 2)")
+            db.execSQL("INSERT INTO favorite (profileId, type, itemId, name, imageUrl, addedAt) VALUES (2, 'LIVE', 101, 'NPO 1', NULL, 1)")
+            db.execSQL("INSERT INTO playback_position (profileId, type, itemId, positionMs, durationMs, updatedAt) VALUES (1, 'MOVIE', 5001, 62000, 180000, 2)")
+        }
+
+        helper.runMigrationsAndValidate(DB, 4, true).use { db ->
+            assertEquals(2, db.count("profile"))
+            assertEquals(1, db.count("favorite WHERE profileId = 2"))
+            assertEquals(1, db.count("playback_position WHERE profileId = 1"))
+            assertEquals("guide starts empty", 0, db.count("epg_programme"))
+        }
+    }
+
     private fun SupportSQLiteDatabase.insertPhase1Data() {
         execSQL("INSERT INTO favorite (type, itemId, name, imageUrl, addedAt) VALUES ('LIVE', 101, '┃NL┃ NPO 1 HD', NULL, 1)")
         execSQL("INSERT INTO playback_position (type, itemId, positionMs, durationMs, updatedAt) VALUES ('MOVIE', 5001, 62000, 180000, 2)")
