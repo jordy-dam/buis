@@ -1,13 +1,14 @@
 # Handoff — feature work
 
 ## TL;DR for the next person
-Phase 1 is built and verified on the Android TV emulator (1080p) against the mock Xtream server,
-on branch `feat/phase-1` (not committed yet at time of writing). It has **not** been tested on the
-real Google TV yet; that test decides whether phase 2 can start. Report and test list:
-`docs/plans/2026-10-28-phase-1.md`.
+Phase 1 runs on the real tv (TCL Smart TV Pro, Android 14, 32-bit) with Jordy's real subscription:
+login, sync, zapping, VOD, resume, audio and favourites all work (Jordy, 2026-10-28). Next is
+phase 2a "vinden" (names, countries, search, EPG check): `docs/plans/2026-10-28-phase-2a-vinden.md`.
+Start with real Room migrations — the tv now holds favourites and positions.
 
 ## Current phase
-Phase 1 — Works on my tv: built, emulator-verified, waiting for the real-tv test.
+Phase 1 — done and tested on the real tv. Phase 2a — built and installed on the tv (not started yet
+ by Jordy); open: EPG check on the tv. The app is now called BUIS.
 
 ## What's working (emulator + mock server)
 - Login with validation and Dutch error states (wrong password, expired, unreachable, not Xtream)
@@ -39,8 +40,13 @@ Phase 1 — Works on my tv: built, emulator-verified, waiting for the real-tv te
 See `.agents/onboarding/new-dev.md` (mock server: `./mockserver/generate-media.sh`, then `./gradlew :mockserver:run`).
 
 ## Open questions
-- Does the real provider serve HLS, or only .ts? Zap times on the tv will tell (logcat tag `Zap`, debug builds).
-- Does the tv decode AC3/EAC3 itself, or does it fall back to FFmpeg? Check for audio on a channel with AC3.
+- Does `xmltv.php` cover the Dutch channels? Only 45% of them have an EPG id (spike in 2a).
+- Do the `⏺` channels expose `tv_archive` for catch-up? (not stored yet)
+
+## Real-tv notes
+- Install over Ethernet: USB debugging on, `adb connect 192.168.68.91:5555` (see onboarding).
+- The tv's default keyboard was the Google TV remote bridge (no on-screen keyboard); switch to the
+  TCL keyboard in the tv settings, or type via the Google TV app on a phone.
 
 ## Who to ask
 - Jordy: owner, tests on the real Google TV

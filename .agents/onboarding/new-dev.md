@@ -20,6 +20,11 @@ On the real Google TV:
 3. `adb pair <tv-ip>:<pair-port>` with the code shown on the tv, then `adb connect <tv-ip>:<port>`.
 4. `./gradlew installDebug`
 
+Tv on Ethernet (our living-room TCL Smart TV Pro): wireless debugging can't be switched on without
+Wi-Fi. Turn on *USB debugging* instead; the tv then accepts adb over the network on port 5555:
+`adb connect <tv-ip>:5555`, accept "Allow debugging" on the tv (tick "always allow"), then install.
+That tv is 32-bit (`armeabi-v7a`), which is why the APK keeps that ABI.
+
 Without Android Studio: `brew install --cask android-commandlinetools`, accept the licences with
 `sdkmanager --licenses`, install `platform-tools`, `platforms;android-37.0`, `emulator` and
 `system-images;android-36;google-tv;arm64-v8a`, and put `sdk.dir=…` in `local.properties`.

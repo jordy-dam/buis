@@ -1,9 +1,26 @@
 package nl.jordy.iptv.ui.settings
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.focusGroup
+import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.itemsIndexed
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
+import kotlinx.coroutines.flow.SharingStarted
+import kotlinx.coroutines.flow.stateIn
+import nl.jordy.iptv.BuildConfig
+import nl.jordy.iptv.data.epg.XmltvProbe
+import nl.jordy.iptv.data.settings.CountryFilter
+import nl.jordy.iptv.data.settings.SettingsStore
+import nl.jordy.iptv.data.settings.UserPrefs
+import nl.jordy.iptv.data.xtream.NameParser
+import nl.jordy.iptv.ui.components.Focus
+import nl.jordy.iptv.ui.components.ListItemSurface
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -13,7 +30,10 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.ExperimentalComposeUiApi
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.focus.focusRestorer
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.unit.dp
@@ -22,7 +42,9 @@ import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewModelScope
+import androidx.tv.material3.ClickableSurfaceDefaults
 import androidx.tv.material3.MaterialTheme
+import androidx.tv.material3.Surface
 import androidx.tv.material3.Text
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.Dispatchers
@@ -36,7 +58,9 @@ import nl.jordy.iptv.data.repo.EpgRepository
 import nl.jordy.iptv.data.repo.LibraryRepository
 import nl.jordy.iptv.ui.components.PrimaryButton
 import nl.jordy.iptv.ui.components.SecondaryButton
+import nl.jordy.iptv.ui.theme.Accent
 import nl.jordy.iptv.ui.theme.SurfaceColor
+import nl.jordy.iptv.ui.theme.SurfaceRaised
 import nl.jordy.iptv.ui.theme.TextSecondary
 import java.text.NumberFormat
 import java.time.Instant
@@ -54,6 +78,8 @@ data class SettingsState(
 
 @HiltViewModel
 class SettingsViewModel @Inject constructor(
+    private val settings: SettingsStore,
+    private val xmltvProbe: XmltvProbe,
     private val credentials: CredentialStore,
     private val db: AppDatabase,
     private val library: LibraryRepository,
@@ -61,6 +87,28 @@ class SettingsViewModel @Inject constructor(
 ) : ViewModel() {
     private val _state = MutableStateFlow(SettingsState())
     val state = _state.asStateFlow()
+
+    val prefs = settings.prefs.stateIn(viewModelScope, SharingStarted.Eagerly, UserPrefs())
+
+    /** Countries this provider actually has, for the picker. */
+    val countries = MutableStateFlow<List<String>>(emptyList())
+
+    fun toggleCountry(code: String) = viewModelScope.launch {
+        val now = prefs.value.preferredCountries
+        // Never empty: with no preferred country the filter would show nothing useful.
+        val next = if (code in now) (now - code).ifEmpty { now } else now + code
+        settings.setPreferredCountries(next)
+    }
+
+    /** Debug builds only: how much of the provider's full guide covers the preferred channels. */
+    val epgCheck = MutableStateFlow<String?>(null)
+
+    fun checkEpg() = viewModelScope.launch {
+        epgCheck.value = "Gids ophalen…"
+        epgCheck.value = xmltvProbe.run(prefs.value.preferredCountries).also { android.util.Log.i("EpgCheck", it) }
+    }
+
+    fun toggleOnlyPreferred() = viewModelScope.launch { settings.setOnlyPreferred(!prefs.value.onlyPreferred) }
 
     init {
         viewModelScope.launch {
@@ -77,6 +125,7 @@ class SettingsViewModel @Inject constructor(
                 },
                 counts = "${n.format(dao.liveCount())} zenders · ${n.format(dao.movieCount())} films · ${n.format(dao.seriesCount())} series",
             )
+            countries.value = CountryFilter.countries(dao.allCategories(), prefs.value.preferredCountries)
         }
     }
 
@@ -93,51 +142,119 @@ class SettingsViewModel @Inject constructor(
     }
 }
 
-/** Phase 1 settings: just what's needed to keep using the app without clearing its data by hand. */
+/** Settings: countries, subscription, catalog, logout. Only what's needed, not every knob other apps have. */
+@OptIn(ExperimentalComposeUiApi::class)
 @Composable
 fun SettingsScreen(onRefreshCatalog: () -> Unit, onLoggedOut: () -> Unit, vm: SettingsViewModel = hiltViewModel()) {
     val state by vm.state.collectAsStateWithLifecycle()
+    val prefs by vm.prefs.collectAsStateWithLifecycle()
+    val countries by vm.countries.collectAsStateWithLifecycle()
+    val epgCheck by vm.epgCheck.collectAsStateWithLifecycle()
     var confirmLogout by remember { mutableStateOf(false) }
+    var pickCountries by remember { mutableStateOf(false) }
 
-    Column(verticalArrangement = Arrangement.spacedBy(28.dp)) {
-        Text("Instellingen", style = MaterialTheme.typography.headlineMedium)
+    // Entering from the rail (whose Instellingen item sits at the bottom) must land on the first
+    // setting, not on whatever row is nearest: that would be Uitloggen.
+    val first = remember { FocusRequester() }
+    Column(
+        Modifier.width(780.dp).focusRestorer(first).focusGroup().verticalScroll(rememberScrollState()).padding(bottom = 48.dp),
+        verticalArrangement = Arrangement.spacedBy(6.dp),
+    ) {
+        Text("Instellingen", style = MaterialTheme.typography.headlineMedium, modifier = Modifier.padding(bottom = 8.dp))
 
-        Section("Abonnement") {
-            Fact("Server", state.server)
-            Fact("Gebruiker", state.username)
-        }
+        Header("Weergave")
+        SettingRow(
+            "Voorkeurslanden",
+            "Staan bovenaan in Live TV, Films, Series en Zoeken.",
+            value = prefs.preferredCountries.sorted().joinToString(", ") { NameParser.countryName(it) },
+            onClick = { pickCountries = true },
+            modifier = Modifier.focusRequester(first),
+        )
+        SettingRow(
+            "Alleen voorkeurslanden tonen",
+            "Andere landen blijven bereikbaar via \"Alle landen tonen\" onderaan elke lijst.",
+            value = if (prefs.onlyPreferred) "Aan" else "Uit",
+            onClick = vm::toggleOnlyPreferred,
+        )
 
-        Section("Catalogus") {
-            Fact("Bijgewerkt", state.lastSync ?: "nog nooit")
-            Fact("Inhoud", state.counts)
-        }
+        Header("Catalogus")
+        SettingRow(
+            "Catalogus vernieuwen",
+            state.lastSync?.let { "Bijgewerkt $it · ${state.counts}" } ?: "Nog nooit opgehaald.",
+            onClick = onRefreshCatalog,
+        )
 
-        Row(horizontalArrangement = Arrangement.spacedBy(16.dp)) {
-            PrimaryButton("Catalogus vernieuwen", onRefreshCatalog)
-            SecondaryButton("Uitloggen", { confirmLogout = true })
+        Header("Abonnement")
+        SettingRow("Server", value = state.server)
+        SettingRow("Gebruiker", value = state.username)
+        SettingRow(
+            "Uitloggen",
+            "Wist de catalogus, je favorieten en waar je gebleven was op deze tv.",
+            onClick = { confirmLogout = true },
+            destructive = true,
+        )
+
+        if (BuildConfig.DEBUG) {
+            Header("Ontwikkeling")
+            SettingRow("EPG controleren", epgCheck ?: "Hoeveel van je voorkeurszenders een programmagids hebben.", onClick = vm::checkEpg)
         }
     }
 
+    if (pickCountries) {
+        CountryDialog(countries, prefs.preferredCountries, vm::toggleCountry, onDismiss = { pickCountries = false })
+    }
     if (confirmLogout) {
         LogoutDialog(onConfirm = { vm.logout(onLoggedOut) }, onDismiss = { confirmLogout = false })
     }
 }
 
 @Composable
-private fun Section(title: String, content: @Composable () -> Unit) {
-    Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
-        Text(title, style = MaterialTheme.typography.titleLarge)
-        content()
-    }
+private fun Header(title: String) {
+    Text(
+        title.uppercase(),
+        style = MaterialTheme.typography.labelLarge,
+        color = TextSecondary,
+        modifier = Modifier.padding(start = 16.dp, top = 18.dp, bottom = 2.dp),
+    )
 }
 
+/**
+ * One setting, Google TV style: name and explanation on the left, current value on the right.
+ * Rows without [onClick] only inform, so they aren't focusable and the d-pad skips them.
+ */
 @Composable
-private fun Fact(label: String, value: String) {
-    Row {
-        Text(label, style = MaterialTheme.typography.bodyLarge, color = TextSecondary, modifier = Modifier.width(160.dp))
-        Text(value, style = MaterialTheme.typography.bodyLarge)
+private fun SettingRow(
+    title: String,
+    description: String? = null,
+    value: String? = null,
+    onClick: (() -> Unit)? = null,
+    destructive: Boolean = false,
+    modifier: Modifier = Modifier,
+) {
+    val content: @Composable () -> Unit = {
+        Row(Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 12.dp), verticalAlignment = Alignment.CenterVertically) {
+            Column(Modifier.weight(1f)) {
+                Text(title, style = MaterialTheme.typography.titleMedium, color = if (destructive) Danger else MaterialTheme.colorScheme.onSurface)
+                description?.let { Text(it, style = MaterialTheme.typography.bodyMedium, color = TextSecondary) }
+            }
+            value?.let { Text(it, style = MaterialTheme.typography.titleMedium, color = if (onClick != null) Accent else TextSecondary, modifier = Modifier.padding(start = 24.dp)) }
+        }
     }
+    if (onClick == null) {
+        content()
+        return
+    }
+    Surface(
+        onClick = onClick,
+        modifier = modifier.fillMaxWidth(),
+        shape = ClickableSurfaceDefaults.shape(RoundedCornerShape(10.dp)),
+        scale = ClickableSurfaceDefaults.scale(focusedScale = 1.02f),
+        border = ClickableSurfaceDefaults.border(focusedBorder = Focus.border),
+        colors = ClickableSurfaceDefaults.colors(containerColor = SurfaceColor, focusedContainerColor = SurfaceRaised),
+    ) { content() }
 }
+
+private val Danger = androidx.compose.ui.graphics.Color(0xFFFF8A80)
 
 @Composable
 private fun LogoutDialog(onConfirm: () -> Unit, onDismiss: () -> Unit) {
@@ -161,4 +278,29 @@ private fun LogoutDialog(onConfirm: () -> Unit, onDismiss: () -> Unit) {
         }
     }
     LaunchedEffect(Unit) { cancel.requestFocus() }
+}
+
+@Composable
+private fun CountryDialog(countries: List<String>, selected: Set<String>, onToggle: (String) -> Unit, onDismiss: () -> Unit) {
+    val first = remember { FocusRequester() }
+    Dialog(onDismissRequest = onDismiss) {
+        Column(
+            Modifier.background(SurfaceColor, RoundedCornerShape(16.dp)).padding(24.dp).width(420.dp).heightIn(max = 460.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp),
+        ) {
+            Text("Voorkeurslanden", style = MaterialTheme.typography.headlineMedium)
+            LazyColumn(Modifier.weight(1f, fill = false), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                itemsIndexed(countries) { i, code ->
+                    ListItemSurface(
+                        text = (if (code in selected) "✓  " else "     ") + NameParser.countryName(code),
+                        selected = code in selected,
+                        onClick = { onToggle(code) },
+                        modifier = if (i == 0) Modifier.focusRequester(first) else Modifier,
+                    )
+                }
+            }
+            PrimaryButton("Klaar", onDismiss)
+        }
+    }
+    LaunchedEffect(countries.isNotEmpty()) { if (countries.isNotEmpty()) runCatching { first.requestFocus() } }
 }

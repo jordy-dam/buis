@@ -1,12 +1,16 @@
 package nl.jordy.iptv.ui.theme
 
+import android.graphics.Typeface
 import androidx.compose.runtime.Composable
+import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.TextStyle
+import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.tv.material3.MaterialTheme
+import androidx.tv.material3.Text
 import androidx.tv.material3.Typography
 import androidx.tv.material3.darkColorScheme
 
@@ -47,4 +51,18 @@ private val typography = Typography(
 @Composable
 fun IptvTheme(content: @Composable () -> Unit) {
     MaterialTheme(colorScheme = colors, typography = typography, content = content)
+}
+
+/** The BUIS wordmark: plain condensed bold, matching the banner (docs/brand/make-logo.sh). */
+@Composable
+fun BuisWordmark(modifier: Modifier = Modifier) {
+    Text(
+        "BUIS",
+        style = MaterialTheme.typography.headlineMedium.copy(
+            fontFamily = FontFamily(Typeface.create("sans-serif-condensed", Typeface.BOLD)),
+            letterSpacing = 1.sp,
+            color = TextPrimary,
+        ),
+        modifier = modifier,
+    )
 }

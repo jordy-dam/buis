@@ -29,7 +29,5 @@ object AppModule {
     @Singleton
     fun database(@ApplicationContext context: Context): AppDatabase =
         Room.databaseBuilder(context, AppDatabase::class.java, "iptv.db")
-            // Catalog is a cache of the provider; personal data (favourites, positions) gets real migrations once it exists in the wild.
-            .fallbackToDestructiveMigration(dropAllTables = true)
             .build()
 }

@@ -23,3 +23,15 @@
 **Why:** Without it the app can't change provider or refresh the catalog without clearing app data by hand, which blocks testing on the real tv. Wiping on logout because favourites and positions are tied to the old provider's ids, and viewing history shouldn't outlive the login it belongs to.
 **Alternatives rejected:** Themes or other preferences (not in the spec; one accent colour by design); keeping favourites across logout (ids from another provider would point at the wrong items).
 **Revisit if:** phase 2 adds profiles; then per-profile settings and PIN live here too.
+
+## 2026-10-28 — Phase 2 split: 2a "vinden" before 2b "huishouden"
+**Decision:** Phase 2 is split. 2a "vinden" comes first: clean names, smaller cards, country grouping with a preferred country (NL) and filter, search, and an EPG coverage check. 2b "huishouden" (profiles, per-profile favourites/history, Home rows, EPG grid) follows. Phase 3 is unchanged.
+**Why:** The first real-tv test (Jordy, 2026-10-28) showed finding content is the biggest gap, not profiles: the provider has 16k channels in 484 categories, 69k films and 20k series, and only ~7% of the channels are Dutch. Profiles don't help if you can't find a channel.
+**Alternatives rejected:** Phase 2 as in the spec with profiles first (solves a problem one viewer doesn't have yet); per-genre search over VOD (genres only come from per-title `get_vod_info`, so 69k requests).
+**Revisit if:** more household members start using the app before 2a is done.
+
+## 2026-10-28 — Name and logo: BUIS
+**Decision:** The app is called BUIS ("Beste Unieke IPTV Stream"; also Dutch slang for the telly). The logo is just the word BUIS in a plain condensed bold face (DIN Condensed Bold for the rendered banner and icon, the platform's condensed sans in the app), light on the app background. No icons, gradients or effects. Package name stays `nl.jordy.iptv` so updates install over the existing app.
+**Why:** Jordy's choice; a first attempt with a play symbol in the U and a colour gradient was rejected as too busy.
+**Alternatives rejected:** Play-symbol and gradient wordmark; renaming the package (would force a reinstall and lose local data).
+**Revisit if:** the app is ever distributed beyond this household (DIN is only used as a rendered image, not shipped as a font).

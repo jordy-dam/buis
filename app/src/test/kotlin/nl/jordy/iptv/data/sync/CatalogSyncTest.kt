@@ -117,6 +117,25 @@ class CatalogSyncTest {
     }
 
     @Test
+    fun `provider tags are cleaned at sync and land in the search index with their country`() = runTest {
+        responses["get_live_categories"] = """[{"category_id":"1","category_name":"┃NL┃ ALGEMEEN"},{"category_id":"2","category_name":"┃MULTI / LINGO┃ APPLE TV+"}]"""
+        responses["get_live_streams"] = """[{"stream_id":1,"name":"┃NL┃ NPO 1 FHD ⏺ʳᵉᶜ","category_id":"1"},{"stream_id":2,"name":"Apple Kids","category_id":"2"}]"""
+        sync.run(creds)
+
+        val cats = db.catalog().liveCategories().first().associateBy { it.id }
+        assertEquals("ALGEMEEN" to "NL", cats.getValue("1").let { it.name to it.country })
+        assertEquals("APPLE TV+ · Multi", cats.getValue("2").name)
+
+        val npo = db.catalog().liveInCategory("1").single()
+        assertEquals("NPO 1", npo.name)
+        assertEquals("FHD", npo.badges)
+        assertTrue(npo.catchup)
+
+        val hit = db.search().match("npo*", listOf("NL"), 10).single()
+        assertEquals(1 to "NL", hit.itemId to hit.country)
+    }
+
+    @Test
     fun `an empty or non-array answer does not wipe yesterday's catalog`() = runTest {
         responses["get_vod_categories"] = categories("c0")
         responses["get_vod_streams"] = movies(50) { "c0" }

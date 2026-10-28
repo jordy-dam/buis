@@ -2,6 +2,7 @@ package nl.jordy.iptv.data.db
 
 import androidx.paging.PagingSource
 import androidx.room.Dao
+import androidx.room.Insert
 import androidx.room.Query
 import androidx.room.Upsert
 import kotlinx.coroutines.flow.Flow
@@ -37,6 +38,12 @@ interface CatalogDao {
     @Query("SELECT * FROM live_channel WHERE streamId IN (:ids) GROUP BY streamId")
     suspend fun liveByIds(ids: List<Int>): List<LiveChannelEntity>
 
+    @Query("SELECT * FROM movie WHERE streamId IN (:ids) GROUP BY streamId")
+    suspend fun moviesByIds(ids: List<Int>): List<MovieEntity>
+
+    @Query("SELECT * FROM series WHERE seriesId IN (:ids) GROUP BY seriesId")
+    suspend fun seriesByIds(ids: List<Int>): List<SeriesEntity>
+
     @Query("SELECT * FROM movie WHERE categoryId = :categoryId ORDER BY sortIndex")
     fun moviesPaged(categoryId: String): PagingSource<Int, MovieEntity>
     @Query("SELECT * FROM movie WHERE streamId = :streamId LIMIT 1")
@@ -46,6 +53,15 @@ interface CatalogDao {
     fun seriesPaged(categoryId: String): PagingSource<Int, SeriesEntity>
     @Query("SELECT * FROM series WHERE seriesId = :seriesId LIMIT 1")
     suspend fun series(seriesId: Int): SeriesEntity?
+
+    @Query("SELECT * FROM category") suspend fun allCategories(): List<CategoryEntity>
+
+    /** EPG ids of the channels in the given countries' categories (null where the provider has none). */
+    @Query(
+        "SELECT l.epgChannelId FROM live_channel l JOIN category c ON c.type = 'LIVE' AND c.id = l.categoryId " +
+            "WHERE c.country IN (:countries) GROUP BY l.streamId",
+    )
+    suspend fun liveEpgIds(countries: List<String>): List<String?>
 
     @Query("SELECT COUNT(*) FROM live_channel") suspend fun liveCount(): Int
     @Query("SELECT COUNT(*) FROM movie") suspend fun movieCount(): Int
@@ -83,6 +99,20 @@ interface PlaybackDao {
     fun observe(type: ContentType, itemId: Int): Flow<PlaybackPositionEntity?>
     @Query("SELECT * FROM playback_position WHERE type = :type")
     fun observeAll(type: ContentType): Flow<List<PlaybackPositionEntity>>
+}
+
+@Dao
+interface SearchDao {
+    @Insert suspend fun insert(items: List<SearchEntity>)
+    @Query("DELETE FROM search WHERE type = :type") suspend fun deleteType(type: String)
+
+    /**
+     * [match] is an FTS4 MATCH expression, built by the search repository from the user's words.
+     * Preferred countries are pulled forward before the limit, so a short query on a 100k-item
+     * catalog doesn't cut off the Dutch results.
+     */
+    @Query("SELECT * FROM search WHERE search MATCH :match ORDER BY (country IN (:preferred)) DESC LIMIT :limit")
+    suspend fun match(match: String, preferred: List<String>, limit: Int): List<SearchEntity>
 }
 
 @Dao

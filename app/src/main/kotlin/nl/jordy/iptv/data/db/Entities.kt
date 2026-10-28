@@ -1,6 +1,8 @@
 package nl.jordy.iptv.data.db
 
+import androidx.room.ColumnInfo
 import androidx.room.Entity
+import androidx.room.Fts4
 import androidx.room.Index
 import androidx.room.PrimaryKey
 import nl.jordy.iptv.data.xtream.ContentType
@@ -20,6 +22,8 @@ data class CategoryEntity(
     val name: String,
     val sortIndex: Int,
     val generation: Long,
+    /** ISO-ish country tag from the provider's prefix (`┃NL┃ …` → "NL"); null for PPV, sports packs etc. */
+    val country: String? = null,
 )
 
 @Entity(tableName = "live_channel", primaryKeys = ["categoryId", "streamId"], indices = [Index("streamId")])
@@ -31,6 +35,10 @@ data class LiveChannelEntity(
     val epgChannelId: String?,
     val sortIndex: Int,
     val generation: Long,
+    /** Display labels split off the raw name ("4K", "Multi"), comma-separated. */
+    @ColumnInfo(defaultValue = "") val badges: String = "",
+    /** Provider marks the channel as having catch-up (`⏺` in the name). */
+    @ColumnInfo(defaultValue = "0") val catchup: Boolean = false,
 )
 
 @Entity(tableName = "movie", primaryKeys = ["categoryId", "streamId"], indices = [Index("streamId")])
@@ -45,6 +53,7 @@ data class MovieEntity(
     val addedAt: Long?,
     val sortIndex: Int,
     val generation: Long,
+    @ColumnInfo(defaultValue = "") val badges: String = "",
 )
 
 @Entity(tableName = "series", primaryKeys = ["categoryId", "seriesId"], indices = [Index("seriesId")])
@@ -60,6 +69,7 @@ data class SeriesEntity(
     val year: Int?,
     val sortIndex: Int,
     val generation: Long,
+    @ColumnInfo(defaultValue = "") val badges: String = "",
 )
 
 /** Fetched on demand when a series is opened, not during the catalog sync. */
@@ -101,4 +111,18 @@ data class SyncInfoEntity(
     @PrimaryKey val id: Int = 0,
     val lastSyncAt: Long,
     val generation: Long,
+)
+
+/**
+ * Full-text index over cleaned titles of the whole catalog, filled during sync. Keyed by
+ * (type, itemId) so a hit opens the item; country is kept to rank preferred countries first.
+ */
+@Fts4(notIndexed = ["type", "itemId", "country", "categoryId"])
+@Entity(tableName = "search")
+data class SearchEntity(
+    val title: String,
+    val type: String,
+    val itemId: Int,
+    val categoryId: String,
+    val country: String?,
 )

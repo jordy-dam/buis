@@ -23,6 +23,7 @@ import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import nl.jordy.iptv.data.db.FavoriteEntity
+import nl.jordy.iptv.data.xtream.NameParser
 import nl.jordy.iptv.data.repo.LibraryRepository
 import nl.jordy.iptv.data.xtream.ContentType
 import nl.jordy.iptv.ui.PlayerRoute
@@ -66,7 +67,8 @@ fun FavoritesScreen(
             item { Text("Zenders", style = MaterialTheme.typography.titleLarge) }
             items(channels, key = { "live/${it.itemId}" }) { f ->
                 ChannelTile(
-                    name = f.name,
+                    // Favourites from before 2a hold raw provider names.
+                    name = NameParser.parse(f.name).title,
                     logoUrl = f.imageUrl,
                     nowPlaying = null,
                     favorite = true,
@@ -89,7 +91,7 @@ fun FavoritesScreen(
                     ) {
                         items(items, key = { it.itemId }) { f ->
                             PosterTile(
-                                title = f.name,
+                                title = NameParser.parse(f.name).title,
                                 imageUrl = f.imageUrl,
                                 favorite = true,
                                 onClick = { if (type == ContentType.MOVIE) onOpenMovie(f.itemId) else onOpenSeries(f.itemId) },

@@ -55,10 +55,14 @@ import nl.jordy.iptv.data.db.CategoryEntity
 import nl.jordy.iptv.data.db.LiveChannelEntity
 import nl.jordy.iptv.data.repo.EpgRepository
 import nl.jordy.iptv.data.repo.LibraryRepository
+import nl.jordy.iptv.data.settings.SettingsStore
+import nl.jordy.iptv.data.settings.filteredBy
 import nl.jordy.iptv.data.xtream.ContentType
 import nl.jordy.iptv.ui.PlayerRoute
 import nl.jordy.iptv.ui.components.ChannelTile
 import nl.jordy.iptv.ui.components.ListItemSurface
+import nl.jordy.iptv.ui.components.filterToggle
+import nl.jordy.iptv.data.settings.FilteredCategories
 import nl.jordy.iptv.ui.theme.TextSecondary
 import java.time.Instant
 import java.time.ZoneId
@@ -68,12 +72,18 @@ import javax.inject.Inject
 @HiltViewModel
 class LiveViewModel @Inject constructor(
     db: AppDatabase,
+    settings: SettingsStore,
     private val epg: EpgRepository,
     private val library: LibraryRepository,
 ) : ViewModel() {
     private val dao = db.catalog()
+    private val showAll = MutableStateFlow(false)
 
-    val categories = dao.liveCategories().stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), null)
+    val filtered = dao.liveCategories().filteredBy(settings.prefs, showAll)
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), null)
+    val categories = filtered.map { it?.shown }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), null)
+
+    fun toggleShowAll() { showAll.value = !showAll.value }
 
     private val explicitCategory = MutableStateFlow<String?>(null)
 
@@ -118,6 +128,7 @@ class LiveViewModel @Inject constructor(
 @Composable
 fun LiveScreen(onPlay: (PlayerRoute) -> Unit, vm: LiveViewModel = hiltViewModel()) {
     val categories by vm.categories.collectAsStateWithLifecycle()
+    val filtered by vm.filtered.collectAsStateWithLifecycle()
     val selected by vm.selected.collectAsStateWithLifecycle()
     val favorites by vm.favorites.collectAsStateWithLifecycle()
     val channels = vm.channels.collectAsLazyPagingItems()
@@ -141,7 +152,9 @@ fun LiveScreen(onPlay: (PlayerRoute) -> Unit, vm: LiveViewModel = hiltViewModel(
             selected = selected,
             onFocus = vm::select,
             onClick = { channelFocus.requestFocus() },
-            modifier = Modifier.width(320.dp).fillMaxHeight().focusRequester(categoryFocus),
+            filter = filtered,
+            onToggleFilter = vm::toggleShowAll,
+            modifier = Modifier.width(280.dp).fillMaxHeight().focusRequester(categoryFocus),
         )
         LazyColumn(
             modifier = Modifier
@@ -151,7 +164,7 @@ fun LiveScreen(onPlay: (PlayerRoute) -> Unit, vm: LiveViewModel = hiltViewModel(
                 .focusRestorer()
                 .onFocusChanged { channelsHaveFocus = it.hasFocus },
             contentPadding = PaddingValues(top = 8.dp, bottom = 48.dp, start = 8.dp, end = 8.dp),
-            verticalArrangement = Arrangement.spacedBy(10.dp),
+            verticalArrangement = Arrangement.spacedBy(6.dp),
         ) {
             items(channels.itemCount, key = channels.itemKey { "${it.categoryId}/${it.streamId}" }) { index ->
                 val channel = channels[index] ?: return@items
@@ -172,6 +185,7 @@ fun LiveScreen(onPlay: (PlayerRoute) -> Unit, vm: LiveViewModel = hiltViewModel(
                     logoUrl = channel.logoUrl,
                     nowPlaying = nowPlaying,
                     favorite = channel.streamId in favorites,
+                    badges = channel.badges.split(",").filter { it.isNotEmpty() } + listOfNotNull("Terugkijken".takeIf { channel.catchup }),
                     onClick = {
                         vm.lastChannel = channel.streamId
                         onPlay(PlayerRoute(PlayerRoute.Kind.LIVE, channel.streamId, channel.name, categoryId = channel.categoryId))
@@ -191,6 +205,8 @@ private fun CategoryList(
     selected: String?,
     onFocus: (String) -> Unit,
     onClick: () -> Unit,
+    filter: FilteredCategories?,
+    onToggleFilter: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     // Entering from the rail lands on the active category, not on whichever row happens to be nearest.
@@ -210,5 +226,6 @@ private fun CategoryList(
                     .onFocusChanged { if (it.isFocused) onFocus(cat.id) },
             )
         }
+        filterToggle(filter, onToggleFilter)
     }
 }

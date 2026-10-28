@@ -23,7 +23,8 @@ import androidx.paging.compose.itemKey
 import androidx.tv.material3.MaterialTheme
 import androidx.tv.material3.Text
 import kotlinx.coroutines.flow.Flow
-import nl.jordy.iptv.data.db.CategoryEntity
+import nl.jordy.iptv.data.settings.FilteredCategories
+import nl.jordy.iptv.ui.components.filterToggle
 import nl.jordy.iptv.ui.components.lastInRow
 import nl.jordy.iptv.ui.theme.TextSecondary
 
@@ -40,13 +41,14 @@ class FocusMemory {
 @Composable
 fun <T : Any> CategoryRows(
     title: String,
-    categories: List<CategoryEntity>?,
+    filter: FilteredCategories?,
+    onToggleFilter: () -> Unit,
     rowItems: (String) -> Flow<PagingData<T>>,
     itemKey: (T) -> Int,
     focusMemory: FocusMemory,
     tile: @Composable (item: T, categoryId: String, modifier: Modifier) -> Unit,
 ) {
-    if (categories == null) return
+    val categories = filter?.shown ?: return
     LazyColumn(
         modifier = Modifier.fillMaxSize(),
         contentPadding = PaddingValues(bottom = 48.dp),
@@ -77,5 +79,6 @@ fun <T : Any> CategoryRows(
                 }
             }
         }
+        filterToggle(filter, onToggleFilter)
     }
 }

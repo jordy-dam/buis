@@ -3,6 +3,7 @@ package nl.jordy.iptv.ui.login
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
@@ -35,6 +36,7 @@ import nl.jordy.iptv.data.xtream.XtreamClient
 import nl.jordy.iptv.data.xtream.XtreamCredentials
 import nl.jordy.iptv.ui.components.PrimaryButton
 import nl.jordy.iptv.ui.components.TvTextField
+import nl.jordy.iptv.ui.theme.BuisWordmark
 import nl.jordy.iptv.ui.theme.SafeArea
 import nl.jordy.iptv.ui.theme.TextSecondary
 import javax.inject.Inject
@@ -89,8 +91,11 @@ fun LoginScreen(onLoggedIn: () -> Unit, vm: LoginViewModel = hiltViewModel()) {
 
     Box(Modifier.fillMaxSize().padding(SafeArea), contentAlignment = Alignment.Center) {
         Column(Modifier.width(560.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-            Text("Inloggen", style = MaterialTheme.typography.headlineMedium)
-            Text("Gegevens van je IPTV-abonnement (Xtream Codes).", style = MaterialTheme.typography.bodyLarge, color = TextSecondary)
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                BuisWordmark()
+                Text("  Beste Unieke IPTV Stream", style = MaterialTheme.typography.bodyLarge, color = TextSecondary)
+            }
+            Text("Log in met je IPTV-abonnement (Xtream Codes).", style = MaterialTheme.typography.titleLarge)
             TvTextField("Serveradres", server, { server = it }, Modifier.focusRequester(first), keyboardType = KeyboardType.Uri)
             TvTextField("Gebruikersnaam", username, { username = it })
             TvTextField(

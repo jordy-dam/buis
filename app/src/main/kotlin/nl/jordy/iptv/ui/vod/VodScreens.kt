@@ -12,6 +12,7 @@ import androidx.paging.PagingData
 import androidx.paging.cachedIn
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
@@ -20,6 +21,8 @@ import nl.jordy.iptv.data.db.AppDatabase
 import nl.jordy.iptv.data.db.MovieEntity
 import nl.jordy.iptv.data.db.SeriesEntity
 import nl.jordy.iptv.data.repo.LibraryRepository
+import nl.jordy.iptv.data.settings.SettingsStore
+import nl.jordy.iptv.data.settings.filteredBy
 import nl.jordy.iptv.data.xtream.ContentType
 import nl.jordy.iptv.ui.components.PosterTile
 import javax.inject.Inject
@@ -27,12 +30,14 @@ import javax.inject.Inject
 private val pagingConfig = PagingConfig(pageSize = 30, prefetchDistance = 15, enablePlaceholders = false)
 
 @HiltViewModel
-class MoviesViewModel @Inject constructor(db: AppDatabase, private val library: LibraryRepository) : ViewModel() {
+class MoviesViewModel @Inject constructor(db: AppDatabase, settings: SettingsStore, private val library: LibraryRepository) : ViewModel() {
     private val dao = db.catalog()
     private val rows = mutableMapOf<String, Flow<PagingData<MovieEntity>>>()
     val focusMemory = FocusMemory()
 
-    val categories = dao.movieCategories().stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), null)
+    private val showAll = MutableStateFlow(false)
+    val categories = dao.movieCategories().filteredBy(settings.prefs, showAll).stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), null)
+    fun toggleShowAll() { showAll.value = !showAll.value }
     val favorites = library.favoriteIds(ContentType.MOVIE).map { it.toSet() }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptySet())
     /** streamId → fraction watched, for the progress bar on posters. */
     val progress = library.positions(ContentType.MOVIE)
@@ -47,12 +52,14 @@ class MoviesViewModel @Inject constructor(db: AppDatabase, private val library: 
 }
 
 @HiltViewModel
-class SeriesViewModel @Inject constructor(db: AppDatabase, private val library: LibraryRepository) : ViewModel() {
+class SeriesViewModel @Inject constructor(db: AppDatabase, settings: SettingsStore, private val library: LibraryRepository) : ViewModel() {
     private val dao = db.catalog()
     private val rows = mutableMapOf<String, Flow<PagingData<SeriesEntity>>>()
     val focusMemory = FocusMemory()
 
-    val categories = dao.seriesCategories().stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), null)
+    private val showAll = MutableStateFlow(false)
+    val categories = dao.seriesCategories().filteredBy(settings.prefs, showAll).stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), null)
+    fun toggleShowAll() { showAll.value = !showAll.value }
     val favorites = library.favoriteIds(ContentType.SERIES).map { it.toSet() }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptySet())
 
     fun row(categoryId: String) = rows.getOrPut(categoryId) {
@@ -67,7 +74,7 @@ fun MoviesScreen(onOpenMovie: (Int) -> Unit, vm: MoviesViewModel = hiltViewModel
     val categories by vm.categories.collectAsStateWithLifecycle()
     val favorites by vm.favorites.collectAsStateWithLifecycle()
     val progress by vm.progress.collectAsStateWithLifecycle()
-    CategoryRows("Films", categories, vm::row, { it.streamId }, vm.focusMemory) { movie, categoryId, modifier ->
+    CategoryRows("Films", categories, vm::toggleShowAll, vm::row, { it.streamId }, vm.focusMemory) { movie, categoryId, modifier ->
         PosterTile(
             title = movie.name,
             imageUrl = movie.posterUrl,
@@ -87,7 +94,7 @@ fun MoviesScreen(onOpenMovie: (Int) -> Unit, vm: MoviesViewModel = hiltViewModel
 fun SeriesScreen(onOpenSeries: (Int) -> Unit, vm: SeriesViewModel = hiltViewModel()) {
     val categories by vm.categories.collectAsStateWithLifecycle()
     val favorites by vm.favorites.collectAsStateWithLifecycle()
-    CategoryRows("Series", categories, vm::row, { it.seriesId }, vm.focusMemory) { series, categoryId, modifier ->
+    CategoryRows("Series", categories, vm::toggleShowAll, vm::row, { it.seriesId }, vm.focusMemory) { series, categoryId, modifier ->
         PosterTile(
             title = series.name,
             imageUrl = series.coverUrl,

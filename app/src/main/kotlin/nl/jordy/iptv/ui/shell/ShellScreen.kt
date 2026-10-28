@@ -39,8 +39,10 @@ import nl.jordy.iptv.ui.components.PrimaryButton
 import nl.jordy.iptv.ui.components.SecondaryButton
 import nl.jordy.iptv.ui.favorites.FavoritesScreen
 import nl.jordy.iptv.ui.live.LiveScreen
+import nl.jordy.iptv.ui.search.SearchScreen
 import nl.jordy.iptv.ui.settings.SettingsScreen
 import nl.jordy.iptv.ui.theme.Accent
+import nl.jordy.iptv.ui.theme.BuisWordmark
 import nl.jordy.iptv.ui.theme.SafeArea
 import nl.jordy.iptv.ui.theme.SurfaceColor
 import nl.jordy.iptv.ui.theme.SurfaceRaised
@@ -48,13 +50,14 @@ import nl.jordy.iptv.ui.theme.TextSecondary
 import nl.jordy.iptv.ui.vod.MoviesScreen
 import nl.jordy.iptv.ui.vod.SeriesScreen
 
-/** Phase 1 tabs. Home and Zoeken join in phase 2 (they need profiles and search). */
+/** Tabs of the rail. Home joins in phase 2b, once there are profiles to fill it per person. */
 enum class Tab(val label: String, val icon: String) {
     LIVE("Live TV", "▶"),
     MOVIES("Films", "■"),
     SERIES("Series", "≡"),
     // U+FE0E: text-style heart; without it Android draws a red emoji that ignores the theme.
     FAVORITES("Favorieten", "♥︎"),
+    SEARCH("Zoeken", "⌕"),
     // Pinned to the bottom of the rail, away from the content tabs.
     SETTINGS("Instellingen", "⚙︎"),
 }
@@ -100,7 +103,7 @@ fun ShellScreen(
                 .focusGroup(),
             verticalArrangement = Arrangement.spacedBy(8.dp),
         ) {
-            Text("IPTV", style = MaterialTheme.typography.headlineMedium, color = Accent, modifier = Modifier.padding(start = 12.dp, bottom = 24.dp))
+            BuisWordmark(Modifier.padding(start = 12.dp, bottom = 24.dp))
             Tab.entries.forEach { t ->
                 if (t == Tab.SETTINGS) Spacer(Modifier.weight(1f))
                 RailItem(t, selected = t == tab, onFocus = { tab = t }, modifier = Modifier.focusRequester(railFocus.getValue(t)))
@@ -112,6 +115,7 @@ fun ShellScreen(
                 Tab.MOVIES -> MoviesScreen(onOpenMovie = onOpenMovie)
                 Tab.SERIES -> SeriesScreen(onOpenSeries = onOpenSeries)
                 Tab.FAVORITES -> FavoritesScreen(onPlay = onPlay, onOpenMovie = onOpenMovie, onOpenSeries = onOpenSeries)
+                Tab.SEARCH -> SearchScreen(onPlay = onPlay, onOpenMovie = onOpenMovie, onOpenSeries = onOpenSeries)
                 Tab.SETTINGS -> SettingsScreen(onRefreshCatalog = onRefreshCatalog, onLoggedOut = onLoggedOut)
             }
         }
@@ -151,7 +155,7 @@ private fun ExitDialog(onExit: () -> Unit, onDismiss: () -> Unit) {
             Modifier.background(SurfaceColor, RoundedCornerShape(16.dp)).padding(32.dp),
             verticalArrangement = Arrangement.spacedBy(24.dp),
         ) {
-            Text("IPTV afsluiten?", style = MaterialTheme.typography.headlineMedium)
+            Text("BUIS afsluiten?", style = MaterialTheme.typography.headlineMedium)
             Row(horizontalArrangement = Arrangement.spacedBy(16.dp)) {
                 // Default focus on staying: a stray double Back shouldn't close the app.
                 SecondaryButton("Blijven", onDismiss, Modifier.focusRequester(stay))

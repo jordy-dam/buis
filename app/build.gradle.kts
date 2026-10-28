@@ -47,6 +47,9 @@ android {
     }
 
     sourceSets["test"].resources.directories.add(rootProject.file("mockserver/src/main/resources").path)
+    // Exported Room schemas, so MigrationTestHelper can build old versions in unit tests. Robolectric
+    // only sees the app's own assets, so they go into debug (a few KB; never in release).
+    sourceSets["debug"].assets.directories.add("$projectDir/schemas")
 }
 
 kotlin {
@@ -87,8 +90,8 @@ dependencies {
     ksp(libs.hilt.compiler)
 
     implementation(libs.datastore)
+    implementation(libs.datastore.preferences)
     implementation(libs.tink.android)
-    implementation(libs.retrofit)
     implementation(libs.okhttp)
     implementation(libs.kotlinx.serialization.json)
     implementation(libs.coil.compose)
@@ -99,4 +102,5 @@ dependencies {
     testImplementation(libs.kotlinx.coroutines.test)
     testImplementation(libs.androidx.test.core)
     testImplementation(libs.okhttp.mockwebserver)
+    testImplementation(libs.room.testing)
 }

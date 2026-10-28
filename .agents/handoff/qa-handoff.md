@@ -16,13 +16,13 @@ live .m3u8 → .ts fallback, fail-fast on 4xx.
 - [x] Instellingen: refresh runs a sync and returns to Live TV; logout (default focus "Annuleren") wipes the database and credentials, Back from login exits the app
 
 ## What still needs testing (on the real tv)
-- [ ] Log in with real Xtream credentials
+- [x] Log in with real Xtream credentials
 - [ ] Sync time and memory with the real catalog size
-- [ ] Find a channel within 3 clicks
-- [ ] Zap between live channels in under ~2s on the home connection
-- [ ] Play a film and resume it after closing the app (Home button, and after a reboot)
-- [ ] Audio on channels/films with AC3 or EAC3
-- [ ] Every screen with the real remote: long-press OK for favourites, Menu key if the remote has one
+- [x] Find a channel within 3 clicks
+- [x] Zap between live channels in under ~2s on the home connection (felt instant)
+- [x] Play a film and resume it after closing the app (Jordy, 2026-10-28)
+- [x] Audio on channels/films with AC3 or EAC3
+- [x] Every screen with the real remote, incl. long-press OK for favourites
 
 ## How to run the test suite
 ```

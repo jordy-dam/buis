@@ -13,9 +13,11 @@ import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.lazy.LazyListScope
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
@@ -39,6 +41,7 @@ import androidx.tv.material3.MaterialTheme
 import androidx.tv.material3.Surface
 import androidx.tv.material3.Text
 import coil3.compose.AsyncImage
+import nl.jordy.iptv.data.settings.FilteredCategories
 import nl.jordy.iptv.ui.theme.Accent
 import nl.jordy.iptv.ui.theme.SurfaceColor
 import nl.jordy.iptv.ui.theme.SurfaceRaised
@@ -78,7 +81,7 @@ fun PosterTile(
     onClick: () -> Unit,
     onLongClick: () -> Unit,
     modifier: Modifier = Modifier,
-    width: Dp = 150.dp,
+    width: Dp = 120.dp,
     favorite: Boolean = false,
     progress: Float? = null,
 ) {
@@ -111,7 +114,10 @@ fun PosterTile(
     }
 }
 
-/** 16:9 channel tile: logo on a neutral plate (logos are often transparent PNGs), name and now-playing below. */
+/**
+ * Compact channel row: 16:9 logo plate (logos are often transparent PNGs), name on up to two lines
+ * (event channels put the programme in the name), labels, and now-playing when there is a guide.
+ */
 @Composable
 fun ChannelTile(
     name: String,
@@ -121,41 +127,51 @@ fun ChannelTile(
     onLongClick: () -> Unit,
     modifier: Modifier = Modifier,
     favorite: Boolean = false,
+    badges: List<String> = emptyList(),
 ) {
     Surface(
         onClick = onClick,
         onLongClick = onLongClick,
-        modifier = modifier.fillMaxWidth().height(96.dp).onMenuKey(onLongClick),
+        modifier = modifier.fillMaxWidth().heightIn(min = 64.dp).onMenuKey(onLongClick),
         shape = ClickableSurfaceDefaults.shape(tileShape),
         scale = ClickableSurfaceDefaults.scale(focusedScale = 1.03f),
         border = ClickableSurfaceDefaults.border(focusedBorder = Focus.border),
         glow = ClickableSurfaceDefaults.glow(focusedGlow = Focus.glow),
         colors = ClickableSurfaceDefaults.colors(containerColor = SurfaceColor, focusedContainerColor = SurfaceRaised),
     ) {
-        Row(Modifier.fillMaxSize().padding(10.dp), verticalAlignment = Alignment.CenterVertically) {
+        Row(Modifier.fillMaxWidth().padding(horizontal = 10.dp, vertical = 8.dp), verticalAlignment = Alignment.CenterVertically) {
             Box(
-                Modifier.height(76.dp).aspectRatio(16f / 9f).background(SurfaceRaised, RoundedCornerShape(6.dp)),
+                Modifier.height(48.dp).aspectRatio(16f / 9f).background(SurfaceRaised, RoundedCornerShape(6.dp)),
                 contentAlignment = Alignment.Center,
             ) {
-                Text(name.take(2).uppercase(), style = MaterialTheme.typography.titleLarge, color = TextSecondary)
+                Text(name.take(2).uppercase(), style = MaterialTheme.typography.titleMedium, color = TextSecondary)
                 if (logoUrl != null) {
-                    AsyncImage(model = logoUrl, contentDescription = null, contentScale = ContentScale.Fit, modifier = Modifier.fillMaxSize().padding(8.dp))
+                    AsyncImage(model = logoUrl, contentDescription = null, contentScale = ContentScale.Fit, modifier = Modifier.fillMaxSize().padding(6.dp))
                 }
             }
-            Spacer(Modifier.width(16.dp))
+            Spacer(Modifier.width(14.dp))
             Column(Modifier.weight(1f)) {
-                Text(name, style = MaterialTheme.typography.titleMedium, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                Text(
-                    nowPlaying ?: " ",
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = TextSecondary,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                )
+                Text(name, style = MaterialTheme.typography.titleMedium, maxLines = 2, overflow = TextOverflow.Ellipsis)
+                if (nowPlaying != null) {
+                    Text(nowPlaying, style = MaterialTheme.typography.bodyMedium, color = TextSecondary, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                }
             }
-            if (favorite) FavoriteBadge()
+            badges.forEach { Badge(it, Modifier.padding(start = 6.dp)) }
+            if (favorite) FavoriteBadge(Modifier.padding(start = 6.dp))
         }
     }
+}
+
+/** Small label such as "4K", "Multi" or "Terugkijken". */
+@Composable
+fun Badge(text: String, modifier: Modifier = Modifier) {
+    Text(
+        text,
+        style = MaterialTheme.typography.labelLarge,
+        color = TextSecondary,
+        maxLines = 1,
+        modifier = modifier.background(SurfaceRaised, RoundedCornerShape(4.dp)).padding(horizontal = 6.dp, vertical = 2.dp),
+    )
 }
 
 /** Plain focusable row for lists such as categories. */
@@ -199,5 +215,18 @@ fun FavoriteBadge(modifier: Modifier = Modifier) {
 fun ProgressBar(fraction: Float, modifier: Modifier = Modifier) {
     Box(modifier.fillMaxWidth().height(5.dp).background(SurfaceRaised)) {
         Box(Modifier.fillMaxWidth(fraction.coerceIn(0f, 1f)).height(5.dp).background(Accent))
+    }
+}
+
+/** Last entry of a category list: switches the country filter off for this visit, or back on. */
+fun LazyListScope.filterToggle(filter: FilteredCategories?, onToggle: () -> Unit) {
+    val f = filter ?: return
+    if (f.hidden == 0 && !f.showingAll) return
+    item(key = "filter-toggle") {
+        ListItemSurface(
+            text = if (f.showingAll) "Alleen voorkeurslanden" else "Alle landen tonen (${f.hidden} meer)",
+            selected = false,
+            onClick = onToggle,
+        )
     }
 }
