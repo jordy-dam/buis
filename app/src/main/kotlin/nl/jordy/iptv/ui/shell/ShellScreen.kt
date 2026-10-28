@@ -175,7 +175,7 @@ fun ShellScreen(
             verticalArrangement = Arrangement.spacedBy(4.dp),
         ) {
             // Who's watching, top left: the switch point. The BUIS logo lives on "Wie kijkt er?".
-            profile?.let { ProfileItem(it.name, it.avatar, railOpen, onSwitchProfile) }
+            profile?.let { ProfileItem(it.name, it.avatar, it.face, railOpen, onSwitchProfile) }
             Spacer(Modifier.height(12.dp))
             Tab.entries.forEach { t ->
                 if (t == Tab.SETTINGS) Spacer(Modifier.weight(1f))
@@ -234,7 +234,7 @@ class ShellViewModel @Inject constructor(profiles: ProfileRepository, guide: Epg
  * "Wie kijkt er?", so switching is Up, OK, (Left/Right), OK.
  */
 @Composable
-private fun ProfileItem(name: String, avatar: Int, open: Boolean, onClick: () -> Unit) {
+private fun ProfileItem(name: String, avatar: Int, face: Int, open: Boolean, onClick: () -> Unit) {
     Surface(
         onClick = onClick,
         shape = ClickableSurfaceDefaults.shape(RoundedCornerShape(8.dp)),
@@ -243,7 +243,7 @@ private fun ProfileItem(name: String, avatar: Int, open: Boolean, onClick: () ->
         colors = ClickableSurfaceDefaults.colors(containerColor = androidx.compose.ui.graphics.Color.Transparent, focusedContainerColor = SurfaceFocus),
     ) {
         Row(Modifier.padding(horizontal = 8.dp, vertical = 6.dp), verticalAlignment = Alignment.CenterVertically) {
-            AvatarCircle(name, avatar, 32.dp)
+            AvatarCircle(name, avatar, 32.dp, face = face)
             if (open) {
                 Text(
                     name,

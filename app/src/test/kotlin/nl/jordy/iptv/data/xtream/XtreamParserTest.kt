@@ -55,7 +55,7 @@ class XtreamParserTest {
     @Test
     fun `movie rating, year and container fall back sensibly`() {
         val movies = array("vod_streams.json").mapNotNull(XtreamParser::movie).associateBy { it.streamId }
-        assertEquals(7, movies.size)
+        assertEquals("the fixture's films, including an NL-sub version of 5001", 8, movies.size)
         assertEquals(7.5, movies.getValue(5001).rating!!, 0.001)
         assertEquals(2019, movies.getValue(5001).year)
         assertEquals(6.0, movies.getValue(5002).rating!!, 0.001)

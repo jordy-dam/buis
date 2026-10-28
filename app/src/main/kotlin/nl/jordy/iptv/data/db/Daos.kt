@@ -2,6 +2,7 @@ package nl.jordy.iptv.data.db
 
 import androidx.paging.PagingSource
 import androidx.room.Dao
+import androidx.room.Embedded
 import androidx.room.Insert
 import androidx.room.Query
 import androidx.room.Update
@@ -47,6 +48,30 @@ interface CatalogDao {
 
     @Query("SELECT * FROM movie WHERE categoryId = :categoryId ORDER BY sortIndex")
     fun moviesPaged(categoryId: String): PagingSource<Int, MovieEntity>
+
+    /**
+     * A category's films, one tile per film: language versions of the same title and year (the
+     * provider lists NL-sub, NL-audio and Multi separately) collapse into the first one listed.
+     * SQLite takes the other columns from the row with MIN(sortIndex).
+     */
+    @Query(
+        "SELECT m.*, COUNT(*) AS versions, MIN(m.sortIndex) AS firstSort FROM movie m WHERE m.categoryId = :categoryId " +
+            "GROUP BY lower(m.name), m.year ORDER BY firstSort",
+    )
+    fun movieTilesPaged(categoryId: String): PagingSource<Int, MovieTile>
+
+    @Query(
+        "SELECT m.*, COUNT(*) AS versions, MIN(m.sortIndex) AS firstSort FROM movie m JOIN movie_info i ON i.streamId = m.streamId " +
+            "WHERE m.categoryId = :categoryId AND (i.genre LIKE :pattern OR i.genre LIKE :alt) GROUP BY lower(m.name), m.year ORDER BY firstSort",
+    )
+    fun movieTilesPagedByGenre(categoryId: String, pattern: String, alt: String): PagingSource<Int, MovieTile>
+
+    /** Every version of a film in the whole catalog, with the country of a category it's in. */
+    @Query(
+        "SELECT m.*, c.country AS country FROM movie m LEFT JOIN category c ON c.type = 'MOVIE' AND c.id = m.categoryId " +
+            "WHERE lower(m.name) = lower(:name) AND m.year IS :year GROUP BY m.streamId ORDER BY m.streamId",
+    )
+    suspend fun movieVersions(name: String, year: Int?): List<MovieVersionRow>
     @Query("SELECT * FROM movie WHERE streamId = :streamId LIMIT 1")
     suspend fun movie(streamId: Int): MovieEntity?
 
@@ -82,7 +107,7 @@ interface CatalogDao {
     @Query(
         "SELECT m.* FROM movie m JOIN category c ON c.type = 'MOVIE' AND c.id = m.categoryId " +
             "WHERE c.country IN (:countries) AND (:hideAdult = 0 OR c.adult = 0) AND m.addedAt IS NOT NULL " +
-            "GROUP BY m.streamId ORDER BY m.addedAt DESC LIMIT :limit",
+            "GROUP BY lower(m.name), m.year ORDER BY m.addedAt DESC LIMIT :limit",
     )
     fun recentMovies(countries: List<String>, hideAdult: Boolean, limit: Int): Flow<List<MovieEntity>>
 
@@ -221,3 +246,8 @@ interface MovieInfoDao {
     )
     fun done(countries: List<String>): Flow<Int>
 }
+
+/** A film tile: the first version of a title in a category, and how many versions it stands for. */
+data class MovieTile(@Embedded val movie: MovieEntity, val versions: Int, val firstSort: Int)
+
+data class MovieVersionRow(@Embedded val movie: MovieEntity, val country: String?)

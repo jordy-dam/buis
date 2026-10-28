@@ -66,6 +66,7 @@ data class ProfileForm(
     val isNew: Boolean = true,
     val name: String = "",
     val avatar: Int = 0,
+    val face: Int = 0,
     val kids: Boolean = false,
     val pinHash: String? = null,
     val canDelete: Boolean = false,
@@ -87,17 +88,18 @@ class ProfileEditViewModel @Inject constructor(
             val p = profiles.get(id)
             original = p
             _form.value = if (p == null) {
-                // A colour nobody has yet, so the new face is easy to tell apart.
-                val used = all.map { it.avatar }.toSet()
-                ProfileForm(loaded = true, avatar = AvatarColors.indices.firstOrNull { it !in used } ?: 0)
+                // A face and colour nobody has yet, so the new profile is easy to tell apart.
+                val (face, colour) = ProfileRepository.defaultLook(all)
+                ProfileForm(loaded = true, avatar = colour, face = face)
             } else {
-                ProfileForm(true, isNew = false, p.name, p.avatar, p.kids, p.pinHash, canDelete = all.size > 1)
+                ProfileForm(true, isNew = false, p.name, p.avatar, p.face, p.kids, p.pinHash, canDelete = all.size > 1)
             }
         }
     }
 
     fun setName(name: String) = _form.update { it.copy(name = name.take(MAX_NAME)) }
     fun setAvatar(i: Int) = _form.update { it.copy(avatar = i) }
+    fun setFace(i: Int) = _form.update { it.copy(face = i) }
     fun toggleKids() = _form.update { it.copy(kids = !it.kids) }
     fun setPin(pin: String?) = _form.update { it.copy(pinHash = pin?.let(Pin::hash)) }
 
@@ -105,8 +107,8 @@ class ProfileEditViewModel @Inject constructor(
         val f = _form.value
         if (f.name.isBlank()) return@launch
         val p = original
-        if (p == null) profiles.create(f.name, f.avatar, f.kids, f.pinHash)
-        else profiles.update(p.copy(name = f.name, avatar = f.avatar, kids = f.kids, pinHash = f.pinHash))
+        if (p == null) profiles.create(f.name, f.avatar, f.kids, f.pinHash, f.face)
+        else profiles.update(p.copy(name = f.name, avatar = f.avatar, face = f.face, kids = f.kids, pinHash = f.pinHash))
         then()
     }
 
@@ -137,7 +139,7 @@ fun ProfileEditScreen(onDone: () -> Unit, vm: ProfileEditViewModel = hiltViewMod
 
     Row(Modifier.fillMaxSize().padding(SafeArea), horizontalArrangement = Arrangement.spacedBy(64.dp)) {
         Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(16.dp)) {
-            AvatarCircle(f.name, f.avatar, 160.dp)
+            AvatarCircle(f.name, f.avatar, 160.dp, face = f.face)
             Text(f.name.ifBlank { "Nieuw profiel" }, style = MaterialTheme.typography.headlineMedium)
         }
         Column(
@@ -146,6 +148,12 @@ fun ProfileEditScreen(onDone: () -> Unit, vm: ProfileEditViewModel = hiltViewMod
         ) {
             Text(if (f.isNew) "Profiel toevoegen" else "Profiel bewerken", style = MaterialTheme.typography.headlineMedium)
             TvTextField("Naam", f.name, vm::setName, Modifier.focusRequester(first))
+
+            Text("Gezicht", style = MaterialTheme.typography.labelLarge, color = TextSecondary, modifier = Modifier.padding(top = 12.dp))
+            Row(Modifier.focusRestorer().focusGroup(), horizontalArrangement = Arrangement.spacedBy(14.dp)) {
+                // 0 is the initial letter, 1..5 the drawn faces.
+                (0..ProfileRepository.FACES).forEach { i -> FaceDot(f.name, f.avatar, i, selected = i == f.face, onClick = { vm.setFace(i) }) }
+            }
 
             Text("Kleur", style = MaterialTheme.typography.labelLarge, color = TextSecondary, modifier = Modifier.padding(top = 12.dp))
             Row(Modifier.focusRestorer().focusGroup(), horizontalArrangement = Arrangement.spacedBy(14.dp)) {
@@ -192,6 +200,21 @@ fun ProfileEditScreen(onDone: () -> Unit, vm: ProfileEditViewModel = hiltViewMod
     if (confirmDelete) {
         DeleteDialog(f.name, onConfirm = { vm.delete(onDone) }, onDismiss = { confirmDelete = false })
     }
+}
+
+@Composable
+private fun FaceDot(name: String, colour: Int, face: Int, selected: Boolean, onClick: () -> Unit) {
+    Surface(
+        onClick = onClick,
+        modifier = Modifier.size(52.dp),
+        shape = ClickableSurfaceDefaults.shape(CircleShape),
+        scale = ClickableSurfaceDefaults.scale(focusedScale = 1.2f),
+        border = ClickableSurfaceDefaults.border(
+            border = if (selected) Border(BorderStroke(3.dp, TextPrimary), shape = CircleShape) else Border.None,
+            focusedBorder = Border(BorderStroke(3.dp, TextPrimary), shape = CircleShape),
+        ),
+        colors = ClickableSurfaceDefaults.colors(containerColor = androidx.compose.ui.graphics.Color.Transparent, focusedContainerColor = androidx.compose.ui.graphics.Color.Transparent),
+    ) { AvatarCircle(name, colour, 52.dp, face = face) }
 }
 
 @Composable

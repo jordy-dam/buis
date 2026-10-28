@@ -1,17 +1,13 @@
 package nl.jordy.iptv.ui.theme
 
-import android.graphics.Typeface
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.runtime.Composable
-import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.TextStyle
-import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.tv.material3.MaterialTheme
-import androidx.tv.material3.Text
 import androidx.tv.material3.Typography
 import androidx.tv.material3.darkColorScheme
 
@@ -49,32 +45,19 @@ private val colors = darkColorScheme(
     border = Accent,
 )
 
-// 10-foot type, one step below the spec's 16sp body at Jordy's request (2e): secondary text is 14sp.
+// 10-foot type, below the spec's 16sp body at Jordy's request (2e, 2f). 13sp is the floor:
+// smaller is unreadable from the couch.
 private val typography = Typography(
-    displaySmall = TextStyle(fontSize = 32.sp, fontWeight = FontWeight.SemiBold),
-    headlineMedium = TextStyle(fontSize = 24.sp, fontWeight = FontWeight.SemiBold),
-    titleLarge = TextStyle(fontSize = 19.sp, fontWeight = FontWeight.Medium),
-    titleMedium = TextStyle(fontSize = 16.sp, fontWeight = FontWeight.Medium),
-    bodyLarge = TextStyle(fontSize = 16.sp, lineHeight = 22.sp),
-    bodyMedium = TextStyle(fontSize = 14.sp, lineHeight = 20.sp),
-    labelLarge = TextStyle(fontSize = 14.sp, fontWeight = FontWeight.Medium),
+    displaySmall = TextStyle(fontSize = 30.sp, fontWeight = FontWeight.SemiBold),
+    headlineMedium = TextStyle(fontSize = 22.sp, fontWeight = FontWeight.SemiBold),
+    titleLarge = TextStyle(fontSize = 18.sp, fontWeight = FontWeight.Medium),
+    titleMedium = TextStyle(fontSize = 15.sp, fontWeight = FontWeight.Medium),
+    bodyLarge = TextStyle(fontSize = 15.sp, lineHeight = 21.sp),
+    bodyMedium = TextStyle(fontSize = 13.sp, lineHeight = 18.sp),
+    labelLarge = TextStyle(fontSize = 13.sp, fontWeight = FontWeight.Medium),
 )
 
 @Composable
 fun IptvTheme(content: @Composable () -> Unit) {
     MaterialTheme(colorScheme = colors, typography = typography, content = content)
-}
-
-/** The BUIS wordmark: plain condensed bold, matching the banner (docs/brand/make-logo.sh). */
-@Composable
-fun BuisWordmark(modifier: Modifier = Modifier) {
-    Text(
-        "BUIS",
-        style = MaterialTheme.typography.headlineMedium.copy(
-            fontFamily = FontFamily(Typeface.create("sans-serif-condensed", Typeface.BOLD)),
-            letterSpacing = 1.sp,
-            color = TextPrimary,
-        ),
-        modifier = modifier,
-    )
 }

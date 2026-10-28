@@ -31,6 +31,7 @@ import kotlinx.coroutines.launch
 import nl.jordy.iptv.data.db.AppDatabase
 import nl.jordy.iptv.data.db.CategoryEntity
 import nl.jordy.iptv.data.db.MovieEntity
+import nl.jordy.iptv.data.db.MovieTile
 import nl.jordy.iptv.data.db.SeriesEntity
 import nl.jordy.iptv.data.repo.LibraryRepository
 import nl.jordy.iptv.data.profile.ProfileRepository
@@ -83,9 +84,10 @@ class MoviesViewModel @Inject constructor(db: AppDatabase, profiles: ProfileRepo
     val genres = selected.filterNotNull().flatMapLatest { id -> dao.movieGenres(id).map { Genres.top(it) } }
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
 
-    val items: Flow<PagingData<MovieEntity>> = combine(selected.filterNotNull(), genre) { id, g -> id to g }.flatMapLatest { (id, g) ->
+    /** One tile per film; its language versions are picked on the detail screen. */
+    val items: Flow<PagingData<MovieTile>> = combine(selected.filterNotNull(), genre) { id, g -> id to g }.flatMapLatest { (id, g) ->
         Pager(pagingConfig) {
-            if (g == null) dao.moviesPaged(id) else Genres.patterns(g).let { (a, b) -> dao.moviesPagedByGenre(id, a, b) }
+            if (g == null) dao.movieTilesPaged(id) else Genres.patterns(g).let { (a, b) -> dao.movieTilesPagedByGenre(id, a, b) }
         }.flow
     }.cachedIn(viewModelScope)
 
@@ -142,13 +144,15 @@ fun MoviesScreen(onOpenMovie: (Int) -> Unit, vm: MoviesViewModel = hiltViewModel
     val genres by vm.genres.collectAsStateWithLifecycle()
     val genre by vm.genre.collectAsStateWithLifecycle()
     val items = vm.items.collectAsLazyPagingItems()
-    CategoryBrowser(sections, filtered, vm::toggleShowAll, selected, vm::select, items, { it.streamId }, vm.focusMemory, above = {
+    CategoryBrowser(sections, filtered, vm::toggleShowAll, selected, vm::select, items, { it.movie.streamId }, vm.focusMemory, above = {
         GenreChips(genres, genre, { vm.genre.value = it })
-    }, tile = { movie, modifier ->
+    }, tile = { tile, modifier ->
+        val movie = tile.movie
         PosterTile(
             title = movie.name,
             imageUrl = movie.posterUrl,
             width = GridPosterWidth,
+            label = if (tile.versions > 1) "${tile.versions} versies" else null,
             favorite = movie.streamId in favorites,
             progress = progress[movie.streamId],
             onClick = {

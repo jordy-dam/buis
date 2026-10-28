@@ -36,7 +36,10 @@ import nl.jordy.iptv.data.xtream.XtreamClient
 import nl.jordy.iptv.data.xtream.XtreamCredentials
 import nl.jordy.iptv.ui.components.PrimaryButton
 import nl.jordy.iptv.ui.components.TvTextField
-import nl.jordy.iptv.ui.theme.BuisWordmark
+import androidx.compose.foundation.Image
+import androidx.compose.foundation.layout.size
+import androidx.compose.ui.res.painterResource
+import nl.jordy.iptv.R
 import nl.jordy.iptv.ui.theme.SafeArea
 import nl.jordy.iptv.ui.theme.TextSecondary
 import javax.inject.Inject
@@ -92,7 +95,7 @@ fun LoginScreen(onLoggedIn: () -> Unit, vm: LoginViewModel = hiltViewModel()) {
     Box(Modifier.fillMaxSize().padding(SafeArea), contentAlignment = Alignment.Center) {
         Column(Modifier.width(560.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
-                BuisWordmark()
+                Image(painterResource(R.drawable.ic_buis), contentDescription = "BUIS", modifier = Modifier.size(88.dp))
                 Text("  Beste Unieke IPTV Stream", style = MaterialTheme.typography.bodyLarge, color = TextSecondary)
             }
             Text("Log in met je IPTV-abonnement (Xtream Codes).", style = MaterialTheme.typography.titleLarge)

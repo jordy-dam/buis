@@ -12,11 +12,13 @@ and emulator-tested: `docs/plans/2026-10-28-phase-2d-bladeren.md`. 2d is on the 
 frames went from 20% to 5%. Phase 2e "verfijnen" (quiet focus, one step smaller, Home channel
 cards, avatar top left, "Profiel bewerken" in Instellingen, film genres via background
 `get_vod_info`) is built and emulator-tested: `docs/plans/2026-10-28-phase-2e-verfijnen.md`.
-Waiting on: Jordy's round logo (1024×1024 PNG, transparent) and a 320×180 launcher banner.
+2e is on the tv. Phase 2f "eigen gezicht" (logo, icon and banner, five drawn avatars, one tile per
+film with a version choice, text one step smaller, screen kept on while playing) is built and
+emulator-tested: `docs/plans/2026-10-28-phase-2f-eigen-gezicht.md`.
 
 ## Current phase
 Phase 1 — done and tested on the real tv. Phase 2a — built and installed on the tv (not started yet
- by Jordy); open: EPG check on the tv. Phase 2b, 2c and 2d — on the tv. Phase 2e — built, emulator-tested (debug and release), not on the tv.
+ by Jordy); open: EPG check on the tv. Phase 2b to 2e — on the tv. Phase 2f — built, emulator-tested (debug and release), not on the tv.
 
 ## What's working (emulator + mock server)
 - Login with validation and Dutch error states (wrong password, expired, unreachable, not Xtream)
@@ -32,6 +34,7 @@ Phase 1 — done and tested on the real tv. Phase 2a — built and installed on 
 - Guide (2c): full XMLTV in Room, refreshed on start (>20 h), after a sync and via "Gids vernieuwen"; `NU ·` + progress on every channel, "Straks" strip, aliases for channels without an EPG id
 - Layout (2c): one-line 48dp channel rows, rail collapses to icons in the content, Zoeken first in the rail, 104dp posters
 - Browsing (2d): Films/Series = category list (Diensten, Genres, Overig) + grid; series genre chips; channel rows with heart before the number and a fixed quality/catch-up slot
+- Look (2f): round logo as icon/banner/picker header (`docs/brand/make-logo.sh`), five drawn avatars ("Gezicht"), one tile per film with versions on the detail screen, screen kept on while playing
 - Refinements (2e): quiet focus on list rows, one step smaller type/tiles, 5-column grid, Home channel cards, avatar top of the rail, "Profiel bewerken" in Instellingen, film genre chips fed by `MovieEnricher` (status under Instellingen → "Filmgegevens")
 
 ## What's not (yet)
@@ -62,6 +65,8 @@ See `.agents/onboarding/new-dev.md` (mock server: `./mockserver/generate-media.s
 
 ## Real-tv notes
 - Install over Ethernet: USB debugging on, `adb connect 192.168.68.91:5555` (see onboarding).
+- Every `adb install` stops the running app on the tv ("package updated" in `dumpsys activity exit-info nl.jordy.iptv`); only install when Jordy says so, ideally while nobody watches.
+- The TCL starts Google TV's screensaver after 10 min without a key press (`screen_off_timeout` 600000); the player keeps the screen on while playing (2f).
 - The tv runs the **release** build (`assembleRelease`, signed with the debug key): `adb -s 192.168.68.91:5555 install -r app/build/outputs/apk/release/app-release.apk`. Release isn't debuggable, so `run-as` (reading its database) doesn't work there.
 - Frame times on the tv (`adb shell dumpsys gfxinfo nl.jordy.iptv`, `… reset` to start fresh): debug build 20% janky, p90 85 ms, p99 400 ms; release + R8 5.2% janky, p90 36 ms, p99 150 ms.
 - With the emulator also running, `./gradlew installDebug` installs on both: use `adb -s <device> install -r`.

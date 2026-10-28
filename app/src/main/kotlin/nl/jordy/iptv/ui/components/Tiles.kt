@@ -99,6 +99,8 @@ fun PosterTile(
     width: Dp = 92.dp,
     favorite: Boolean = false,
     progress: Float? = null,
+    /** A small note in the corner, such as "2 versies". */
+    label: String? = null,
 ) {
     Card(
         onClick = onClick,
@@ -124,6 +126,15 @@ fun PosterTile(
                 AsyncImage(model = imageUrl, contentDescription = title, contentScale = ContentScale.Crop, modifier = Modifier.fillMaxSize())
             }
             if (favorite) FavoriteBadge(Modifier.align(Alignment.TopEnd).padding(6.dp))
+            if (label != null) {
+                Text(
+                    label,
+                    style = MaterialTheme.typography.labelSmall,
+                    color = TextPrimary,
+                    modifier = Modifier.align(Alignment.TopStart).padding(5.dp)
+                        .background(Color.Black.copy(alpha = 0.6f), RoundedCornerShape(4.dp)).padding(horizontal = 5.dp, vertical = 1.dp),
+                )
+            }
             if (progress != null) ProgressBar(progress, Modifier.align(Alignment.BottomCenter))
         }
     }

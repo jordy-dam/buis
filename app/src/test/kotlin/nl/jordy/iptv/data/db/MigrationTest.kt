@@ -101,6 +101,18 @@ class MigrationTest {
         }
     }
 
+    @Test
+    fun `5 to 6 adds drawn avatars, existing profiles keep their letter`() {
+        helper.createDatabase(DB, 5).use { db ->
+            db.execSQL("INSERT INTO profile (id, name, avatar, pinHash, preferredCountries, onlyPreferred, kids, lastUsedAt, createdAt) VALUES (1, 'Anna', 3, NULL, 'NL', 1, 0, 5, 1)")
+            db.execSQL("INSERT INTO movie_info (streamId, genre, `cast`, director, plot, rating, fetchedAt, failed) VALUES (7, 'Drama', NULL, NULL, NULL, NULL, 1, 0)")
+        }
+        helper.runMigrationsAndValidate(DB, 6, true).use { db ->
+            db.query("SELECT avatar, face FROM profile WHERE id = 1").use { it.moveToFirst(); assertEquals(3, it.getInt(0)); assertEquals(0, it.getInt(1)) }
+            assertEquals("film details stay", 1, db.count("movie_info"))
+        }
+    }
+
     private fun SupportSQLiteDatabase.insertPhase1Data() {
         execSQL("INSERT INTO favorite (type, itemId, name, imageUrl, addedAt) VALUES ('LIVE', 101, '┃NL┃ NPO 1 HD', NULL, 1)")
         execSQL("INSERT INTO playback_position (type, itemId, positionMs, durationMs, updatedAt) VALUES ('MOVIE', 5001, 62000, 180000, 2)")

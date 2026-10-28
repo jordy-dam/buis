@@ -119,6 +119,18 @@ class ProfileIsolationTest {
     }
 
     @Test
+    fun `a new profile gets a face and colour nobody uses yet, a fresh household starts with the cat`() = runTest {
+        profiles.ensureOne()
+        assertEquals(1, profiles.all().single().face)
+        val taken = listOf(
+            nl.jordy.iptv.data.db.ProfileEntity(1, "A", avatar = 0, face = 1),
+            nl.jordy.iptv.data.db.ProfileEntity(2, "B", avatar = 1, face = 0),
+            nl.jordy.iptv.data.db.ProfileEntity(3, "C", avatar = 2, face = 2),
+        )
+        assertEquals(3 to 3, ProfileRepository.defaultLook(taken))
+    }
+
+    @Test
     fun `editing from Instellingen asks the same PINs as the picker`() {
         val dad = nl.jordy.iptv.data.db.ProfileEntity(1, "Papa", 0, pinHash = "h1")
         val mum = nl.jordy.iptv.data.db.ProfileEntity(2, "Mama", 1, pinHash = "h2")

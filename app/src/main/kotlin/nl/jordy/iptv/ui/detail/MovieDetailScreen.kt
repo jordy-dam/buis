@@ -1,6 +1,18 @@
 package nl.jordy.iptv.ui.detail
 
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.padding
+import androidx.compose.ui.Alignment
+import androidx.tv.material3.MaterialTheme
+import androidx.tv.material3.Text
+import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.flatMapLatest
+import nl.jordy.iptv.data.db.MovieVersionRow
+import nl.jordy.iptv.data.repo.MovieVersions
+import nl.jordy.iptv.ui.components.Chip
+import nl.jordy.iptv.ui.theme.TextSecondary
 import androidx.compose.foundation.layout.Row
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -34,27 +46,48 @@ import nl.jordy.iptv.ui.components.SecondaryButton
 import nl.jordy.iptv.ui.player.formatTime
 import javax.inject.Inject
 
+/** A version the detail screen offers: the stream and its button text. */
+data class Version(val streamId: Int, val label: String, val containerExtension: String)
+
+@OptIn(ExperimentalCoroutinesApi::class)
 @HiltViewModel
 class MovieDetailViewModel @Inject constructor(
     savedState: SavedStateHandle,
     private val db: AppDatabase,
     private val library: LibraryRepository,
 ) : ViewModel() {
-    val streamId = savedState.toRoute<MovieDetailRoute>().streamId
+    private val opened = savedState.toRoute<MovieDetailRoute>().streamId
 
     val movie = MutableStateFlow<MovieEntity?>(null)
     val info = MutableStateFlow<MovieInfo?>(null)
-    val position = library.position(ContentType.MOVIE, streamId).stateIn(viewModelScope, SharingStarted.Eagerly, null)
-    val isFavorite = library.isFavorite(ContentType.MOVIE, streamId).stateIn(viewModelScope, SharingStarted.Eagerly, false)
+
+    /** All language versions of this film; one entry when there's only one. */
+    val versions = MutableStateFlow<List<Version>>(emptyList())
+    /** The version Play, the resume position and the favourite heart refer to. */
+    val selected = MutableStateFlow(opened)
+
+    val position = selected.flatMapLatest { library.position(ContentType.MOVIE, it) }.stateIn(viewModelScope, SharingStarted.Eagerly, null)
+    val isFavorite = selected.flatMapLatest { library.isFavorite(ContentType.MOVIE, it) }.stateIn(viewModelScope, SharingStarted.Eagerly, false)
 
     init {
-        viewModelScope.launch { movie.value = db.catalog().movie(streamId) }
-        viewModelScope.launch { info.value = library.movieInfo(streamId) }
+        viewModelScope.launch {
+            val m = db.catalog().movie(opened) ?: return@launch
+            movie.value = m
+            val rows = db.catalog().movieVersions(m.name, m.year).ifEmpty { listOf(MovieVersionRow(m, null)) }
+            versions.value = rows.zip(MovieVersions.labels(rows)) { r, label -> Version(r.movie.streamId, label, r.movie.containerExtension) }
+            // Start on the version watched last, else the one that was opened.
+            val watched = library.positions(ContentType.MOVIE).first().filter { p -> rows.any { it.movie.streamId == p.itemId } }
+                .associate { it.itemId to it.updatedAt }
+            selected.value = MovieVersions.pickDefault(rows.map { it.movie.streamId }, watched, opened)
+        }
+        viewModelScope.launch { info.value = library.movieInfo(opened) }
     }
+
+    fun select(streamId: Int) { selected.value = streamId }
 
     fun toggleFavorite() = viewModelScope.launch {
         val m = movie.value ?: return@launch
-        library.toggleFavorite(ContentType.MOVIE, m.streamId, m.name, m.posterUrl)
+        library.toggleFavorite(ContentType.MOVIE, selected.value, m.name, m.posterUrl)
     }
 }
 
@@ -64,13 +97,16 @@ fun MovieDetailScreen(onPlay: (PlayerRoute) -> Unit, vm: MovieDetailViewModel = 
     val info by vm.info.collectAsStateWithLifecycle()
     val position by vm.position.collectAsStateWithLifecycle()
     val favorite by vm.isFavorite.collectAsStateWithLifecycle()
+    val versions by vm.versions.collectAsStateWithLifecycle()
+    val selected by vm.selected.collectAsStateWithLifecycle()
     val m = movie ?: return
     val primary = remember { FocusRequester() }
     LaunchedEffect(Unit) { runCatching { primary.requestFocus() } }
 
     val resumeAt = position?.let { ResumePolicy.startPosition(it.positionMs, it.durationMs) } ?: 0
-    val ext = info?.containerExtension ?: m.containerExtension
-    fun play(fromStart: Boolean) = onPlay(PlayerRoute(PlayerRoute.Kind.MOVIE, m.streamId, m.name, ext, fromStart = fromStart))
+    val version = versions.firstOrNull { it.streamId == selected }
+    val ext = version?.containerExtension ?: info?.containerExtension ?: m.containerExtension
+    fun play(fromStart: Boolean) = onPlay(PlayerRoute(PlayerRoute.Kind.MOVIE, selected, m.name, ext, fromStart = fromStart))
 
     DetailScaffold(
         title = m.name,
@@ -79,14 +115,23 @@ fun MovieDetailScreen(onPlay: (PlayerRoute) -> Unit, vm: MovieDetailViewModel = 
         facts = facts(info?.year ?: m.year, info?.rating ?: m.rating, info?.genre, info?.durationSecs),
         plot = info?.plot,
         actions = {
-            Row(horizontalArrangement = Arrangement.spacedBy(16.dp)) {
-                if (resumeAt > 0) {
-                    PrimaryButton("Hervatten vanaf ${formatTime(resumeAt)}", { play(false) }, Modifier.focusRequester(primary))
-                    SecondaryButton("Vanaf begin", { play(true) })
-                } else {
-                    PrimaryButton("Afspelen", { play(true) }, Modifier.focusRequester(primary))
+            Column(verticalArrangement = Arrangement.spacedBy(14.dp)) {
+                Row(horizontalArrangement = Arrangement.spacedBy(16.dp)) {
+                    if (resumeAt > 0) {
+                        PrimaryButton("Hervatten vanaf ${formatTime(resumeAt)}", { play(false) }, Modifier.focusRequester(primary))
+                        SecondaryButton("Vanaf begin", { play(true) })
+                    } else {
+                        PrimaryButton("Afspelen", { play(true) }, Modifier.focusRequester(primary))
+                    }
+                    SecondaryButton(if (favorite) "♥︎ In favorieten" else "♡︎ Favoriet", { vm.toggleFavorite() })
                 }
-                SecondaryButton(if (favorite) "♥︎ In favorieten" else "♡︎ Favoriet", { vm.toggleFavorite() })
+                // Language versions of the same film: picking one changes what Play starts.
+                if (versions.size > 1) {
+                    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        Text("Versie", style = MaterialTheme.typography.labelLarge, color = TextSecondary, modifier = Modifier.padding(end = 4.dp))
+                        versions.forEach { v -> Chip(v.label, v.streamId == selected) { vm.select(v.streamId) } }
+                    }
+                }
             }
         },
     )

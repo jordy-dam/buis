@@ -99,6 +99,8 @@ data class ProfileEntity(
     val name: String,
     /** Index into the built-in avatar colours. */
     val avatar: Int,
+    /** Drawn avatar 1..5 (cat, fox, robot, owl, monster), or 0 for the initial letter. */
+    @ColumnInfo(defaultValue = "0") val face: Int = 0,
     val pinHash: String? = null,
     /** Comma-separated group codes ("NL,BE"). */
     val preferredCountries: String = "NL",

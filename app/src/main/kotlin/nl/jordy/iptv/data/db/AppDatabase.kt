@@ -24,7 +24,7 @@ import androidx.sqlite.db.SupportSQLiteDatabase
         EpgInfoEntity::class,
         MovieInfoEntity::class,
     ],
-    version = 5,
+    version = 6,
     exportSchema = true,
     autoMigrations = [
         AutoMigration(from = 1, to = 2, spec = AppDatabase.CatalogResync::class),
@@ -32,6 +32,8 @@ import androidx.sqlite.db.SupportSQLiteDatabase
         AutoMigration(from = 3, to = 4),
         // Film details table only; filled in the background.
         AutoMigration(from = 4, to = 5),
+        // Drawn avatars; existing profiles keep their letter (face 0).
+        AutoMigration(from = 5, to = 6),
     ],
 )
 abstract class AppDatabase : RoomDatabase() {

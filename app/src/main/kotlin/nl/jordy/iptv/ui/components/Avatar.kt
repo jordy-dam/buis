@@ -1,6 +1,8 @@
 package nl.jordy.iptv.ui.components
 
 import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.Image
+import androidx.compose.ui.graphics.ColorFilter
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -36,10 +38,18 @@ val AvatarColors = listOf(
 
 fun avatarColor(index: Int) = AvatarColors[index.mod(AvatarColors.size)]
 
-/** Coloured circle with the name's first letter. No photos and no emoji: emoji ignore the theme. */
+/**
+ * Coloured circle with a drawn [face] (see [AvatarFaces]) or, for face 0, the name's first letter.
+ * No photos and no emoji: emoji ignore the theme.
+ */
 @Composable
-fun AvatarCircle(name: String, avatar: Int, size: Dp, modifier: Modifier = Modifier, symbol: String? = null) {
+fun AvatarCircle(name: String, avatar: Int, size: Dp, modifier: Modifier = Modifier, symbol: String? = null, face: Int = 0) {
     Box(modifier.size(size).background(avatarColor(avatar), CircleShape), contentAlignment = Alignment.Center) {
+        val drawn = AvatarFaces.get(face).takeIf { symbol == null }
+        if (drawn != null) {
+            Image(drawn, contentDescription = null, colorFilter = ColorFilter.tint(TextPrimary), modifier = Modifier.size(size * 0.68f))
+            return@Box
+        }
         Text(
             symbol ?: name.trim().take(1).uppercase().ifEmpty { "?" },
             color = TextPrimary,
@@ -59,6 +69,7 @@ fun AvatarTile(
     caption: String? = null,
     size: Dp = 128.dp,
     symbol: String? = null,
+    face: Int = 0,
 ) {
     Column(Modifier.width(size + 40.dp), horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(14.dp)) {
         Surface(
@@ -69,7 +80,7 @@ fun AvatarTile(
             border = ClickableSurfaceDefaults.border(focusedBorder = Border(BorderStroke(4.dp, TextPrimary), shape = CircleShape)),
             glow = ClickableSurfaceDefaults.glow(focusedGlow = Focus.glow),
             colors = ClickableSurfaceDefaults.colors(containerColor = Color.Transparent, focusedContainerColor = Color.Transparent),
-        ) { AvatarCircle(name, avatar, size, symbol = symbol) }
+        ) { AvatarCircle(name, avatar, size, symbol = symbol, face = face) }
         Text(name, style = MaterialTheme.typography.titleMedium, maxLines = 1, overflow = TextOverflow.Ellipsis, textAlign = TextAlign.Center)
         caption?.let { Text(it, style = MaterialTheme.typography.bodyMedium, color = TextSecondary, textAlign = TextAlign.Center) }
     }

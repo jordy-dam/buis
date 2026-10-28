@@ -37,6 +37,8 @@ import androidx.compose.ui.input.key.nativeKeyCode
 import androidx.compose.ui.input.key.onKeyEvent
 import androidx.compose.ui.input.key.type
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalView
+import androidx.media3.common.Player
 import androidx.compose.ui.unit.dp
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.Lifecycle
@@ -80,6 +82,21 @@ fun PlayerScreen(onExit: () -> Unit, vm: PlayerViewModel = hiltViewModel()) {
         overlayVisible = false
     }
     LaunchedEffect(Unit) { focus.requestFocus() }
+
+    // Keep the screen on while something actually plays: without it the Google TV screensaver
+    // takes over after its timeout (10 min on the TCL) in the middle of a film. Paused, it may come.
+    val view = LocalView.current
+    DisposableEffect(vm.player) {
+        val listener = object : Player.Listener {
+            override fun onIsPlayingChanged(isPlaying: Boolean) { view.keepScreenOn = isPlaying }
+        }
+        vm.player.addListener(listener)
+        view.keepScreenOn = vm.player.isPlaying
+        onDispose {
+            vm.player.removeListener(listener)
+            view.keepScreenOn = false
+        }
+    }
     if (!vm.isLive) {
         LaunchedEffect(Unit) {
             while (true) {

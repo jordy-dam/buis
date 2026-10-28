@@ -70,7 +70,8 @@ class SearchRepository @Inject constructor(private val db: AppDatabase) {
         fun <T> ordered(ids: List<Int>, rows: List<T>, id: (T) -> Int) = rows.associateBy(id).let { m -> ids.mapNotNull { m[it] } }
         return SearchResults(
             channels = ids(ContentType.LIVE).let { ordered(it, dao.liveByIds(it)) { c -> c.streamId } },
-            movies = ids(ContentType.MOVIE).let { ordered(it, dao.moviesByIds(it)) { m -> m.streamId } },
+            // One hit per film: language versions of the same title and year are one result.
+            movies = ids(ContentType.MOVIE).let { ordered(it, dao.moviesByIds(it)) { m -> m.streamId } }.distinctBy { it.name.lowercase() to it.year },
             series = ids(ContentType.SERIES).let { ordered(it, dao.seriesByIds(it)) { s -> s.seriesId } },
         )
     }

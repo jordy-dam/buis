@@ -38,7 +38,10 @@ import nl.jordy.iptv.data.profile.Pin
 import nl.jordy.iptv.data.profile.ProfileRepository
 import nl.jordy.iptv.ui.components.AvatarTile
 import nl.jordy.iptv.ui.components.SecondaryButton
-import nl.jordy.iptv.ui.theme.BuisWordmark
+import androidx.compose.foundation.Image
+import androidx.compose.foundation.layout.size
+import androidx.compose.ui.res.painterResource
+import nl.jordy.iptv.R
 import nl.jordy.iptv.ui.theme.SafeArea
 import javax.inject.Inject
 
@@ -101,13 +104,14 @@ fun ProfilePickerScreen(
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.spacedBy(32.dp, Alignment.CenterVertically),
     ) {
-        BuisWordmark()
+        Image(painterResource(R.drawable.ic_buis), contentDescription = "BUIS", modifier = Modifier.size(96.dp))
         Text(if (managing) "Profielen beheren" else "Wie kijkt er?", style = MaterialTheme.typography.displaySmall)
         Row(Modifier.focusRestorer().focusGroup(), horizontalArrangement = Arrangement.spacedBy(32.dp)) {
             s.profiles.forEachIndexed { i, p ->
                 AvatarTile(
                     name = p.name,
                     avatar = p.avatar,
+                    face = p.face,
                     caption = when {
                         managing -> "Bewerken"
                         p.kids -> "Kinderprofiel"
