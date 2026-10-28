@@ -1,0 +1,12 @@
+{
+  "seasons": [],
+  "info": {"name": "Afleveringen als lijst"},
+  "episodes": [
+    [
+      {"id": "81001", "episode_num": 1, "title": "S1E1", "container_extension": "mkv", "season": 1}
+    ],
+    [
+      {"id": "81002", "episode_num": 1, "title": "S2E1", "container_extension": "mkv", "season": 2}
+    ]
+  ]
+}

@@ -1,0 +1,16 @@
+[
+  {"num": 1, "name": "NPO 1 HD", "stream_type": "live", "stream_id": 101, "stream_icon": "{base}/img/logo0.png", "epg_channel_id": "npo1.nl", "added": "1700000000", "category_id": "1", "tv_archive": 0},
+  {"num": "2", "name": "NPO 2 HD", "stream_type": "live", "stream_id": "102", "stream_icon": "", "epg_channel_id": null, "added": 1700000000, "category_id": 1},
+  {"num": null, "name": "RTL 4", "stream_id": 103, "stream_icon": null, "category_id": "1"},
+  {"name": "Kapotte logo-URL", "stream_id": 104, "stream_icon": "http://", "category_id": "1"},
+  {"name": "Logo 404", "stream_id": 105, "stream_icon": "{base}/img/does-not-exist.png", "category_id": "1"},
+  {"name": null, "stream_id": 106, "category_id": "2"},
+  {"name": "Geen stream_id", "category_id": "2"},
+  {"name": "stream_id als tekst", "stream_id": "abc", "category_id": "2"},
+  {"name": "Ziggo Sport", "stream_id": 107, "stream_icon": "{base}/img/logo1.png", "category_id": "2", "epg_channel_id": "ziggosport.nl"},
+  {"name": "Zonder categorie", "stream_id": 108, "category_id": null},
+  {"name": "Alleen TS (geen m3u8)", "stream_id": 117, "stream_icon": "{base}/img/logo2.png", "category_id": "1"},
+  {"name": "Dubbel id", "stream_id": 101, "category_id": "5"},
+  42,
+  null
+]

@@ -1,0 +1,11 @@
+[
+  {"category_id": "1", "category_name": "NL | Algemeen", "parent_id": 0},
+  {"category_id": 2, "category_name": "NL | Sport", "parent_id": "0"},
+  {"category_id": "3", "category_name": null, "parent_id": 0},
+  {"category_id": null, "category_name": "Kapot zonder id"},
+  {"category_name": "Ook geen id"},
+  {"category_id": "4", "category_name": "   ===== XXX ===== ", "parent_id": 0},
+  {"category_id": "5", "category_name": "UK | Entertainment"},
+  "not an object",
+  null
+]

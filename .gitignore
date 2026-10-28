@@ -35,3 +35,6 @@ output-metadata.json
 # Logs / OS
 *.log
 .DS_Store
+
+# Generated mock-server test media
+mockserver/media/

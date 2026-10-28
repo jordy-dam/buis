@@ -20,8 +20,20 @@ On the real Google TV:
 3. `adb pair <tv-ip>:<pair-port>` with the code shown on the tv, then `adb connect <tv-ip>:<port>`.
 4. `./gradlew installDebug`
 
+Without Android Studio: `brew install --cask android-commandlinetools`, accept the licences with
+`sdkmanager --licenses`, install `platform-tools`, `platforms;android-37.0`, `emulator` and
+`system-images;android-36;google-tv;arm64-v8a`, and put `sdk.dir=…` in `local.properties`.
+
 Xtream credentials go in the app's login screen, never in the repo. For development, use the mock
-Xtream server (added in phase 1).
+Xtream server (dev only, never in the APK):
+
+```
+./mockserver/generate-media.sh     # once; needs ffmpeg, output is gitignored
+./gradlew :mockserver:run          # http://127.0.0.1:8080, login demo / demo
+```
+
+In the emulator, log in with server `10.0.2.2:8080`. Channels whose id ends in 7 have no HLS, to
+exercise the .ts fallback. Zap times are logged in debug builds under logcat tag `Zap`.
 
 ## 3. Where things live
 - Build spec and phases: `docs/spec/build-prompt.md`

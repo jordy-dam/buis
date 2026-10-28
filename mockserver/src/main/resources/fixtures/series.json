@@ -1,0 +1,6 @@
+[
+  {"num": 1, "name": "Testserie", "series_id": 7001, "cover": "{base}/img/poster2.png", "plot": "Drie seizoenen testbeeld.", "cast": "Kleurbalk", "genre": "Drama", "releaseDate": "2020-01-01", "rating": "8.1", "category_id": "20", "backdrop_path": ["{base}/img/backdrop2.png"]},
+  {"name": "Rating null", "series_id": "7002", "cover": null, "rating": null, "category_id": 20, "backdrop_path": []},
+  {"name": "Backdrop als string", "series_id": 7003, "backdrop_path": "{base}/img/backdrop3.png", "category_id": "21", "year": "2018"},
+  {"name": "Geen series_id", "category_id": "21"}
+]

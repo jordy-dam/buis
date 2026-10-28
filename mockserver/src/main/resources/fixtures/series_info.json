@@ -1,0 +1,25 @@
+{
+  "seasons": [
+    {"season_number": 1, "name": "Seizoen 1", "episode_count": "2"},
+    {"season_number": "2", "name": "Seizoen 2"}
+  ],
+  "info": {
+    "name": "Testserie",
+    "cover": "{base}/img/poster2.png",
+    "plot": "Drie seizoenen testbeeld.",
+    "genre": "Drama",
+    "rating": "8.1",
+    "backdrop_path": ["{base}/img/backdrop2.png"]
+  },
+  "episodes": {
+    "1": [
+      {"id": "80001", "episode_num": 1, "title": "Testserie - S01E01 - Begin", "container_extension": "mp4", "season": 1, "info": {"plot": "Het begin.", "duration_secs": 180, "movie_image": "{base}/img/backdrop2.png"}},
+      {"id": "80002", "episode_num": "2", "title": "Testserie - S01E02", "container_extension": "mp4", "season": "1", "info": []}
+    ],
+    "2": [
+      {"id": 80003, "episode_num": 1, "title": null, "container_extension": null, "season": 2},
+      {"episode_num": 2, "title": "Geen id", "season": 2}
+    ],
+    "3": []
+  }
+}

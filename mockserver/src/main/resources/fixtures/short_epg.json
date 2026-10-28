@@ -1,0 +1,7 @@
+{
+  "epg_listings": [
+    {"id": "1", "epg_id": "1", "title": "TlUgT1AgVFY=", "lang": "nl", "start": "2026-10-28 17:00:00", "end": "2026-10-28 18:00:00", "description": "SGV0IHByb2dyYW1tYSBkYXQgbnUgbG9vcHQu", "channel_id": "npo1.nl", "start_timestamp": "1792515600", "stop_timestamp": "1792519200"},
+    {"id": "2", "title": "RGFhcm5h", "start": "2026-10-28 18:00:00", "end": "2026-10-28 19:00:00", "description": "", "start_timestamp": 1792519200, "stop_timestamp": "1792522800"},
+    {"id": "3", "title": "not base64 at all!!", "start_timestamp": "x", "stop_timestamp": null}
+  ]
+}

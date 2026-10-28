@@ -11,3 +11,33 @@
 **Why:** Viewing history of household members is personal data. Keeping it on the device avoids a backend to run and secure, and avoids sending it anywhere.
 **Alternatives rejected:** A small sync backend for profiles across devices; an external recommendation service.
 **Revisit if:** the app needs to run on more than one tv with shared profiles.
+
+## 2026-10-28 — Media3 pinned to the Jellyfin FFmpeg decoder version
+**Decision:** Media3 1.9.0 with `org.jellyfin.media3:media3-ffmpeg-decoder:1.9.0+1`, renderer mode `EXTENSION_RENDERER_MODE_ON` (platform decoders first, FFmpeg as fallback).
+**Why:** Google publishes no FFmpeg decoder artifact; Jellyfin's prebuilt one only exists for 1.9.0, and mixed Media3 versions break at runtime. Mode ON instead of PREFER: software-decoding every audio track costs CPU on cheap tv dongles that decode AC3 fine themselves.
+**Alternatives rejected:** Building the FFmpeg extension ourselves (NDK toolchain in the build, slow, fragile); Media3 1.11 without FFmpeg (EAC3 channels silent on some devices).
+**Revisit if:** Jellyfin publishes a decoder for a newer Media3, or AC3/EAC3 audio stutters on the tv (then try PREFER). Bump `media3` and `ffmpegDecoder` together.
+
+## 2026-10-28 — OkHttp + kotlinx.serialization directly, no Retrofit
+**Decision:** `XtreamClient` calls OkHttp itself and parses to `JsonElement`, mapped per item by `XtreamParser`. Big arrays are decoded as a stream (`decodeToSequence`) and written to Room in batches of 500.
+**Why:** Xtream JSON is too inconsistent for typed DTOs (numbers as strings, `[]` instead of objects), and streaming 10k+ items doesn't fit Retrofit's model. Retrofit would add a layer that does nothing here.
+**Alternatives rejected:** Retrofit with lenient DTOs (the spec's suggestion): one bad item fails a whole list; Ktor client (second HTTP stack next to the one Media3/Coil use).
+**Revisit if:** we start talking to an API with a stable schema.
+
+## 2026-10-28 — Credentials: DataStore + Tink AEAD, key in Android Keystore
+**Decision:** Xtream login is stored as one AES-256-GCM blob (Tink) in a DataStore file; the Tink keyset is wrapped by an Android Keystore key. No HTTP logging interceptor, because every Xtream URL contains the password.
+**Why:** `EncryptedSharedPreferences` (security-crypto) is deprecated; Tink is what it used underneath.
+**Alternatives rejected:** EncryptedSharedPreferences (deprecated); plain DataStore (credentials in plain text on disk).
+**Revisit if:** Android ships a supported replacement in Jetpack.
+
+## 2026-10-28 — Live playback fails fast on 4xx
+**Decision:** `FailFastLoadErrorPolicy`: no retries on HTTP 4xx; 5xx and network errors keep Media3's normal retries. Live tries `.m3u8` first and falls back to `.ts`; a channel whose HLS failed goes straight to `.ts` for the rest of the session.
+**Why:** Measured on the emulator: with the default policy a 404 playlist was retried with 1s + 2s back-off, so a TS-only channel took 3+ seconds to start. With fail-fast it starts in ~0.6s, within the 2s zap budget.
+**Alternatives rejected:** Probing which format a provider supports at login (extra requests, and providers differ per channel).
+**Revisit if:** a provider returns transient 4xx (e.g. 429) where a retry would help.
+
+## 2026-10-28 — compileSdk/targetSdk 37
+**Decision:** Compile and target API 37 (Android 17); minSdk stays 28.
+**Why:** The current androidx Compose/navigation/Coil releases require compileSdk 37; the spec asks to target the latest stable SDK.
+**Alternatives rejected:** Older library versions to stay on 36.
+**Revisit if:** something behaves differently on the tv's Android TV OS version that we can't handle.

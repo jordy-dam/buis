@@ -1,0 +1,21 @@
+{
+  "info": {
+    "movie_image": "{base}/img/poster0.png",
+    "backdrop_path": ["{base}/img/backdrop0.png"],
+    "plot": "Een testfilm met een testbeeld en een sinustoon. Ideaal om hervatten te testen.",
+    "cast": "Kleurbalk, Sinus Toon",
+    "director": "FFmpeg",
+    "genre": "Drama, Documentaire",
+    "releasedate": "2019-05-01",
+    "duration_secs": 180,
+    "duration": "00:03:00",
+    "rating": "7.5"
+  },
+  "movie_data": {
+    "stream_id": 5001,
+    "name": "Testfilm (2019)",
+    "added": "1700000000",
+    "category_id": "10",
+    "container_extension": "mp4"
+  }
+}
