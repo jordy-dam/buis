@@ -1,0 +1,37 @@
+# Never commit local/personal memory
+.agents/memory/.local/
+!.agents/memory/.local/.gitkeep
+
+# Secrets: Xtream credentials, signing keys
+.env
+*.env
+secrets.properties
+keystore.properties
+*.jks
+*.keystore
+
+# Gradle / Kotlin
+.gradle/
+.kotlin/
+build/
+local.properties
+
+# Android Studio / IntelliJ (keep shared code style + run configs)
+*.iml
+.idea/*
+!.idea/codeStyles/
+!.idea/runConfigurations/
+captures/
+.externalNativeBuild/
+.cxx/
+.navigation/
+
+# Build outputs
+*.apk
+*.aab
+*.ap_
+output-metadata.json
+
+# Logs / OS
+*.log
+.DS_Store
