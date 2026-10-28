@@ -40,7 +40,7 @@ class FavoritesViewModel @Inject constructor(private val library: LibraryReposit
     fun remove(f: FavoriteEntity) = viewModelScope.launch { library.toggleFavorite(f.type, f.itemId, f.name, f.imageUrl) }
 }
 
-/** One global list for now (per profile in phase 2): channels, films and series as separate rows. */
+/** The watching profile's favourites: channels, films and series as separate rows. */
 @OptIn(ExperimentalComposeUiApi::class)
 @Composable
 fun FavoritesScreen(

@@ -5,6 +5,15 @@ import kotlinx.serialization.Serializable
 @Serializable data object LoginRoute
 @Serializable data object SyncRoute
 @Serializable data object ShellRoute
+
+/**
+ * "Wie kijkt er?". [atLaunch]: shown on start, Back exits and a pick continues to [syncAfter]
+ * (stale catalog) or the shell. Otherwise opened from the rail: a pick or Back returns there.
+ */
+@Serializable data class ProfilesRoute(val atLaunch: Boolean, val syncAfter: Boolean = false)
+
+/** Add (id 0) or edit a profile. */
+@Serializable data class ProfileEditRoute(val id: Long = 0)
 @Serializable data class MovieDetailRoute(val streamId: Int)
 @Serializable data class SeriesDetailRoute(val seriesId: Int)
 

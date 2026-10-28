@@ -13,6 +13,16 @@ import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.text.style.TextOverflow
+import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
+import androidx.lifecycle.ViewModel
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import dagger.hilt.android.lifecycle.HiltViewModel
+import nl.jordy.iptv.data.profile.ProfileRepository
+import nl.jordy.iptv.ui.components.AvatarCircle
+import nl.jordy.iptv.ui.home.HomeScreen
+import javax.inject.Inject
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -50,8 +60,9 @@ import nl.jordy.iptv.ui.theme.TextSecondary
 import nl.jordy.iptv.ui.vod.MoviesScreen
 import nl.jordy.iptv.ui.vod.SeriesScreen
 
-/** Tabs of the rail. Home joins in phase 2b, once there are profiles to fill it per person. */
+/** Tabs of the rail. Home is the start tab: the watching profile's own rows. */
 enum class Tab(val label: String, val icon: String) {
+    HOME("Home", "⌂"),
     LIVE("Live TV", "▶"),
     MOVIES("Films", "■"),
     SERIES("Series", "≡"),
@@ -65,13 +76,16 @@ enum class Tab(val label: String, val icon: String) {
 @OptIn(ExperimentalComposeUiApi::class)
 @Composable
 fun ShellScreen(
+    onSwitchProfile: () -> Unit,
     onPlay: (PlayerRoute) -> Unit,
     onOpenMovie: (Int) -> Unit,
     onOpenSeries: (Int) -> Unit,
     onRefreshCatalog: () -> Unit,
     onLoggedOut: () -> Unit,
+    vm: ShellViewModel = hiltViewModel(),
 ) {
-    var tab by rememberSaveable { mutableStateOf(Tab.LIVE) }
+    val profile by vm.profile.collectAsStateWithLifecycle()
+    var tab by rememberSaveable { mutableStateOf(Tab.HOME) }
     var confirmExit by remember { mutableStateOf(false) }
     val railFocus = remember { Tab.entries.associateWith { FocusRequester() } }
     val activity = LocalActivity.current
@@ -84,11 +98,22 @@ fun ShellScreen(
         }
     }
 
-    // Back: any tab → Live TV → "Afsluiten?". Screens handle their own inner Back first.
+    // Someone else picked up the remote: start them on their own Home, not on the last one's tab.
+    var shownProfile by rememberSaveable { mutableStateOf<Long?>(null) }
+    LaunchedEffect(profile?.id) {
+        val id = profile?.id ?: return@LaunchedEffect
+        if (shownProfile != null && shownProfile != id) {
+            tab = Tab.HOME
+            runCatching { railFocus.getValue(Tab.HOME).requestFocus() }
+        }
+        shownProfile = id
+    }
+
+    // Back: any tab → Home → "Afsluiten?". Screens handle their own inner Back first.
     BackHandler {
-        if (tab != Tab.LIVE) {
-            tab = Tab.LIVE
-            railFocus.getValue(Tab.LIVE).requestFocus()
+        if (tab != Tab.HOME) {
+            tab = Tab.HOME
+            railFocus.getValue(Tab.HOME).requestFocus()
         } else confirmExit = true
     }
 
@@ -101,9 +126,10 @@ fun ShellScreen(
                 .padding(start = 24.dp, end = 12.dp, top = SafeArea, bottom = SafeArea)
                 .focusRestorer(railFocus.getValue(tab))
                 .focusGroup(),
-            verticalArrangement = Arrangement.spacedBy(8.dp),
+            verticalArrangement = Arrangement.spacedBy(4.dp),
         ) {
-            BuisWordmark(Modifier.padding(start = 12.dp, bottom = 24.dp))
+            BuisWordmark(Modifier.padding(start = 12.dp, bottom = 8.dp))
+            profile?.let { ProfileItem(it.name, it.avatar, onSwitchProfile) }
             Tab.entries.forEach { t ->
                 if (t == Tab.SETTINGS) Spacer(Modifier.weight(1f))
                 RailItem(t, selected = t == tab, onFocus = { tab = t }, modifier = Modifier.focusRequester(railFocus.getValue(t)))
@@ -111,6 +137,7 @@ fun ShellScreen(
         }
         Box(Modifier.fillMaxSize().padding(top = SafeArea, end = SafeArea, start = 24.dp)) {
             when (tab) {
+                Tab.HOME -> HomeScreen(onPlay = onPlay, onOpenMovie = onOpenMovie)
                 Tab.LIVE -> LiveScreen(onPlay = onPlay)
                 Tab.MOVIES -> MoviesScreen(onOpenMovie = onOpenMovie)
                 Tab.SERIES -> SeriesScreen(onOpenSeries = onOpenSeries)
@@ -123,6 +150,37 @@ fun ShellScreen(
 
     if (confirmExit) {
         ExitDialog(onExit = { activity?.finish() }, onDismiss = { confirmExit = false })
+    }
+}
+
+@HiltViewModel
+class ShellViewModel @Inject constructor(profiles: ProfileRepository) : ViewModel() {
+    val profile = profiles.current
+}
+
+/**
+ * Who's watching, at the top of the rail. Unlike the tabs, focusing it does nothing: OK opens
+ * "Wie kijkt er?", so switching is Up, OK, (Left/Right), OK.
+ */
+@Composable
+private fun ProfileItem(name: String, avatar: Int, onClick: () -> Unit) {
+    Surface(
+        onClick = onClick,
+        shape = ClickableSurfaceDefaults.shape(RoundedCornerShape(8.dp)),
+        scale = ClickableSurfaceDefaults.scale(focusedScale = 1.05f),
+        border = ClickableSurfaceDefaults.border(focusedBorder = Focus.border),
+        colors = ClickableSurfaceDefaults.colors(containerColor = androidx.compose.ui.graphics.Color.Transparent, focusedContainerColor = SurfaceRaised),
+    ) {
+        Row(Modifier.padding(horizontal = 8.dp, vertical = 6.dp), verticalAlignment = Alignment.CenterVertically) {
+            AvatarCircle(name, avatar, 32.dp)
+            Text(
+                name,
+                style = MaterialTheme.typography.titleMedium,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+                modifier = Modifier.padding(start = 12.dp),
+            )
+        }
     }
 }
 
@@ -140,7 +198,7 @@ private fun RailItem(tab: Tab, selected: Boolean, onFocus: () -> Unit, modifier:
             focusedContainerColor = SurfaceRaised,
         ),
     ) {
-        Row(Modifier.padding(horizontal = 12.dp, vertical = 12.dp)) {
+        Row(Modifier.padding(horizontal = 12.dp, vertical = 9.dp)) {
             Text(tab.icon, color = if (selected) Accent else TextSecondary, modifier = Modifier.width(28.dp))
             Text(tab.label, style = MaterialTheme.typography.titleMedium, color = if (selected) Accent else MaterialTheme.colorScheme.onSurface)
         }

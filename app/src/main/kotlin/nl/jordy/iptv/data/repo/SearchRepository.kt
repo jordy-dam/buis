@@ -55,11 +55,17 @@ object SearchRanking {
 @Singleton
 class SearchRepository @Inject constructor(private val db: AppDatabase) {
 
-    suspend fun search(query: String, preferred: Set<String>): SearchResults {
+    /** [hideAdult]: kids profile, hits that only sit in adult categories are dropped. */
+    suspend fun search(query: String, preferred: Set<String>, hideAdult: Boolean = false): SearchResults {
         val match = SearchRanking.matchExpression(query) ?: return SearchResults()
-        // Over-fetch, then rank: FTS returns hits in index order, not by relevance.
-        val ranked = SearchRanking.rank(db.search().match(match, preferred.toList(), limit = 600), query, preferred, perType = PER_TYPE)
         val dao = db.catalog()
+        var hits = db.search().match(match, preferred.toList(), limit = 600)
+        if (hideAdult) {
+            val adult = ContentType.entries.associateWith { dao.adultCategoryIds(it).toSet() }
+            hits = hits.filterNot { h -> ContentType.valueOf(h.type).let { h.categoryId in adult.getValue(it) } }
+        }
+        // Over-fetch, then rank: FTS returns hits in index order, not by relevance.
+        val ranked = SearchRanking.rank(hits, query, preferred, perType = PER_TYPE)
         fun ids(type: ContentType) = ranked[type.name].orEmpty().map { it.itemId }
         fun <T> ordered(ids: List<Int>, rows: List<T>, id: (T) -> Int) = rows.associateBy(id).let { m -> ids.mapNotNull { m[it] } }
         return SearchResults(

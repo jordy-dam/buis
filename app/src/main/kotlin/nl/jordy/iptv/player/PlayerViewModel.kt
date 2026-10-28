@@ -149,7 +149,7 @@ class PlayerViewModel @Inject constructor(
         return when (val cat = route.categoryId) {
             null -> emptyList()
             PlayerRoute.FAVORITES_CATEGORY -> {
-                val favs = db.favorites().all().first().filter { it.type == ContentType.LIVE }
+                val favs = library.favorites().first().filter { it.type == ContentType.LIVE }
                 val byId = dao.liveByIds(favs.map { it.itemId }).associateBy { it.streamId }
                 favs.mapNotNull { byId[it.itemId] }
             }
@@ -225,7 +225,11 @@ class PlayerViewModel @Inject constructor(
 
     // VOD
 
+    /** Whose position this is: the profile that started playing, even if saving happens later. */
+    private var profileId: Long? = null
+
     private suspend fun playVod(url: String, type: ContentType) {
+        profileId = library.currentProfileId()
         val saved = if (route.fromStart) null else library.savedPosition(type, route.id)
         val startAt = ResumePolicy.startPosition(saved?.positionMs, saved?.durationMs ?: 0)
         player.setMediaItem(MediaItem.fromUri(url), startAt)
@@ -238,13 +242,15 @@ class PlayerViewModel @Inject constructor(
     private suspend fun saveLoop() {
         while (viewModelScope.isActive) {
             delay(10_000)
-            if (playbackStarted && player.isPlaying) library.reportProgress(vodType, route.id, player.currentPosition, player.duration.coerceAtLeast(0))
+            val profile = profileId ?: continue
+            if (playbackStarted && player.isPlaying) library.reportProgress(profile, vodType, route.id, player.currentPosition, player.duration.coerceAtLeast(0))
         }
     }
 
     fun saveNow() {
+        val profile = profileId ?: return
         if (!isLive && playbackStarted) {
-            library.reportProgressDetached(vodType, route.id, player.currentPosition, player.duration.coerceAtLeast(0))
+            library.reportProgressDetached(profile, vodType, route.id, player.currentPosition, player.duration.coerceAtLeast(0))
         }
     }
 

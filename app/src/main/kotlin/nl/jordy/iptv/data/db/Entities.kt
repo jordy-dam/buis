@@ -2,6 +2,7 @@ package nl.jordy.iptv.data.db
 
 import androidx.room.ColumnInfo
 import androidx.room.Entity
+import androidx.room.ForeignKey
 import androidx.room.Fts4
 import androidx.room.Index
 import androidx.room.PrimaryKey
@@ -24,6 +25,8 @@ data class CategoryEntity(
     val generation: Long,
     /** ISO-ish country tag from the provider's prefix (`┃NL┃ …` → "NL"); null for PPV, sports packs etc. */
     val country: String? = null,
+    /** Adult content by the provider's name (`ADULT`, `XXX`, `18+`); hidden on kids profiles. */
+    @ColumnInfo(defaultValue = "0") val adult: Boolean = false,
 )
 
 @Entity(tableName = "live_channel", primaryKeys = ["categoryId", "streamId"], indices = [Index("streamId")])
@@ -86,9 +89,35 @@ data class EpisodeEntity(
     val durationSecs: Int?,
 )
 
+/**
+ * A household member. Their country settings live on the row, so switching profile switches them.
+ * [pinHash] is a household lock against children, not security (see [nl.jordy.iptv.data.profile.Pin]).
+ */
+@Entity(tableName = "profile")
+data class ProfileEntity(
+    @PrimaryKey(autoGenerate = true) val id: Long = 0,
+    val name: String,
+    /** Index into the built-in avatar colours. */
+    val avatar: Int,
+    val pinHash: String? = null,
+    /** Comma-separated group codes ("NL,BE"). */
+    val preferredCountries: String = "NL",
+    val onlyPreferred: Boolean = true,
+    /** Hides adult categories everywhere. */
+    val kids: Boolean = false,
+    /** The profile with the highest value is the active one; picking a profile bumps it. */
+    val lastUsedAt: Long = 0,
+    val createdAt: Long = 0,
+)
+
 /** Name and image are a snapshot, so a favourite still renders if a re-sync drops or renames the item. */
-@Entity(tableName = "favorite", primaryKeys = ["type", "itemId"])
+@Entity(
+    tableName = "favorite",
+    primaryKeys = ["profileId", "type", "itemId"],
+    foreignKeys = [ForeignKey(ProfileEntity::class, ["id"], ["profileId"], onDelete = ForeignKey.CASCADE)],
+)
 data class FavoriteEntity(
+    val profileId: Long,
     val type: ContentType,
     val itemId: Int,
     val name: String,
@@ -97,8 +126,13 @@ data class FavoriteEntity(
 )
 
 /** Movies use type MOVIE + streamId; episodes use type SERIES + episodeId. */
-@Entity(tableName = "playback_position", primaryKeys = ["type", "itemId"])
+@Entity(
+    tableName = "playback_position",
+    primaryKeys = ["profileId", "type", "itemId"],
+    foreignKeys = [ForeignKey(ProfileEntity::class, ["id"], ["profileId"], onDelete = ForeignKey.CASCADE)],
+)
 data class PlaybackPositionEntity(
+    val profileId: Long,
     val type: ContentType,
     val itemId: Int,
     val positionMs: Long,

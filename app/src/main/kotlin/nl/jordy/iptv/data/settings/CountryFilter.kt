@@ -10,14 +10,17 @@ import nl.jordy.iptv.data.db.CategoryEntity
  * Order: preferred countries, then categories without a country (PPV, Champions League, Multi,
  * radio…), then everything else, each block in the provider's own order. With [onlyPreferred],
  * the last block is hidden: on a 16k-channel provider that removes ~90% of the noise.
+ * [hideAdult] (kids profiles) drops adult categories whatever the other settings say.
  */
 object CountryFilter {
     fun apply(
         categories: List<CategoryEntity>,
         preferred: Set<String>,
         onlyPreferred: Boolean,
+        hideAdult: Boolean = false,
     ): List<CategoryEntity> {
-        val (mine, rest) = categories.partition { it.country != null && it.country in preferred }
+        val visible = if (hideAdult) categories.filterNot { it.adult } else categories
+        val (mine, rest) = visible.partition { it.country != null && it.country in preferred }
         val (untagged, foreign) = rest.partition { it.country == null }
         return if (onlyPreferred && mine.isNotEmpty()) mine + untagged else mine + untagged + foreign
     }
@@ -42,6 +45,8 @@ fun Flow<List<CategoryEntity>>.filteredBy(
     showAll: Flow<Boolean>,
 ): Flow<FilteredCategories> =
     combine(this, prefs, showAll) { cats, p, all ->
-        val shown = CountryFilter.apply(cats, p.preferredCountries, onlyPreferred = p.onlyPreferred && !all)
-        FilteredCategories(shown, hidden = cats.size - shown.size, showingAll = all)
+        val shown = CountryFilter.apply(cats, p.preferredCountries, onlyPreferred = p.onlyPreferred && !all, hideAdult = p.hideAdult)
+        // Adult categories on a kids profile don't count as "more": "Alle landen" won't show them.
+        val reachable = if (p.hideAdult) cats.count { !it.adult } else cats.size
+        FilteredCategories(shown, hidden = reachable - shown.size, showingAll = all)
     }

@@ -35,3 +35,9 @@
 **Why:** Jordy's choice; a first attempt with a play symbol in the U and a colour gradient was rejected as too busy.
 **Alternatives rejected:** Play-symbol and gradient wordmark; renaming the package (would force a reinstall and lose local data).
 **Revisit if:** the app is ever distributed beyond this household (DIN is only used as a rendered image, not shipped as a font).
+
+## 2026-10-28 — Phase 2b "huishouden": profiles, Home as start screen, kids profile
+**Decision:** Household profiles without login: "Wie kijkt er?" on launch when there is more than one profile (focus on the last used, so one OK), switching from an avatar at the top of the rail (two OK presses). Per profile: favourites, resume positions / "Verder kijken", preferred countries and the filter. Shared: subscription, catalog, search index, EPG. Profiles are managed in the picker ("Profielen beheren"), not in Instellingen; Instellingen shows "Voor <naam>" and "Voor iedereen". Home is now the first tab and start screen with "Verder kijken", "Favoriete zenders" and "Recent toegevoegd"; Back goes to Home, then "Afsluiten?". A kids profile hides adult categories (name contains ADULT, XXX or 18+) everywhere; once a kids profile exists, managing profiles asks a grown-up's PIN. Avatars are 8 fixed colours with the initial; no photos.
+**Why:** Jordy's scope for 2b. The kids profile was a proposal: it costs one column and a filter, and without the management lock a child could simply switch it off.
+**Alternatives rejected:** Profile management inside Instellingen (a kids profile could reach it); photo or emoji avatars (emoji ignore the theme); ratings, hiding/reordering categories and the EPG grid in 2b (stay in the backlog).
+**Revisit if:** the household wants per-profile category hiding, or the adult name match misses the real provider's categories.

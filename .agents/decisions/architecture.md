@@ -41,3 +41,15 @@
 **Why:** The current androidx Compose/navigation/Coil releases require compileSdk 37; the spec asks to target the latest stable SDK.
 **Alternatives rejected:** Older library versions to stay on 36.
 **Revisit if:** something behaves differently on the tv's Android TV OS version that we can't handle.
+
+## 2026-10-28 — Profiles: active profile is the last used one, settings live on the profile row
+**Decision:** A `profile` table (Room, schema 3) holds name, avatar colour, PIN hash, preferred countries, the "alleen voorkeurslanden" switch and the kids flag. `favorite` and `playback_position` are keyed by `(profileId, type, itemId)` with `ON DELETE CASCADE`. The watching profile is simply the one with the highest `lastUsedAt`; picking a profile bumps it. `ProfileRepository` exposes it as a flow and every per-profile query goes through it (`flatMapLatest`). The 2a DataStore settings are copied once into the first profile and the file is emptied. Migration 2→3 is a hand-written `Migration` (primary keys change, so the two tables are rebuilt); existing rows go to "Profiel 1" and the catalog is emptied so the sync fills the new `category.adult` column.
+**Why:** One source of truth that survives process death without extra state: a restored back stack always has a profile, and "Wie kijkt er?" can focus whoever watched last. Settings next to the profile make a switch one write, and a removed profile takes its data with it.
+**Alternatives rejected:** A separate in-memory "session" plus a DataStore key for the last profile (two places to keep in sync, nothing after process death); one DataStore file per profile; an AutoMigration spec for the key change (less readable than the SQL).
+**Revisit if:** profiles need to sync between devices (see "Data stays on the device").
+
+## 2026-10-28 — Profile PIN is a household lock, not security
+**Decision:** Optional 4-digit PIN per profile, stored as `salt:sha256(salt + pin)`, entered on an on-screen keypad (hardware digit keys also work). Forgotten PIN: "Uitloggen" wipes everything.
+**Why:** It keeps children out of a parent's profile. Four digits can be brute-forced by anyone holding the database file, which on an unrooted tv nobody has; a slow KDF would add nothing real.
+**Alternatives rejected:** PBKDF2/Argon2 (no gain at 10,000 possible PINs); a master PIN (one more thing to forget).
+**Revisit if:** a profile ever protects something more sensitive than what a child may watch.

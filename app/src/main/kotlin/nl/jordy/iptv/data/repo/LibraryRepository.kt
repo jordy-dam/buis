@@ -4,13 +4,16 @@ import androidx.room.withTransaction
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.launch
 import nl.jordy.iptv.data.auth.CredentialStore
 import nl.jordy.iptv.data.db.AppDatabase
 import nl.jordy.iptv.data.db.EpisodeEntity
 import nl.jordy.iptv.data.db.FavoriteEntity
 import nl.jordy.iptv.data.db.PlaybackPositionEntity
+import nl.jordy.iptv.data.profile.ProfileRepository
 import nl.jordy.iptv.data.xtream.ContentType
 import nl.jordy.iptv.data.xtream.MovieInfo
 import nl.jordy.iptv.data.xtream.SeriesInfo
@@ -27,6 +30,7 @@ class LibraryRepository @Inject constructor(
     private val client: XtreamClient,
     private val credentials: CredentialStore,
     private val db: AppDatabase,
+    private val profiles: ProfileRepository,
 ) {
     private val movieInfo = ConcurrentHashMap<Int, MovieInfo>()
     private val detached = CoroutineScope(SupervisorJob() + Dispatchers.IO)
@@ -57,40 +61,50 @@ class LibraryRepository @Inject constructor(
 
     fun episodes(seriesId: Int): Flow<List<EpisodeEntity>> = db.episodes().forSeries(seriesId)
 
-    // Favourites
+    // Favourites and resume positions belong to the watching profile; the flows follow a switch.
 
-    fun favorites(): Flow<List<FavoriteEntity>> = db.favorites().all()
-    fun favoriteIds(type: ContentType): Flow<List<Int>> = db.favorites().ids(type)
-    fun isFavorite(type: ContentType, id: Int): Flow<Boolean> = db.favorites().observeIsFavorite(type, id)
+    @OptIn(ExperimentalCoroutinesApi::class)
+    private fun <T> perProfile(query: (Long) -> Flow<T>): Flow<T> = profiles.currentId.flatMapLatest(query)
+
+    fun favorites(): Flow<List<FavoriteEntity>> = perProfile { db.favorites().all(it) }
+    fun favoriteIds(type: ContentType): Flow<List<Int>> = perProfile { db.favorites().ids(it, type) }
+    fun isFavorite(type: ContentType, id: Int): Flow<Boolean> = perProfile { db.favorites().observeIsFavorite(it, type, id) }
 
     /** Returns true when the item is now a favourite. */
     suspend fun toggleFavorite(type: ContentType, id: Int, name: String, imageUrl: String?): Boolean {
         val dao = db.favorites()
-        return if (dao.isFavorite(type, id)) {
-            dao.delete(type, id)
+        val profile = profiles.currentId()
+        return if (dao.isFavorite(profile, type, id)) {
+            dao.delete(profile, type, id)
             false
         } else {
-            dao.upsert(FavoriteEntity(type, id, name, imageUrl, System.currentTimeMillis()))
+            dao.upsert(FavoriteEntity(profile, type, id, name, imageUrl, System.currentTimeMillis()))
             true
         }
     }
 
     // Resume positions (movies: MOVIE + streamId, episodes: SERIES + episodeId)
 
-    fun position(type: ContentType, id: Int): Flow<PlaybackPositionEntity?> = db.playback().observe(type, id)
-    fun positions(type: ContentType): Flow<List<PlaybackPositionEntity>> = db.playback().observeAll(type)
-    suspend fun savedPosition(type: ContentType, id: Int): PlaybackPositionEntity? = db.playback().get(type, id)
+    fun position(type: ContentType, id: Int): Flow<PlaybackPositionEntity?> = perProfile { db.playback().observe(it, type, id) }
+    fun positions(type: ContentType): Flow<List<PlaybackPositionEntity>> = perProfile { db.playback().observeAll(it, type) }
+    fun recentPositions(limit: Int): Flow<List<PlaybackPositionEntity>> = perProfile { db.playback().recent(it, limit) }
+    suspend fun savedPosition(type: ContentType, id: Int): PlaybackPositionEntity? = db.playback().get(profiles.currentId(), type, id)
 
-    /** Fire-and-forget save that outlives the player screen, for the final position on exit. */
-    fun reportProgressDetached(type: ContentType, id: Int, positionMs: Long, durationMs: Long) {
-        detached.launch { reportProgress(type, id, positionMs, durationMs) }
+    /**
+     * Fire-and-forget save that outlives the player screen, for the final position on exit.
+     * [profileId] is the profile that started playing, taken when playback began.
+     */
+    fun reportProgressDetached(profileId: Long, type: ContentType, id: Int, positionMs: Long, durationMs: Long) {
+        detached.launch { reportProgress(profileId, type, id, positionMs, durationMs) }
     }
 
-    suspend fun reportProgress(type: ContentType, id: Int, positionMs: Long, durationMs: Long) {
+    suspend fun reportProgress(profileId: Long, type: ContentType, id: Int, positionMs: Long, durationMs: Long) {
         when (val d = ResumePolicy.onProgress(positionMs, durationMs)) {
             is ResumePolicy.Decision.Save ->
-                db.playback().upsert(PlaybackPositionEntity(type, id, d.positionMs, durationMs, System.currentTimeMillis()))
-            ResumePolicy.Decision.Clear -> db.playback().delete(type, id)
+                db.playback().upsert(PlaybackPositionEntity(profileId, type, id, d.positionMs, durationMs, System.currentTimeMillis()))
+            ResumePolicy.Decision.Clear -> db.playback().delete(profileId, type, id)
         }
     }
+
+    suspend fun currentProfileId(): Long = profiles.currentId()
 }

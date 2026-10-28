@@ -55,7 +55,7 @@ import nl.jordy.iptv.data.db.CategoryEntity
 import nl.jordy.iptv.data.db.LiveChannelEntity
 import nl.jordy.iptv.data.repo.EpgRepository
 import nl.jordy.iptv.data.repo.LibraryRepository
-import nl.jordy.iptv.data.settings.SettingsStore
+import nl.jordy.iptv.data.profile.ProfileRepository
 import nl.jordy.iptv.data.settings.filteredBy
 import nl.jordy.iptv.data.xtream.ContentType
 import nl.jordy.iptv.ui.PlayerRoute
@@ -72,14 +72,14 @@ import javax.inject.Inject
 @HiltViewModel
 class LiveViewModel @Inject constructor(
     db: AppDatabase,
-    settings: SettingsStore,
+    profiles: ProfileRepository,
     private val epg: EpgRepository,
     private val library: LibraryRepository,
 ) : ViewModel() {
     private val dao = db.catalog()
     private val showAll = MutableStateFlow(false)
 
-    val filtered = dao.liveCategories().filteredBy(settings.prefs, showAll)
+    val filtered = dao.liveCategories().filteredBy(profiles.prefs, showAll)
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), null)
     val categories = filtered.map { it?.shown }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), null)
 
@@ -89,7 +89,8 @@ class LiveViewModel @Inject constructor(
 
     /** The category whose channels are shown: the one last focused, else the first. Survives navigating to the player. */
     val selected = combine(explicitCategory, categories) { picked, cats ->
-        picked ?: cats?.firstOrNull()?.id
+        // A profile switch can hide the picked category; fall back to the first one then.
+        picked?.takeIf { id -> cats?.any { it.id == id } == true } ?: cats?.firstOrNull()?.id
     }.stateIn(viewModelScope, SharingStarted.Eagerly, null)
 
     @OptIn(ExperimentalCoroutinesApi::class)

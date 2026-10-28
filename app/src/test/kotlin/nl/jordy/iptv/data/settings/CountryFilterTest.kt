@@ -7,7 +7,7 @@ import org.junit.Test
 
 class CountryFilterTest {
 
-    private fun cat(id: String, country: String?) = CategoryEntity(ContentType.LIVE, id, id, 0, 0, country)
+    private fun cat(id: String, country: String?, adult: Boolean = false) = CategoryEntity(ContentType.LIVE, id, id, 0, 0, country, adult)
 
     // Provider order: PPV first, Dutch somewhere in the middle, like the real catalog.
     private val provider = listOf(
@@ -42,5 +42,18 @@ class CountryFilterTest {
     fun `country picker lists preferred first, then by size`() {
         val cats = listOf(cat("a", "US"), cat("b", "US"), cat("c", "GB"), cat("d", "NL"), cat("e", null))
         assertEquals(listOf("NL", "US", "GB"), CountryFilter.countries(cats, setOf("NL")))
+    }
+
+    @Test
+    fun `a kids profile never sees adult categories, not even with the filter off`() {
+        val withAdult = provider + cat("xxx", null, adult = true) + cat("nl-adult", "NL", adult = true)
+        assertEquals(listOf("nl1", "nl2", "ppv", "radio"), CountryFilter.apply(withAdult, setOf("NL"), onlyPreferred = true, hideAdult = true).map { it.id })
+        assertEquals(false, CountryFilter.apply(withAdult, setOf("NL"), onlyPreferred = false, hideAdult = true).any { it.adult })
+    }
+
+    @Test
+    fun `other profiles keep seeing adult categories as before`() {
+        val withAdult = provider + cat("xxx", null, adult = true)
+        assertEquals(true, CountryFilter.apply(withAdult, setOf("NL"), onlyPreferred = true).any { it.id == "xxx" })
     }
 }

@@ -8,11 +8,12 @@ import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import kotlinx.coroutines.flow.SharingStarted
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import nl.jordy.iptv.BuildConfig
 import nl.jordy.iptv.data.epg.XmltvProbe
 import nl.jordy.iptv.data.settings.CountryFilter
-import nl.jordy.iptv.data.settings.SettingsStore
+import nl.jordy.iptv.data.profile.ProfileRepository
 import nl.jordy.iptv.data.settings.UserPrefs
 import nl.jordy.iptv.data.xtream.NameParser
 import nl.jordy.iptv.ui.components.Focus
@@ -78,7 +79,7 @@ data class SettingsState(
 
 @HiltViewModel
 class SettingsViewModel @Inject constructor(
-    private val settings: SettingsStore,
+    private val profiles: ProfileRepository,
     private val xmltvProbe: XmltvProbe,
     private val credentials: CredentialStore,
     private val db: AppDatabase,
@@ -88,7 +89,8 @@ class SettingsViewModel @Inject constructor(
     private val _state = MutableStateFlow(SettingsState())
     val state = _state.asStateFlow()
 
-    val prefs = settings.prefs.stateIn(viewModelScope, SharingStarted.Eagerly, UserPrefs())
+    val prefs = profiles.prefs.stateIn(viewModelScope, SharingStarted.Eagerly, UserPrefs())
+    val profileName = profiles.current.map { it?.name.orEmpty() }.stateIn(viewModelScope, SharingStarted.Eagerly, "")
 
     /** Countries this provider actually has, for the picker. */
     val countries = MutableStateFlow<List<String>>(emptyList())
@@ -97,7 +99,7 @@ class SettingsViewModel @Inject constructor(
         val now = prefs.value.preferredCountries
         // Never empty: with no preferred country the filter would show nothing useful.
         val next = if (code in now) (now - code).ifEmpty { now } else now + code
-        settings.setPreferredCountries(next)
+        profiles.setPreferredCountries(next)
     }
 
     /** Debug builds only: how much of the provider's full guide covers the preferred channels. */
@@ -108,7 +110,7 @@ class SettingsViewModel @Inject constructor(
         epgCheck.value = xmltvProbe.run(prefs.value.preferredCountries).also { android.util.Log.i("EpgCheck", it) }
     }
 
-    fun toggleOnlyPreferred() = viewModelScope.launch { settings.setOnlyPreferred(!prefs.value.onlyPreferred) }
+    fun toggleOnlyPreferred() = viewModelScope.launch { profiles.setOnlyPreferred(!prefs.value.onlyPreferred) }
 
     init {
         viewModelScope.launch {
@@ -125,13 +127,14 @@ class SettingsViewModel @Inject constructor(
                 },
                 counts = "${n.format(dao.liveCount())} zenders · ${n.format(dao.movieCount())} films · ${n.format(dao.seriesCount())} series",
             )
-            countries.value = CountryFilter.countries(dao.allCategories(), prefs.value.preferredCountries)
+            countries.value = CountryFilter.countries(dao.allCategories(), profiles.currentPrefs().preferredCountries)
         }
     }
 
     /**
-     * Wipes everything tied to this provider: catalog, favourites and resume positions only make
-     * sense for its ids, and viewing history shouldn't outlive the login it belongs to.
+     * Wipes everything tied to this provider: catalog, profiles, favourites and resume positions
+     * only make sense for its ids, and viewing history shouldn't outlive the login it belongs to.
+     * The next sync creates a fresh first profile.
      */
     fun logout(then: () -> Unit) = viewModelScope.launch {
         withContext(Dispatchers.IO) { db.clearAllTables() }
@@ -142,12 +145,16 @@ class SettingsViewModel @Inject constructor(
     }
 }
 
-/** Settings: countries, subscription, catalog, logout. Only what's needed, not every knob other apps have. */
+/**
+ * Settings, split by whom they affect: the watching profile's countries, and the household's
+ * catalog and subscription. Profiles themselves are managed from "Wie kijkt er?".
+ */
 @OptIn(ExperimentalComposeUiApi::class)
 @Composable
 fun SettingsScreen(onRefreshCatalog: () -> Unit, onLoggedOut: () -> Unit, vm: SettingsViewModel = hiltViewModel()) {
     val state by vm.state.collectAsStateWithLifecycle()
     val prefs by vm.prefs.collectAsStateWithLifecycle()
+    val profileName by vm.profileName.collectAsStateWithLifecycle()
     val countries by vm.countries.collectAsStateWithLifecycle()
     val epgCheck by vm.epgCheck.collectAsStateWithLifecycle()
     var confirmLogout by remember { mutableStateOf(false) }
@@ -162,7 +169,7 @@ fun SettingsScreen(onRefreshCatalog: () -> Unit, onLoggedOut: () -> Unit, vm: Se
     ) {
         Text("Instellingen", style = MaterialTheme.typography.headlineMedium, modifier = Modifier.padding(bottom = 8.dp))
 
-        Header("Weergave")
+        Header("Voor $profileName")
         SettingRow(
             "Voorkeurslanden",
             "Staan bovenaan in Live TV, Films, Series en Zoeken.",
@@ -177,19 +184,18 @@ fun SettingsScreen(onRefreshCatalog: () -> Unit, onLoggedOut: () -> Unit, vm: Se
             onClick = vm::toggleOnlyPreferred,
         )
 
-        Header("Catalogus")
+        Header("Voor iedereen")
         SettingRow(
             "Catalogus vernieuwen",
             state.lastSync?.let { "Bijgewerkt $it · ${state.counts}" } ?: "Nog nooit opgehaald.",
             onClick = onRefreshCatalog,
         )
 
-        Header("Abonnement")
         SettingRow("Server", value = state.server)
         SettingRow("Gebruiker", value = state.username)
         SettingRow(
             "Uitloggen",
-            "Wist de catalogus, je favorieten en waar je gebleven was op deze tv.",
+            "Wist de catalogus en alle profielen, met hun favorieten en kijkgeschiedenis, op deze tv.",
             onClick = { confirmLogout = true },
             destructive = true,
         )
@@ -209,7 +215,7 @@ fun SettingsScreen(onRefreshCatalog: () -> Unit, onLoggedOut: () -> Unit, vm: Se
 }
 
 @Composable
-private fun Header(title: String) {
+internal fun Header(title: String) {
     Text(
         title.uppercase(),
         style = MaterialTheme.typography.labelLarge,
@@ -223,7 +229,7 @@ private fun Header(title: String) {
  * Rows without [onClick] only inform, so they aren't focusable and the d-pad skips them.
  */
 @Composable
-private fun SettingRow(
+internal fun SettingRow(
     title: String,
     description: String? = null,
     value: String? = null,
@@ -266,7 +272,7 @@ private fun LogoutDialog(onConfirm: () -> Unit, onDismiss: () -> Unit) {
         ) {
             Text("Uitloggen?", style = MaterialTheme.typography.headlineMedium)
             Text(
-                "De catalogus, je favorieten en waar je gebleven was worden van deze tv gewist.",
+                "De catalogus en alle profielen, met hun favorieten en kijkgeschiedenis, worden van deze tv gewist.",
                 style = MaterialTheme.typography.bodyLarge,
                 color = TextSecondary,
             )

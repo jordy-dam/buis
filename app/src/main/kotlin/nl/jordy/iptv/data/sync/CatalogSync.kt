@@ -83,7 +83,7 @@ class CatalogSync @Inject constructor(
                 val n = NameParser.parse(it.name, stripQuality = false)
                 // "APPLE TV+ · Multi": the badge stays readable next to the name.
                 val name = (listOf(n.title) + n.badges).joinToString(" · ")
-                categories += CategoryEntity(type, it.id, name, categories.size, generation, n.country)
+                categories += CategoryEntity(type, it.id, name, categories.size, generation, n.country, adult = NameParser.isAdult(it.name))
             }
         }
         val categoryCountry = categories.associate { it.id to it.country }

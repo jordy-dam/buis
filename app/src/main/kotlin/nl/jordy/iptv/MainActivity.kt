@@ -20,7 +20,9 @@ import kotlinx.coroutines.launch
 import nl.jordy.iptv.data.auth.CredentialStore
 import nl.jordy.iptv.data.db.AppDatabase
 import nl.jordy.iptv.ui.AppNavHost
+import nl.jordy.iptv.data.profile.ProfileRepository
 import nl.jordy.iptv.ui.LoginRoute
+import nl.jordy.iptv.ui.ProfilesRoute
 import nl.jordy.iptv.ui.ShellRoute
 import nl.jordy.iptv.ui.SyncRoute
 import nl.jordy.iptv.ui.theme.Background
@@ -46,11 +48,15 @@ class MainActivity : ComponentActivity() {
     }
 }
 
-/** Picks the first screen: login when there are no credentials, sync when the catalog is missing or a day old. */
+/**
+ * Picks the first screen: login when there are no credentials, then "Wie kijkt er?" when there is
+ * more than one profile, then sync when the catalog is missing or a day old.
+ */
 @HiltViewModel
 class StartViewModel @Inject constructor(
     credentials: CredentialStore,
     db: AppDatabase,
+    profiles: ProfileRepository,
 ) : ViewModel() {
     private val _start = MutableStateFlow<Any?>(null)
     val start = _start.asStateFlow()
@@ -58,10 +64,13 @@ class StartViewModel @Inject constructor(
     init {
         viewModelScope.launch {
             val creds = runCatching { credentials.current() }.getOrNull()
+            profiles.ensureOne()
             val lastSync = db.syncInfo().get()?.lastSyncAt ?: 0
+            val stale = System.currentTimeMillis() - lastSync > RESYNC_AFTER_MS
             _start.value = when {
                 creds == null -> LoginRoute
-                System.currentTimeMillis() - lastSync > RESYNC_AFTER_MS -> SyncRoute
+                profiles.all().size > 1 -> ProfilesRoute(atLaunch = true, syncAfter = stale)
+                stale -> SyncRoute
                 else -> ShellRoute
             }
         }

@@ -4,6 +4,7 @@ import androidx.paging.PagingSource
 import androidx.room.Dao
 import androidx.room.Insert
 import androidx.room.Query
+import androidx.room.Update
 import androidx.room.Upsert
 import kotlinx.coroutines.flow.Flow
 import nl.jordy.iptv.data.xtream.ContentType
@@ -63,6 +64,17 @@ interface CatalogDao {
     )
     suspend fun liveEpgIds(countries: List<String>): List<String?>
 
+    /** "Recent toegevoegd" on Home: newest films in the given countries, each film once. */
+    @Query(
+        "SELECT m.* FROM movie m JOIN category c ON c.type = 'MOVIE' AND c.id = m.categoryId " +
+            "WHERE c.country IN (:countries) AND (:hideAdult = 0 OR c.adult = 0) AND m.addedAt IS NOT NULL " +
+            "GROUP BY m.streamId ORDER BY m.addedAt DESC LIMIT :limit",
+    )
+    fun recentMovies(countries: List<String>, hideAdult: Boolean, limit: Int): Flow<List<MovieEntity>>
+
+    @Query("SELECT id FROM category WHERE type = :type AND adult = 1")
+    suspend fun adultCategoryIds(type: ContentType): List<String>
+
     @Query("SELECT COUNT(*) FROM live_channel") suspend fun liveCount(): Int
     @Query("SELECT COUNT(*) FROM movie") suspend fun movieCount(): Int
     @Query("SELECT COUNT(*) FROM series") suspend fun seriesCount(): Int
@@ -78,27 +90,48 @@ interface EpisodeDao {
 }
 
 @Dao
+interface ProfileDao {
+    @Insert suspend fun insert(item: ProfileEntity): Long
+    @Update suspend fun update(item: ProfileEntity)
+    @Query("DELETE FROM profile WHERE id = :id") suspend fun delete(id: Long)
+    @Query("SELECT * FROM profile ORDER BY createdAt, id") fun observeAll(): Flow<List<ProfileEntity>>
+    @Query("SELECT * FROM profile ORDER BY createdAt, id") suspend fun all(): List<ProfileEntity>
+    @Query("SELECT * FROM profile WHERE id = :id") suspend fun get(id: Long): ProfileEntity?
+    /** Makes [id] the most recently used; strictly newest even when two picks share a millisecond. */
+    @Query("UPDATE profile SET lastUsedAt = MAX(:at, (SELECT MAX(lastUsedAt) FROM profile) + 1) WHERE id = :id")
+    suspend fun touch(id: Long, at: Long)
+}
+
+/** Everything here is per profile: every query takes the profile it belongs to. */
+@Dao
 interface FavoriteDao {
     @Upsert suspend fun upsert(item: FavoriteEntity)
-    @Query("DELETE FROM favorite WHERE type = :type AND itemId = :itemId") suspend fun delete(type: ContentType, itemId: Int)
-    @Query("SELECT EXISTS (SELECT 1 FROM favorite WHERE type = :type AND itemId = :itemId)")
-    suspend fun isFavorite(type: ContentType, itemId: Int): Boolean
-    @Query("SELECT EXISTS (SELECT 1 FROM favorite WHERE type = :type AND itemId = :itemId)")
-    fun observeIsFavorite(type: ContentType, itemId: Int): Flow<Boolean>
-    @Query("SELECT * FROM favorite ORDER BY addedAt DESC") fun all(): Flow<List<FavoriteEntity>>
-    @Query("SELECT itemId FROM favorite WHERE type = :type") fun ids(type: ContentType): Flow<List<Int>>
+    @Query("DELETE FROM favorite WHERE profileId = :profileId AND type = :type AND itemId = :itemId")
+    suspend fun delete(profileId: Long, type: ContentType, itemId: Int)
+    @Query("SELECT EXISTS (SELECT 1 FROM favorite WHERE profileId = :profileId AND type = :type AND itemId = :itemId)")
+    suspend fun isFavorite(profileId: Long, type: ContentType, itemId: Int): Boolean
+    @Query("SELECT EXISTS (SELECT 1 FROM favorite WHERE profileId = :profileId AND type = :type AND itemId = :itemId)")
+    fun observeIsFavorite(profileId: Long, type: ContentType, itemId: Int): Flow<Boolean>
+    @Query("SELECT * FROM favorite WHERE profileId = :profileId ORDER BY addedAt DESC")
+    fun all(profileId: Long): Flow<List<FavoriteEntity>>
+    @Query("SELECT itemId FROM favorite WHERE profileId = :profileId AND type = :type")
+    fun ids(profileId: Long, type: ContentType): Flow<List<Int>>
 }
 
 @Dao
 interface PlaybackDao {
     @Upsert suspend fun upsert(item: PlaybackPositionEntity)
-    @Query("DELETE FROM playback_position WHERE type = :type AND itemId = :itemId") suspend fun delete(type: ContentType, itemId: Int)
-    @Query("SELECT * FROM playback_position WHERE type = :type AND itemId = :itemId")
-    suspend fun get(type: ContentType, itemId: Int): PlaybackPositionEntity?
-    @Query("SELECT * FROM playback_position WHERE type = :type AND itemId = :itemId")
-    fun observe(type: ContentType, itemId: Int): Flow<PlaybackPositionEntity?>
-    @Query("SELECT * FROM playback_position WHERE type = :type")
-    fun observeAll(type: ContentType): Flow<List<PlaybackPositionEntity>>
+    @Query("DELETE FROM playback_position WHERE profileId = :profileId AND type = :type AND itemId = :itemId")
+    suspend fun delete(profileId: Long, type: ContentType, itemId: Int)
+    @Query("SELECT * FROM playback_position WHERE profileId = :profileId AND type = :type AND itemId = :itemId")
+    suspend fun get(profileId: Long, type: ContentType, itemId: Int): PlaybackPositionEntity?
+    @Query("SELECT * FROM playback_position WHERE profileId = :profileId AND type = :type AND itemId = :itemId")
+    fun observe(profileId: Long, type: ContentType, itemId: Int): Flow<PlaybackPositionEntity?>
+    @Query("SELECT * FROM playback_position WHERE profileId = :profileId AND type = :type")
+    fun observeAll(profileId: Long, type: ContentType): Flow<List<PlaybackPositionEntity>>
+    /** "Verder kijken": finished items are already deleted by the resume policy. */
+    @Query("SELECT * FROM playback_position WHERE profileId = :profileId ORDER BY updatedAt DESC LIMIT :limit")
+    fun recent(profileId: Long, limit: Int): Flow<List<PlaybackPositionEntity>>
 }
 
 @Dao

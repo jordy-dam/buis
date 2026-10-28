@@ -131,6 +131,12 @@ object NameParser {
         return c.takeIf { it in isoCountries || it in languageGroups }
     }
 
+    // Whole words only: "XXX" and "ADULT(S)", plus "18+"; "ADULTSWIM" or "MIDDLESEX" don't count.
+    private val adultWord = Regex("""(?<![A-Z0-9])(ADULTS?|XXX|18\+)(?![A-Z0-9])""", RegexOption.IGNORE_CASE)
+
+    /** Adult category by its raw provider name (`ADULT ---`, `===== XXX =====`, `┃18+┃ …`). */
+    fun isAdult(rawName: String): Boolean = adultWord.containsMatchIn(rawName)
+
     /** Dutch display name for a group code: "NL" → "Nederland", "EN" → "Engelstalig". */
     fun countryName(code: String): String = when (code) {
         "EN" -> "Engelstalig"

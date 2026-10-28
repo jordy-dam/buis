@@ -29,6 +29,7 @@ import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import nl.jordy.iptv.data.auth.CredentialStore
 import nl.jordy.iptv.data.db.AppDatabase
+import nl.jordy.iptv.data.profile.ProfileRepository
 import nl.jordy.iptv.data.sync.CatalogSync
 import nl.jordy.iptv.data.xtream.ContentType
 import nl.jordy.iptv.ui.components.PrimaryButton
@@ -54,6 +55,7 @@ class SyncViewModel @Inject constructor(
     private val sync: CatalogSync,
     private val credentials: CredentialStore,
     private val db: AppDatabase,
+    private val profiles: ProfileRepository,
 ) : ViewModel() {
     private val _state = MutableStateFlow(SyncState())
     val state = _state.asStateFlow()
@@ -63,6 +65,8 @@ class SyncViewModel @Inject constructor(
     fun start() {
         _state.value = SyncState()
         viewModelScope.launch {
+            // After a logout wipe there is no profile until here: the shell needs one.
+            profiles.ensureOne()
             val c = credentials.current() ?: return@launch _state.update { it.copy(error = "Niet ingelogd.") }
             try {
                 sync.run(c) { p -> _state.update { it.copy(current = p.type, counts = it.counts + (p.type to p.items)) } }

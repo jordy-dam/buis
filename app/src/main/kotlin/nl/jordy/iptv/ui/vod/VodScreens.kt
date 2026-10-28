@@ -21,7 +21,7 @@ import nl.jordy.iptv.data.db.AppDatabase
 import nl.jordy.iptv.data.db.MovieEntity
 import nl.jordy.iptv.data.db.SeriesEntity
 import nl.jordy.iptv.data.repo.LibraryRepository
-import nl.jordy.iptv.data.settings.SettingsStore
+import nl.jordy.iptv.data.profile.ProfileRepository
 import nl.jordy.iptv.data.settings.filteredBy
 import nl.jordy.iptv.data.xtream.ContentType
 import nl.jordy.iptv.ui.components.PosterTile
@@ -30,13 +30,13 @@ import javax.inject.Inject
 private val pagingConfig = PagingConfig(pageSize = 30, prefetchDistance = 15, enablePlaceholders = false)
 
 @HiltViewModel
-class MoviesViewModel @Inject constructor(db: AppDatabase, settings: SettingsStore, private val library: LibraryRepository) : ViewModel() {
+class MoviesViewModel @Inject constructor(db: AppDatabase, profiles: ProfileRepository, private val library: LibraryRepository) : ViewModel() {
     private val dao = db.catalog()
     private val rows = mutableMapOf<String, Flow<PagingData<MovieEntity>>>()
     val focusMemory = FocusMemory()
 
     private val showAll = MutableStateFlow(false)
-    val categories = dao.movieCategories().filteredBy(settings.prefs, showAll).stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), null)
+    val categories = dao.movieCategories().filteredBy(profiles.prefs, showAll).stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), null)
     fun toggleShowAll() { showAll.value = !showAll.value }
     val favorites = library.favoriteIds(ContentType.MOVIE).map { it.toSet() }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptySet())
     /** streamId → fraction watched, for the progress bar on posters. */
@@ -52,13 +52,13 @@ class MoviesViewModel @Inject constructor(db: AppDatabase, settings: SettingsSto
 }
 
 @HiltViewModel
-class SeriesViewModel @Inject constructor(db: AppDatabase, settings: SettingsStore, private val library: LibraryRepository) : ViewModel() {
+class SeriesViewModel @Inject constructor(db: AppDatabase, profiles: ProfileRepository, private val library: LibraryRepository) : ViewModel() {
     private val dao = db.catalog()
     private val rows = mutableMapOf<String, Flow<PagingData<SeriesEntity>>>()
     val focusMemory = FocusMemory()
 
     private val showAll = MutableStateFlow(false)
-    val categories = dao.seriesCategories().filteredBy(settings.prefs, showAll).stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), null)
+    val categories = dao.seriesCategories().filteredBy(profiles.prefs, showAll).stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), null)
     fun toggleShowAll() { showAll.value = !showAll.value }
     val favorites = library.favoriteIds(ContentType.SERIES).map { it.toSet() }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptySet())
 

@@ -32,7 +32,7 @@ import kotlinx.coroutines.flow.mapLatest
 import kotlinx.coroutines.flow.stateIn
 import nl.jordy.iptv.data.repo.SearchRepository
 import nl.jordy.iptv.data.repo.SearchResults
-import nl.jordy.iptv.data.settings.SettingsStore
+import nl.jordy.iptv.data.profile.ProfileRepository
 import nl.jordy.iptv.ui.PlayerRoute
 import nl.jordy.iptv.ui.components.ChannelTile
 import nl.jordy.iptv.ui.components.PosterTile
@@ -42,12 +42,12 @@ import nl.jordy.iptv.ui.theme.TextSecondary
 import javax.inject.Inject
 
 @HiltViewModel
-class SearchViewModel @Inject constructor(repo: SearchRepository, settings: SettingsStore) : ViewModel() {
+class SearchViewModel @Inject constructor(repo: SearchRepository, profiles: ProfileRepository) : ViewModel() {
     val query = MutableStateFlow("")
 
     @OptIn(FlowPreview::class, kotlinx.coroutines.ExperimentalCoroutinesApi::class)
-    val results = combine(query.debounce(300), settings.prefs) { q, p -> q to p.preferredCountries }
-        .mapLatest { (q, preferred) -> if (q.isBlank()) null else repo.search(q, preferred) }
+    val results = combine(query.debounce(300), profiles.prefs) { q, p -> q to p }
+        .mapLatest { (q, p) -> if (q.isBlank()) null else repo.search(q, p.preferredCountries, hideAdult = p.hideAdult) }
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), null)
 }
 

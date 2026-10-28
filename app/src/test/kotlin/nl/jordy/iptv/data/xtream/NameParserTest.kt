@@ -124,4 +124,14 @@ class NameParserTest {
         assertEquals("Verenigd Koninkrijk", NameParser.countryName("GB"))
         assertEquals("Engelstalig", NameParser.countryName("EN"))
     }
+
+    @Test
+    fun `adult categories are recognised by whole words only`() {
+        listOf("ADULT ---", "   ===== XXX ===== ", "┃18+┃ Nachtprogramma", "|ADULTS| VOD", "For adults").forEach {
+            assertEquals(it, true, NameParser.isAdult(it))
+        }
+        listOf("┃NL┃ ALGEMEEN", "ADULTSWIM", "MIDDLESEX", "┃UK┃ XXXL Sports", "Top 180+").forEach {
+            assertEquals(it, false, NameParser.isAdult(it))
+        }
+    }
 }
