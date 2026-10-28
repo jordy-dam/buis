@@ -52,6 +52,11 @@ interface CatalogDao {
 
     @Query("SELECT * FROM series WHERE categoryId = :categoryId ORDER BY sortIndex")
     fun seriesPaged(categoryId: String): PagingSource<Int, SeriesEntity>
+    /** A category's series with a genre, in either of two spellings (see [nl.jordy.iptv.data.repo.Genres]). */
+    @Query("SELECT * FROM series WHERE categoryId = :categoryId AND (genre LIKE :pattern OR genre LIKE :alt) ORDER BY sortIndex")
+    fun seriesPagedByGenre(categoryId: String, pattern: String, alt: String): PagingSource<Int, SeriesEntity>
+    @Query("SELECT genre FROM series WHERE categoryId = :categoryId")
+    suspend fun seriesGenres(categoryId: String): List<String?>
     @Query("SELECT * FROM series WHERE seriesId = :seriesId LIMIT 1")
     suspend fun series(seriesId: Int): SeriesEntity?
 

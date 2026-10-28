@@ -126,13 +126,6 @@ fun ShellScreen(
         shownProfile = id
     }
 
-    // Back: any tab → Home → "Afsluiten?". Screens handle their own inner Back first.
-    BackHandler {
-        if (tab != Tab.HOME) {
-            tab = Tab.HOME
-            railFocus.getValue(Tab.HOME).requestFocus()
-        } else confirmExit = true
-    }
 
     // The rail steps back to icons while you browse, and opens again when focus comes back to it.
     var railOpen by remember { mutableStateOf(true) }
@@ -151,6 +144,20 @@ fun ShellScreen(
     fun openNow(t: Tab) {
         pendingTab = null
         tab = t
+    }
+
+    // Back: any tab → Home → "Afsluiten?". Screens handle their own inner Back first.
+    BackHandler {
+        if (tab != Tab.HOME) {
+            pendingTab = null
+            tab = Tab.HOME
+            // After the frame that removes the old screen: otherwise its focused item disappears
+            // afterwards and the rail's focus restorer puts focus back on the old tab.
+            scope.launch {
+                withFrameNanos { }
+                runCatching { railFocus.getValue(Tab.HOME).requestFocus() }
+            }
+        } else confirmExit = true
     }
 
     Row(Modifier.fillMaxSize()) {

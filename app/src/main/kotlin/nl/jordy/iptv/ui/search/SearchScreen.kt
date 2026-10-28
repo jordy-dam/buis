@@ -35,6 +35,7 @@ import nl.jordy.iptv.data.repo.SearchResults
 import nl.jordy.iptv.data.profile.ProfileRepository
 import nl.jordy.iptv.ui.PlayerRoute
 import nl.jordy.iptv.ui.components.ChannelTile
+import nl.jordy.iptv.ui.components.bestQuality
 import nl.jordy.iptv.ui.components.PosterTile
 import nl.jordy.iptv.ui.components.TvTextField
 import nl.jordy.iptv.ui.components.lastInRow
@@ -89,7 +90,8 @@ fun SearchScreen(
                         ChannelTile(
                             name = c.name,
                             logoUrl = c.logoUrl,
-                            badges = c.badges.split(",").filter { it.isNotEmpty() },
+                            quality = bestQuality(c.badges.split(",")),
+                            catchup = c.catchup,
                             onClick = { onPlay(PlayerRoute(PlayerRoute.Kind.LIVE, c.streamId, c.name, categoryId = c.categoryId)) },
                             onLongClick = {},
                             modifier = Modifier.width(720.dp),

@@ -8,6 +8,8 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.ui.text.style.TextOverflow
 import nl.jordy.iptv.data.xtream.EpgEntry
+import nl.jordy.iptv.ui.components.CategoryList
+import nl.jordy.iptv.ui.components.bestQuality
 import nl.jordy.iptv.ui.components.rememberNowAndNext
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
@@ -145,7 +147,7 @@ fun LiveScreen(onPlay: (PlayerRoute) -> Unit, vm: LiveViewModel = hiltViewModel(
 
     Row(Modifier.fillMaxSize()) {
         CategoryList(
-            categories = cats,
+            sections = listOf(null to cats),
             selected = selected,
             onFocus = vm::select,
             onClick = { channelFocus.requestFocus() },
@@ -182,7 +184,8 @@ fun LiveScreen(onPlay: (PlayerRoute) -> Unit, vm: LiveViewModel = hiltViewModel(
                     number = index + 1,
                     now = now,
                     favorite = channel.streamId in favorites,
-                    badges = channel.badges.split(",").filter { it.isNotEmpty() } + listOfNotNull("Terugkijken".takeIf { channel.catchup }),
+                    quality = bestQuality(channel.badges.split(",")),
+                    catchup = channel.catchup,
                     onClick = {
                         vm.lastChannel = channel.streamId
                         onPlay(PlayerRoute(PlayerRoute.Kind.LIVE, channel.streamId, channel.name, categoryId = channel.categoryId))
@@ -218,37 +221,5 @@ private fun NowNextStrip(channel: LiveChannelEntity?, load: suspend (Int) -> Pai
                 }
             }
         }
-    }
-}
-
-@OptIn(ExperimentalComposeUiApi::class)
-@Composable
-private fun CategoryList(
-    categories: List<CategoryEntity>,
-    selected: String?,
-    onFocus: (String) -> Unit,
-    onClick: () -> Unit,
-    filter: FilteredCategories?,
-    onToggleFilter: () -> Unit,
-    modifier: Modifier = Modifier,
-) {
-    // Entering from the rail lands on the active category, not on whichever row happens to be nearest.
-    val selectedFocus = remember { FocusRequester() }
-    LazyColumn(
-        modifier = modifier.focusRestorer(selectedFocus).focusGroup(),
-        contentPadding = PaddingValues(vertical = 8.dp, horizontal = 8.dp),
-        verticalArrangement = Arrangement.spacedBy(4.dp),
-    ) {
-        items(categories, key = { it.id }) { cat ->
-            ListItemSurface(
-                text = cat.name,
-                selected = cat.id == selected,
-                onClick = onClick,
-                modifier = Modifier
-                    .then(if (cat.id == selected) Modifier.focusRequester(selectedFocus) else Modifier)
-                    .onFocusChanged { if (it.isFocused) onFocus(cat.id) },
-            )
-        }
-        filterToggle(filter, onToggleFilter)
     }
 }

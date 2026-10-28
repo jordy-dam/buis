@@ -11,6 +11,17 @@ import androidx.paging.PagingConfig
 import androidx.paging.PagingData
 import androidx.paging.cachedIn
 import dagger.hilt.android.lifecycle.HiltViewModel
+import androidx.paging.compose.collectAsLazyPagingItems
+import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.filterNotNull
+import kotlinx.coroutines.flow.flatMapLatest
+import kotlinx.coroutines.flow.mapLatest
+import nl.jordy.iptv.data.repo.Genres
+import nl.jordy.iptv.data.settings.CategoryGroups
+import nl.jordy.iptv.data.settings.FilteredCategories
+import nl.jordy.iptv.ui.components.GenreChips
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
@@ -18,6 +29,7 @@ import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import nl.jordy.iptv.data.db.AppDatabase
+import nl.jordy.iptv.data.db.CategoryEntity
 import nl.jordy.iptv.data.db.MovieEntity
 import nl.jordy.iptv.data.db.SeriesEntity
 import nl.jordy.iptv.data.repo.LibraryRepository
@@ -27,84 +39,139 @@ import nl.jordy.iptv.data.xtream.ContentType
 import nl.jordy.iptv.ui.components.PosterTile
 import javax.inject.Inject
 
-private val pagingConfig = PagingConfig(pageSize = 30, prefetchDistance = 15, enablePlaceholders = false)
+private val pagingConfig = PagingConfig(pageSize = 40, prefetchDistance = 20, enablePlaceholders = false)
 
+/** Category list with "Diensten", "Genres" and "Overig" headers, after the country filter. */
+private fun Flow<FilteredCategories?>.sections() = map { f ->
+    f?.shown?.let { shown ->
+        val groups = CategoryGroups.group(shown)
+        // One kind only: no header needed.
+        if (groups.size == 1) listOf(null to groups[0].categories) else groups.map { it.kind.title to it.categories }
+    }
+}
+
+/**
+ * The category shown in the grid: the one last focused while it's still listed, else the first
+ * in the list as shown (so the first service, not the provider's first category).
+ */
+private fun selectedOf(picked: Flow<String?>, sections: Flow<List<Pair<String?, List<CategoryEntity>>>?>) =
+    combine(picked, sections) { id, s ->
+        val shown = s.orEmpty().flatMap { it.second }
+        id?.takeIf { p -> shown.any { it.id == p } } ?: shown.firstOrNull()?.id
+    }.distinctUntilChanged()
+
+@OptIn(ExperimentalCoroutinesApi::class)
 @HiltViewModel
 class MoviesViewModel @Inject constructor(db: AppDatabase, profiles: ProfileRepository, private val library: LibraryRepository) : ViewModel() {
     private val dao = db.catalog()
-    private val rows = mutableMapOf<String, Flow<PagingData<MovieEntity>>>()
     val focusMemory = FocusMemory()
 
     private val showAll = MutableStateFlow(false)
-    val categories = dao.movieCategories().filteredBy(profiles.prefs, showAll).stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), null)
+    val filtered = dao.movieCategories().filteredBy(profiles.prefs, showAll).stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), null)
+    val sections = filtered.sections().stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), null)
     fun toggleShowAll() { showAll.value = !showAll.value }
+
+    private val picked = MutableStateFlow<String?>(null)
+    val selected = selectedOf(picked, sections).stateIn(viewModelScope, SharingStarted.Eagerly, null)
+    fun select(id: String) { picked.value = id }
+
+    val items: Flow<PagingData<MovieEntity>> = selected.filterNotNull().flatMapLatest { id ->
+        Pager(pagingConfig) { dao.moviesPaged(id) }.flow
+    }.cachedIn(viewModelScope)
+
     val favorites = library.favoriteIds(ContentType.MOVIE).map { it.toSet() }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptySet())
     /** streamId → fraction watched, for the progress bar on posters. */
     val progress = library.positions(ContentType.MOVIE)
         .map { list -> list.filter { it.durationMs > 0 }.associate { it.itemId to it.positionMs.toFloat() / it.durationMs } }
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyMap())
 
-    fun row(categoryId: String) = rows.getOrPut(categoryId) {
-        Pager(pagingConfig) { dao.moviesPaged(categoryId) }.flow.cachedIn(viewModelScope)
-    }
-
     fun toggleFavorite(m: MovieEntity) = viewModelScope.launch { library.toggleFavorite(ContentType.MOVIE, m.streamId, m.name, m.posterUrl) }
 }
 
+@OptIn(ExperimentalCoroutinesApi::class)
 @HiltViewModel
 class SeriesViewModel @Inject constructor(db: AppDatabase, profiles: ProfileRepository, private val library: LibraryRepository) : ViewModel() {
     private val dao = db.catalog()
-    private val rows = mutableMapOf<String, Flow<PagingData<SeriesEntity>>>()
     val focusMemory = FocusMemory()
 
     private val showAll = MutableStateFlow(false)
-    val categories = dao.seriesCategories().filteredBy(profiles.prefs, showAll).stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), null)
+    val filtered = dao.seriesCategories().filteredBy(profiles.prefs, showAll).stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), null)
+    val sections = filtered.sections().stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), null)
     fun toggleShowAll() { showAll.value = !showAll.value }
-    val favorites = library.favoriteIds(ContentType.SERIES).map { it.toSet() }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptySet())
 
-    fun row(categoryId: String) = rows.getOrPut(categoryId) {
-        Pager(pagingConfig) { dao.seriesPaged(categoryId) }.flow.cachedIn(viewModelScope)
+    private val picked = MutableStateFlow<String?>(null)
+    val selected = selectedOf(picked, sections).stateIn(viewModelScope, SharingStarted.Eagerly, null)
+    fun select(id: String) {
+        if (picked.value != id) genre.value = null // a genre belongs to the category it was picked in
+        picked.value = id
     }
+
+    /** Series genres come with the catalog (`get_series`), so a category can be filtered right away. */
+    val genre = MutableStateFlow<String?>(null)
+    val genres = selected.filterNotNull().mapLatest { Genres.top(dao.seriesGenres(it)) }
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
+
+    val items: Flow<PagingData<SeriesEntity>> = combine(selected.filterNotNull(), genre) { id, g -> id to g }.flatMapLatest { (id, g) ->
+        Pager(pagingConfig) {
+            if (g == null) dao.seriesPaged(id) else Genres.patterns(g).let { (a, b) -> dao.seriesPagedByGenre(id, a, b) }
+        }.flow
+    }.cachedIn(viewModelScope)
+
+    val favorites = library.favoriteIds(ContentType.SERIES).map { it.toSet() }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptySet())
 
     fun toggleFavorite(s: SeriesEntity) = viewModelScope.launch { library.toggleFavorite(ContentType.SERIES, s.seriesId, s.name, s.coverUrl) }
 }
 
 @Composable
 fun MoviesScreen(onOpenMovie: (Int) -> Unit, vm: MoviesViewModel = hiltViewModel()) {
-    val categories by vm.categories.collectAsStateWithLifecycle()
+    val sections by vm.sections.collectAsStateWithLifecycle()
+    val filtered by vm.filtered.collectAsStateWithLifecycle()
+    val selected by vm.selected.collectAsStateWithLifecycle()
     val favorites by vm.favorites.collectAsStateWithLifecycle()
     val progress by vm.progress.collectAsStateWithLifecycle()
-    CategoryRows(categories, vm::toggleShowAll, vm::row, { it.streamId }, vm.focusMemory) { movie, categoryId, modifier ->
+    val items = vm.items.collectAsLazyPagingItems()
+    CategoryBrowser(sections, filtered, vm::toggleShowAll, selected, vm::select, items, { it.streamId }, vm.focusMemory, tile = { movie, modifier ->
         PosterTile(
             title = movie.name,
             imageUrl = movie.posterUrl,
+            width = GridPosterWidth,
             favorite = movie.streamId in favorites,
             progress = progress[movie.streamId],
             onClick = {
-                vm.focusMemory.opened("$categoryId/${movie.streamId}")
+                vm.focusMemory.opened("$selected/${movie.streamId}")
                 onOpenMovie(movie.streamId)
             },
             onLongClick = { vm.toggleFavorite(movie) },
             modifier = modifier,
         )
-    }
+    })
 }
 
 @Composable
 fun SeriesScreen(onOpenSeries: (Int) -> Unit, vm: SeriesViewModel = hiltViewModel()) {
-    val categories by vm.categories.collectAsStateWithLifecycle()
+    val sections by vm.sections.collectAsStateWithLifecycle()
+    val filtered by vm.filtered.collectAsStateWithLifecycle()
+    val selected by vm.selected.collectAsStateWithLifecycle()
     val favorites by vm.favorites.collectAsStateWithLifecycle()
-    CategoryRows(categories, vm::toggleShowAll, vm::row, { it.seriesId }, vm.focusMemory) { series, categoryId, modifier ->
-        PosterTile(
-            title = series.name,
-            imageUrl = series.coverUrl,
-            favorite = series.seriesId in favorites,
-            onClick = {
-                vm.focusMemory.opened("$categoryId/${series.seriesId}")
-                onOpenSeries(series.seriesId)
-            },
-            onLongClick = { vm.toggleFavorite(series) },
-            modifier = modifier,
-        )
-    }
+    val genres by vm.genres.collectAsStateWithLifecycle()
+    val genre by vm.genre.collectAsStateWithLifecycle()
+    val items = vm.items.collectAsLazyPagingItems()
+    CategoryBrowser(
+        sections, filtered, vm::toggleShowAll, selected, vm::select, items, { it.seriesId }, vm.focusMemory,
+        tile = { series, modifier ->
+            PosterTile(
+                title = series.name,
+                imageUrl = series.coverUrl,
+                width = GridPosterWidth,
+                favorite = series.seriesId in favorites,
+                onClick = {
+                    vm.focusMemory.opened("$selected/${series.seriesId}")
+                    onOpenSeries(series.seriesId)
+                },
+                onLongClick = { vm.toggleFavorite(series) },
+                modifier = modifier,
+            )
+        },
+        above = { GenreChips(genres, genre, { vm.genre.value = it }) },
+    )
 }

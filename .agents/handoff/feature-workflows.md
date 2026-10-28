@@ -6,12 +6,14 @@ Phase 2a "vinden" is on the tv but not yet tried by Jordy. Phase 2b "huishouden"
 PIN, kids profile) is built and tested on the emulator, not on the tv:
 `docs/plans/2026-10-28-phase-2b-huishouden.md`. 2b is installed on the tv. Phase 2c "kijken" (full EPG,
 compact channel list, collapsing rail, search on top) is built and emulator-tested, not on the tv:
-`docs/plans/2026-10-28-phase-2c-kijken.md`. Next: Jordy tests 2b + 2c on the tv; then measure the
-real VOD category names and decide service rows.
+`docs/plans/2026-10-28-phase-2c-kijken.md` (on the tv). Phase 2d "bladeren" (release build with R8,
+Films/Series as list + grid with Diensten/Genres, series genre chips, calmer channel rows) is built
+and emulator-tested: `docs/plans/2026-10-28-phase-2d-bladeren.md`. Next: install 2d (release) on the
+tv and compare gfxinfo with the debug baseline.
 
 ## Current phase
 Phase 1 — done and tested on the real tv. Phase 2a — built and installed on the tv (not started yet
- by Jordy); open: EPG check on the tv. Phase 2b — on the tv. Phase 2c — built, emulator-tested, not on the tv.
+ by Jordy); open: EPG check on the tv. Phase 2b and 2c — on the tv. Phase 2d — built, emulator-tested (debug and release), not on the tv.
 
 ## What's working (emulator + mock server)
 - Login with validation and Dutch error states (wrong password, expired, unreachable, not Xtream)
@@ -26,6 +28,7 @@ Phase 1 — done and tested on the real tv. Phase 2a — built and installed on 
 - Home (2b): start tab with "Verder kijken", "Favoriete zenders", "Recent toegevoegd"
 - Guide (2c): full XMLTV in Room, refreshed on start (>20 h), after a sync and via "Gids vernieuwen"; `NU ·` + progress on every channel, "Straks" strip, aliases for channels without an EPG id
 - Layout (2c): one-line 48dp channel rows, rail collapses to icons in the content, Zoeken first in the rail, 104dp posters
+- Browsing (2d): Films/Series = category list (Diensten, Genres, Overig) + 4-column grid; series genre chips; channel rows with heart before the number and a fixed quality/catch-up slot
 
 ## What's not (yet)
 - EPG grid, hide/reorder categories, ratings, service rows (after measuring) and phase 3 (suggestions)
@@ -55,6 +58,8 @@ See `.agents/onboarding/new-dev.md` (mock server: `./mockserver/generate-media.s
 
 ## Real-tv notes
 - Install over Ethernet: USB debugging on, `adb connect 192.168.68.91:5555` (see onboarding).
+- The tv runs the **release** build (`assembleRelease`, signed with the debug key): `adb -s 192.168.68.91:5555 install -r app/build/outputs/apk/release/app-release.apk`. Release isn't debuggable, so `run-as` (reading its database) doesn't work there.
+- Debug baseline on the tv (2c): 20% janky frames, p90 85 ms, p99 400 ms (`adb shell dumpsys gfxinfo nl.jordy.iptv`).
 - With the emulator also running, `./gradlew installDebug` installs on both: use `adb -s <device> install -r`.
 - The tv's default keyboard was the Google TV remote bridge (no on-screen keyboard); switch to the
   TCL keyboard in the tv settings, or type via the Google TV app on a phone.

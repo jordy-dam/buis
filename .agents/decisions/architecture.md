@@ -59,3 +59,9 @@
 **Why:** The short EPG per channel came back empty on the real provider; the full guide covers 98% of the Dutch channels that have an id (measured on the tv: 67 MB, 27 s). Parsing to a list and then one transaction keeps the database free for other writes during the slow download, and the screens never see half a guide. Aliases cover HD/FHD/4K duplicates, which make up much of the 55% of Dutch streams without an id.
 **Alternatives rejected:** WorkManager for a nightly job (new dependency; the app only matters while it's open); keeping the whole guide (200k programmes for channels nobody here watches); matching on display names inside the XMLTV (too fuzzy across providers).
 **Revisit if:** the download hurts on the tv (then refresh in the background less often or stream into Room), or coverage stays low after aliasing.
+
+## 2026-10-28 — The tv runs the release build with R8
+**Decision:** The tv gets `assembleRelease`: R8 minify plus resource shrinking, signed with the debug key (so it installs over the debug build and keeps the data). Keep rules only for what libraries can't know (`PlayerRoute.Kind`, `ContentType`, the Media3 FFmpeg classes). The emulator keeps the debug build for development.
+**Why:** Measured on the tv with the debug build: 20% janky frames, p90 85 ms, p99 400 ms, almost all "slow UI thread" and one slow bitmap upload. Images and caching weren't the problem (Coil caches by default); a debuggable Compose app on a 32-bit CPU was. The release APK is 7.6 MB instead of 54 MB.
+**Alternatives rejected:** A custom image cache (the measurement didn't point there); a baseline profile now (extra module; first see what R8 gives).
+**Revisit if:** the tv still janks on release (then add a baseline profile), or something breaks only under R8. `run-as` no longer works on the tv, so reading its database needs a debug install.

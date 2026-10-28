@@ -23,7 +23,11 @@ android {
 
     buildTypes {
         release {
-            isMinifyEnabled = false
+            // The tv runs this build: R8 plus a non-debuggable app is what makes Compose smooth
+            // on its 32-bit CPU (the debug build had 20% janky frames there).
+            isMinifyEnabled = true
+            isShrinkResources = true
+            proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
             // Sideloaded only: sign release with the debug key so `installRelease` works without a keystore.
             signingConfig = signingConfigs.getByName("debug")
         }

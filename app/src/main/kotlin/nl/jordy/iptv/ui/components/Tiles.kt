@@ -3,6 +3,8 @@ package nl.jordy.iptv.ui.components
 import android.view.KeyEvent
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusProperties
 import androidx.compose.foundation.layout.Box
@@ -134,7 +136,9 @@ fun ChannelTile(
     number: Int? = null,
     now: EpgEntry? = null,
     favorite: Boolean = false,
-    badges: List<String> = emptyList(),
+    /** Best picture quality ("4K", "FHD"…), see [bestQuality]. */
+    quality: String? = null,
+    catchup: Boolean = false,
 ) {
     Surface(
         onClick = onClick,
@@ -148,10 +152,14 @@ fun ChannelTile(
     ) {
         Box(Modifier.fillMaxSize()) {
             Row(Modifier.fillMaxSize().padding(horizontal = 8.dp), verticalAlignment = Alignment.CenterVertically) {
-                if (number != null) {
-                    Text("$number", style = MaterialTheme.typography.bodyMedium, color = TextSecondary, textAlign = TextAlign.End, modifier = Modifier.width(36.dp))
-                    Spacer(Modifier.width(10.dp))
+                // Favourite first, in a fixed slot, so numbers and names line up with or without it.
+                Box(Modifier.width(18.dp), contentAlignment = Alignment.Center) {
+                    if (favorite) Text("♥︎", color = Accent, style = MaterialTheme.typography.labelLarge)
                 }
+                if (number != null) {
+                    Text("$number", style = MaterialTheme.typography.bodyMedium, color = TextSecondary, textAlign = TextAlign.End, modifier = Modifier.width(32.dp))
+                }
+                Spacer(Modifier.width(10.dp))
                 Box(Modifier.height(32.dp).aspectRatio(16f / 9f).background(SurfaceRaised, RoundedCornerShape(4.dp)), contentAlignment = Alignment.Center) {
                     Text(name.take(2).uppercase(), style = MaterialTheme.typography.labelLarge, color = TextSecondary)
                     if (logoUrl != null) {
@@ -164,24 +172,50 @@ fun ChannelTile(
                     style = MaterialTheme.typography.titleMedium,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
-                    modifier = Modifier.weight(if (now != null) 0.45f else 1f, fill = now == null),
+                    modifier = Modifier.weight(0.42f),
                 )
-                if (now != null) {
-                    Text(
-                        "  NU · ${now.title}",
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = TextSecondary,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis,
-                        modifier = Modifier.weight(0.55f),
-                    )
+                // Same columns on every row, guide or not, so nothing moves when a programme loads.
+                Text(
+                    now?.let { "NU · ${it.title}" } ?: "",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = TextSecondary,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                    modifier = Modifier.weight(0.58f).padding(start = 12.dp),
+                )
+                // Always the same width, empty or not: the "NU" text must never shift between rows.
+                Row(Modifier.width(72.dp), horizontalArrangement = Arrangement.End, verticalAlignment = Alignment.CenterVertically) {
+                    if (catchup) Text("↺︎", color = TextSecondary, style = MaterialTheme.typography.titleMedium, modifier = Modifier.padding(end = 6.dp))
+                    if (quality != null) QualityLabel(quality)
                 }
-                badges.forEach { Badge(it, Modifier.padding(start = 6.dp)) }
-                if (favorite) FavoriteBadge(Modifier.padding(start = 6.dp))
             }
-            if (now != null) ProgressBar(now.progress(), Modifier.align(Alignment.BottomCenter), thickness = 2.dp)
+            if (now != null) {
+                Box(
+                    Modifier.align(Alignment.BottomStart).fillMaxWidth(now.progress()).height(2.dp)
+                        .background(Accent.copy(alpha = 0.45f)),
+                )
+            }
         }
     }
+}
+
+/** A quiet outlined label for picture quality, so it reads as a property, not a button. */
+@Composable
+private fun QualityLabel(text: String) {
+    Text(
+        text,
+        style = MaterialTheme.typography.labelSmall,
+        color = TextSecondary,
+        maxLines = 1,
+        modifier = Modifier.border(1.dp, TextSecondary.copy(alpha = 0.6f), RoundedCornerShape(3.dp)).padding(horizontal = 4.dp, vertical = 1.dp),
+    )
+}
+
+/** The best picture quality among a channel's labels, or null; "Multi" and the like aren't qualities. */
+fun bestQuality(badges: List<String>): String? {
+    val rank = listOf("UHD", "4K", "FHD", "HD")
+    return badges.map { it.uppercase() }.filter { it in rank }.minByOrNull { rank.indexOf(it) }
+        ?.let { if (it == "UHD") "4K" else it }
 }
 
 /** How far the programme is, 0..1, at this moment. */
@@ -202,18 +236,6 @@ fun rememberNowAndNext(streamId: Int, load: suspend (Int) -> Pair<EpgEntry?, Epg
         }
     }
     return value
-}
-
-/** Small label such as "4K", "Multi" or "Terugkijken". */
-@Composable
-fun Badge(text: String, modifier: Modifier = Modifier) {
-    Text(
-        text,
-        style = MaterialTheme.typography.labelLarge,
-        color = TextSecondary,
-        maxLines = 1,
-        modifier = modifier.background(SurfaceRaised, RoundedCornerShape(4.dp)).padding(horizontal = 6.dp, vertical = 2.dp),
-    )
 }
 
 /** Plain focusable row for lists such as categories. */
