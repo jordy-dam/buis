@@ -57,6 +57,8 @@ data class MovieEntity(
     val sortIndex: Int,
     val generation: Long,
     @ColumnInfo(defaultValue = "") val badges: String = "",
+    /** TMDB id from the film list, when the panel sends it. Language versions share it. */
+    val tmdbId: Int? = null,
 )
 
 @Entity(tableName = "series", primaryKeys = ["categoryId", "seriesId"], indices = [Index("seriesId")])
@@ -211,4 +213,6 @@ data class MovieInfoEntity(
     val fetchedAt: Long,
     /** The request failed; retried after a day. */
     @ColumnInfo(defaultValue = "0") val failed: Boolean = false,
+    /** TMDB id from `get_vod_info`: groups language versions whose titles differ. */
+    val tmdbId: Int? = null,
 )

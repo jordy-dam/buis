@@ -113,6 +113,25 @@ class MigrationTest {
         }
     }
 
+    @Test
+    fun `6 to 7 adds TMDB ids, re-syncs the catalog and re-fetches film details without losing them`() {
+        helper.createDatabase(DB, 6).use { db ->
+            db.execSQL("INSERT INTO profile (id, name, avatar, face, pinHash, preferredCountries, onlyPreferred, kids, lastUsedAt, createdAt) VALUES (1, 'Anna', 3, 2, NULL, 'NL', 1, 0, 5, 1)")
+            db.execSQL("INSERT INTO movie_info (streamId, genre, `cast`, director, plot, rating, fetchedAt, failed) VALUES (7, 'Drama', NULL, NULL, NULL, NULL, 99, 0)")
+            db.execSQL("INSERT INTO sync_info (id, lastSyncAt, generation) VALUES (0, 3, 1)")
+        }
+        helper.runMigrationsAndValidate(DB, 7, true).use { db ->
+            db.query("SELECT face FROM profile").use { it.moveToFirst(); assertEquals(2, it.getInt(0)) }
+            db.query("SELECT genre, failed, fetchedAt FROM movie_info").use {
+                it.moveToFirst()
+                assertEquals("genres stay usable meanwhile", "Drama", it.getString(0))
+                assertEquals("queued for a re-fetch", 1, it.getInt(1))
+                assertEquals(0L, it.getLong(2))
+            }
+            assertEquals("next launch syncs the catalog", 0, db.count("sync_info"))
+        }
+    }
+
     private fun SupportSQLiteDatabase.insertPhase1Data() {
         execSQL("INSERT INTO favorite (type, itemId, name, imageUrl, addedAt) VALUES ('LIVE', 101, '┃NL┃ NPO 1 HD', NULL, 1)")
         execSQL("INSERT INTO playback_position (type, itemId, positionMs, durationMs, updatedAt) VALUES ('MOVIE', 5001, 62000, 180000, 2)")

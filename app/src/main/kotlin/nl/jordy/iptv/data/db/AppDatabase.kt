@@ -24,7 +24,7 @@ import androidx.sqlite.db.SupportSQLiteDatabase
         EpgInfoEntity::class,
         MovieInfoEntity::class,
     ],
-    version = 6,
+    version = 7,
     exportSchema = true,
     autoMigrations = [
         AutoMigration(from = 1, to = 2, spec = AppDatabase.CatalogResync::class),
@@ -34,6 +34,8 @@ import androidx.sqlite.db.SupportSQLiteDatabase
         AutoMigration(from = 4, to = 5),
         // Drawn avatars; existing profiles keep their letter (face 0).
         AutoMigration(from = 5, to = 6),
+        // TMDB ids, to merge language versions with different titles: catalog re-syncs, film details are fetched again.
+        AutoMigration(from = 6, to = 7, spec = AppDatabase.TmdbRefetch::class),
     ],
 )
 abstract class AppDatabase : RoomDatabase() {
@@ -55,6 +57,17 @@ abstract class AppDatabase : RoomDatabase() {
     class CatalogResync : AutoMigrationSpec {
         override fun onPostMigrate(db: SupportSQLiteDatabase) {
             listOf("category", "live_channel", "movie", "series", "sync_info").forEach { db.execSQL("DELETE FROM `$it`") }
+        }
+    }
+
+    /**
+     * Schema 7 adds TMDB ids: the catalog is emptied so the next sync fills `movie.tmdbId`, and
+     * film details are marked for a quiet re-fetch (their genres keep working meanwhile).
+     */
+    class TmdbRefetch : AutoMigrationSpec {
+        override fun onPostMigrate(db: SupportSQLiteDatabase) {
+            CatalogResync().onPostMigrate(db)
+            db.execSQL("UPDATE movie_info SET failed = 1, fetchedAt = 0")
         }
     }
 

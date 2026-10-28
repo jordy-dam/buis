@@ -22,8 +22,8 @@ import org.robolectric.RobolectricTestRunner
 @RunWith(RobolectricTestRunner::class)
 class MovieVersionsTest {
 
-    private fun movie(cat: String, id: Int, name: String, year: Int?, badges: String = "", sort: Int = id) =
-        MovieEntity(cat, id, name, null, null, year, "mp4", null, sort, 1, badges)
+    private fun movie(cat: String, id: Int, name: String, year: Int?, badges: String = "", sort: Int = id, tmdb: Int? = null) =
+        MovieEntity(cat, id, name, null, null, year, "mp4", null, sort, 1, badges, tmdb)
 
     @Test
     fun `each version gets a distinct, readable name`() {
@@ -34,7 +34,19 @@ class MovieVersionsTest {
             MovieVersionRow(movie("c", 4, "Film", 2020), null),
             MovieVersionRow(movie("d", 5, "Film", 2020), null),
         )
-        assertEquals(listOf("Nederland", "NL sub", "Multi · 4K", "Origineel 1", "Origineel 2"), MovieVersions.labels(rows))
+        assertEquals(listOf("Origineel 1", "NL sub", "Multi · 4K", "Origineel 2", "Origineel 3"), MovieVersions.labels(rows))
+    }
+
+    @Test
+    fun `versions with different titles say which title they are`() {
+        val rows = listOf(
+            MovieVersionRow(movie("a", 1, "The Croods 2: Een Nieuw Begin", 2020, "NL gesproken"), "NL"),
+            MovieVersionRow(movie("a", 2, "The Croods: A New Age", 2020), "NL"),
+        )
+        assertEquals(
+            listOf("NL gesproken · The Croods 2: Een Nieuw Begin", "Origineel · The Croods: A New Age"),
+            MovieVersions.labels(rows),
+        )
     }
 
     @Test
@@ -63,12 +75,35 @@ class MovieVersionsTest {
         }
         val tiles = load(dao.movieTilesPaged("c"))
         assertEquals(listOf(10 to 3, 13 to 1, 14 to 1), tiles.map { it.movie.streamId to it.versions })
-        assertEquals("all versions across the catalog", listOf(10, 11, 12), dao.movieVersions("Dune", 2021).map { it.movie.streamId })
+        assertEquals("all versions across the catalog", listOf(10, 11, 12), dao.movieVersions("Dune", 2021, null).map { it.movie.streamId })
 
         db.movieInfo().upsert(MovieInfoEntity(11, "Sci-Fi", null, null, null, null, 1))
         db.movieInfo().upsert(MovieInfoEntity(13, "Sci-Fi", null, null, null, null, 1))
         val (a, b) = Genres.patterns("Sci-Fi")
         assertEquals("genre filter grouped too", listOf(11, 13), load(dao.movieTilesPagedByGenre("c", a, b)).map { it.movie.streamId })
+        db.close()
+    }
+
+    @Test
+    fun `a Dutch and an English title of the same film are one tile through the TMDB id`() = runTest {
+        val db = Room.inMemoryDatabaseBuilder(ApplicationProvider.getApplicationContext<Context>(), AppDatabase::class.java).allowMainThreadQueries().build()
+        val dao = db.catalog()
+        dao.upsertCategories(listOf(CategoryEntity(ContentType.MOVIE, "d", "Disney+", 0, 1, "NL")))
+        dao.upsertMovies(
+            listOf(
+                // As measured on the tv: the NL-dubbed and the original version under different titles.
+                movie("d", 1, "The Croods 2: Een Nieuw Begin", 2020, "NL gesproken", sort = 0, tmdb = 529203),
+                movie("d", 2, "The Croods: A New Age", 2020, sort = 1),
+                movie("d", 3, "Garfield 2", 2006, sort = 2),
+            ),
+        )
+        // The second version's id only comes with its details (get_vod_info).
+        db.movieInfo().upsert(MovieInfoEntity(2, "Familie", null, null, null, null, 1, tmdbId = 529203))
+        val tiles = runBlocking {
+            (dao.movieTilesPaged("d").load(PagingSource.LoadParams.Refresh(null, 50, false)) as PagingSource.LoadResult.Page).data
+        }
+        assertEquals(listOf(1 to 2, 3 to 1), tiles.map { it.movie.streamId to it.versions })
+        assertEquals(listOf(1, 2), dao.movieVersions("The Croods 2: Een Nieuw Begin", 2020, 529203).map { it.movie.streamId })
         db.close()
     }
 }

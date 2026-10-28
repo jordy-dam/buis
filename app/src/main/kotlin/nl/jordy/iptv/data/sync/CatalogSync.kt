@@ -48,7 +48,7 @@ class CatalogSync @Inject constructor(
         sync(c, ContentType.MOVIE, "get_vod_categories", "get_vod_streams", generation, onProgress,
             parse = XtreamParser::movie, category = { it.categoryId }, rawName = { it.name },
             toItem = { it, n, cat, i ->
-                Item(MovieEntity(cat, it.streamId, n.title, it.posterUrl, it.rating, it.year, it.containerExtension, it.addedAt, i, generation, n.badges.joinToString(",")), it.streamId, n.title, n.country)
+                Item(MovieEntity(cat, it.streamId, n.title, it.posterUrl, it.rating, it.year, it.containerExtension, it.addedAt, i, generation, n.badges.joinToString(","), it.tmdbId), it.streamId, n.title, n.country)
             },
             write = dao::upsertMovies, existing = dao::movieCount, deleteOld = dao::deleteOldMovies)
 

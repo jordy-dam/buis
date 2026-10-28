@@ -55,23 +55,28 @@ interface CatalogDao {
      * SQLite takes the other columns from the row with MIN(sortIndex).
      */
     @Query(
-        "SELECT m.*, COUNT(*) AS versions, MIN(m.sortIndex) AS firstSort FROM movie m WHERE m.categoryId = :categoryId " +
-            "GROUP BY lower(m.name), m.year ORDER BY firstSort",
+        "SELECT m.*, COUNT(*) AS versions, MIN(m.sortIndex) AS firstSort FROM movie m LEFT JOIN movie_info i ON i.streamId = m.streamId " +
+            "WHERE m.categoryId = :categoryId GROUP BY $FILM_KEY ORDER BY firstSort",
     )
     fun movieTilesPaged(categoryId: String): PagingSource<Int, MovieTile>
 
     @Query(
         "SELECT m.*, COUNT(*) AS versions, MIN(m.sortIndex) AS firstSort FROM movie m JOIN movie_info i ON i.streamId = m.streamId " +
-            "WHERE m.categoryId = :categoryId AND (i.genre LIKE :pattern OR i.genre LIKE :alt) GROUP BY lower(m.name), m.year ORDER BY firstSort",
+            "WHERE m.categoryId = :categoryId AND (i.genre LIKE :pattern OR i.genre LIKE :alt) GROUP BY $FILM_KEY ORDER BY firstSort",
     )
     fun movieTilesPagedByGenre(categoryId: String, pattern: String, alt: String): PagingSource<Int, MovieTile>
 
-    /** Every version of a film in the whole catalog, with the country of a category it's in. */
+    /**
+     * Every version of a film in the whole catalog: the same TMDB id (from the list or the film's
+     * details), or, without one, the same title and year.
+     */
     @Query(
         "SELECT m.*, c.country AS country FROM movie m LEFT JOIN category c ON c.type = 'MOVIE' AND c.id = m.categoryId " +
-            "WHERE lower(m.name) = lower(:name) AND m.year IS :year GROUP BY m.streamId ORDER BY m.streamId",
+            "LEFT JOIN movie_info i ON i.streamId = m.streamId " +
+            "WHERE (:tmdbId IS NOT NULL AND (m.tmdbId = :tmdbId OR i.tmdbId = :tmdbId)) OR (lower(m.name) = lower(:name) AND m.year IS :year) " +
+            "GROUP BY m.streamId ORDER BY m.streamId",
     )
-    suspend fun movieVersions(name: String, year: Int?): List<MovieVersionRow>
+    suspend fun movieVersions(name: String, year: Int?, tmdbId: Int?): List<MovieVersionRow>
     @Query("SELECT * FROM movie WHERE streamId = :streamId LIMIT 1")
     suspend fun movie(streamId: Int): MovieEntity?
 
@@ -107,7 +112,7 @@ interface CatalogDao {
     @Query(
         "SELECT m.* FROM movie m JOIN category c ON c.type = 'MOVIE' AND c.id = m.categoryId " +
             "WHERE c.country IN (:countries) AND (:hideAdult = 0 OR c.adult = 0) AND m.addedAt IS NOT NULL " +
-            "GROUP BY lower(m.name), m.year ORDER BY m.addedAt DESC LIMIT :limit",
+            "GROUP BY COALESCE(CAST(m.tmdbId AS TEXT), lower(m.name) || '|' || IFNULL(m.year, '')) ORDER BY m.addedAt DESC LIMIT :limit",
     )
     fun recentMovies(countries: List<String>, hideAdult: Boolean, limit: Int): Flow<List<MovieEntity>>
 
@@ -224,6 +229,7 @@ interface EpgDao {
 @Dao
 interface MovieInfoDao {
     @Upsert suspend fun upsert(item: MovieInfoEntity)
+    @Query("SELECT * FROM movie_info WHERE streamId = :streamId") suspend fun get(streamId: Int): MovieInfoEntity?
 
     /**
      * Films in the given countries without details yet (or whose last attempt failed before
@@ -246,6 +252,9 @@ interface MovieInfoDao {
     )
     fun done(countries: List<String>): Flow<Int>
 }
+
+/** One film across its language versions: the TMDB id when known, else title and year (tables `m` and `i`). */
+const val FILM_KEY = "COALESCE(CAST(m.tmdbId AS TEXT), CAST(i.tmdbId AS TEXT), lower(m.name) || '|' || IFNULL(m.year, ''))"
 
 /** A film tile: the first version of a title in a category, and how many versions it stands for. */
 data class MovieTile(@Embedded val movie: MovieEntity, val versions: Int, val firstSort: Int)

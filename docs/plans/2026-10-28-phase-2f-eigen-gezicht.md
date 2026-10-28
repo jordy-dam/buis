@@ -29,3 +29,15 @@ Decision: `.agents/decisions/product.md` (2f).
 2. Films: duplicates gone, version choice on the detail screen.
 3. Profiel bewerken → Gezicht: pick one of the five.
 4. Watch something for more than 10 minutes without touching the remote: no screensaver.
+
+## Fix after the first tv test (same evening)
+On the tv most films still appeared twice (Keizer Kuzco, The Croods 2, Baas Baby, Garfield 2):
+the provider lists the NL-dubbed and the original version under **different titles** (Dutch and
+English) in the same category, so title + year didn't match them. Films are now grouped by their
+**TMDB id** (from the film list when the panel sends it, else from `get_vod_info`), falling back to
+title + year. Schema 7: the catalog re-syncs once and film details are fetched again in the
+background (genres keep working meanwhile), so the merge completes over about 1.5 h. Version names
+are now the tag or "Origineel", plus the title when the titles differ ("NL gesproken · The Croods 2:
+Een Nieuw Begin" / "Origineel · The Croods: A New Age"). The old icon on the tv is the launcher's
+cache; the APK holds the new one.
+

@@ -1,20 +1,20 @@
 package nl.jordy.iptv.data.repo
 
 import nl.jordy.iptv.data.db.MovieVersionRow
-import nl.jordy.iptv.data.xtream.NameParser
 
 /** The language versions of one film, as the detail screen offers them. */
 object MovieVersions {
 
     /**
-     * A short name per version from its labels ("NL gesproken", "NL sub · 4K"); without labels
-     * the country of its category, else "Origineel". Equal names get a number, so every button
-     * says something different.
+     * A short name per version: its labels ("NL gesproken", "NL sub · 4K"), else "Origineel".
+     * When the versions carry different titles (a Dutch and an English one), the title is added,
+     * because that's what tells them apart. Equal names get a number.
      */
     fun labels(versions: List<MovieVersionRow>): List<String> {
+        val titlesDiffer = versions.map { it.movie.name.lowercase() }.distinct().size > 1
         val raw = versions.map { v ->
-            v.movie.badges.split(',').map { it.trim() }.filter { it.isNotEmpty() }.joinToString(" · ")
-                .ifEmpty { v.country?.let(NameParser::countryName) ?: "Origineel" }
+            val tags = v.movie.badges.split(',').map { it.trim() }.filter { it.isNotEmpty() }.joinToString(" · ").ifEmpty { "Origineel" }
+            if (titlesDiffer) "$tags · ${v.movie.name}" else tags
         }
         val seen = mutableMapOf<String, Int>()
         return raw.map { label ->

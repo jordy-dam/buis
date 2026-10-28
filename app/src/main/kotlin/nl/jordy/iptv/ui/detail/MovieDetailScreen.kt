@@ -73,7 +73,8 @@ class MovieDetailViewModel @Inject constructor(
         viewModelScope.launch {
             val m = db.catalog().movie(opened) ?: return@launch
             movie.value = m
-            val rows = db.catalog().movieVersions(m.name, m.year).ifEmpty { listOf(MovieVersionRow(m, null)) }
+            val tmdb = m.tmdbId ?: db.movieInfo().get(opened)?.tmdbId ?: library.movieInfo(opened)?.tmdbId
+            val rows = db.catalog().movieVersions(m.name, m.year, tmdb).ifEmpty { listOf(MovieVersionRow(m, null)) }
             versions.value = rows.zip(MovieVersions.labels(rows)) { r, label -> Version(r.movie.streamId, label, r.movie.containerExtension) }
             // Start on the version watched last, else the one that was opened.
             val watched = library.positions(ContentType.MOVIE).first().filter { p -> rows.any { it.movie.streamId == p.itemId } }

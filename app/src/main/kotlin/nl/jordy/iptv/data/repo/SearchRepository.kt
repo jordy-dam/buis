@@ -71,7 +71,7 @@ class SearchRepository @Inject constructor(private val db: AppDatabase) {
         return SearchResults(
             channels = ids(ContentType.LIVE).let { ordered(it, dao.liveByIds(it)) { c -> c.streamId } },
             // One hit per film: language versions of the same title and year are one result.
-            movies = ids(ContentType.MOVIE).let { ordered(it, dao.moviesByIds(it)) { m -> m.streamId } }.distinctBy { it.name.lowercase() to it.year },
+            movies = ids(ContentType.MOVIE).let { ordered(it, dao.moviesByIds(it)) { m -> m.streamId } }.distinctBy { it.tmdbId?.toString() ?: "${it.name.lowercase()}|${it.year}" },
             series = ids(ContentType.SERIES).let { ordered(it, dao.seriesByIds(it)) { s -> s.seriesId } },
         )
     }

@@ -55,8 +55,12 @@ object XtreamParser {
             year = year(o, name),
             containerExtension = o.str("container_extension") ?: DEFAULT_EXTENSION,
             addedAt = o.long("added"),
+            tmdbId = tmdb(o),
         )
     }
+
+    /** Panels spell it `tmdb` or `tmdb_id`, as a number or a string; 0 means none. */
+    private fun tmdb(o: JsonObject): Int? = (o.int("tmdb") ?: o.int("tmdb_id"))?.takeIf { it > 0 }
 
     fun series(el: JsonElement): Series? {
         val o = el.asObjectOrNull() ?: return null
@@ -91,6 +95,7 @@ object XtreamParser {
             rating = rating(info),
             year = year(info, data.str("name").orEmpty()),
             containerExtension = data.str("container_extension"),
+            tmdbId = tmdb(info) ?: tmdb(data),
         )
     }
 

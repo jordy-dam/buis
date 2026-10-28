@@ -31,6 +31,8 @@ data class Movie(
     val year: Int?,
     val containerExtension: String,
     val addedAt: Long?,
+    /** The film's TMDB id when the panel sends one; the same for every language version. */
+    val tmdbId: Int? = null,
 )
 
 data class Series(
@@ -56,6 +58,7 @@ data class MovieInfo(
     val rating: Double?,
     val year: Int?,
     val containerExtension: String?,
+    val tmdbId: Int? = null,
 )
 
 data class Episode(
