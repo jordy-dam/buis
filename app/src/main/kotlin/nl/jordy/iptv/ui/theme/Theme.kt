@@ -20,6 +20,8 @@ val Accent = Color(0xFF4FC3F7)
 val Background = Color(0xFF0E1114)
 val SurfaceColor = Color(0xFF1A1F24)
 val SurfaceRaised = Color(0xFF252B32)
+/** A focused row in a list: one step lighter than [SurfaceRaised], no accent (that's for "selected"). */
+val SurfaceFocus = Color(0xFF2F3740)
 val TextPrimary = Color(0xFFF2F4F5)
 val TextSecondary = Color(0xFFA9B3BC)
 
@@ -47,15 +49,15 @@ private val colors = darkColorScheme(
     border = Accent,
 )
 
-// 10-foot type: body never below 16sp.
+// 10-foot type, one step below the spec's 16sp body at Jordy's request (2e): secondary text is 14sp.
 private val typography = Typography(
-    displaySmall = TextStyle(fontSize = 36.sp, fontWeight = FontWeight.SemiBold),
-    headlineMedium = TextStyle(fontSize = 28.sp, fontWeight = FontWeight.SemiBold),
-    titleLarge = TextStyle(fontSize = 22.sp, fontWeight = FontWeight.Medium),
-    titleMedium = TextStyle(fontSize = 18.sp, fontWeight = FontWeight.Medium),
-    bodyLarge = TextStyle(fontSize = 18.sp, lineHeight = 26.sp),
-    bodyMedium = TextStyle(fontSize = 16.sp, lineHeight = 22.sp),
-    labelLarge = TextStyle(fontSize = 16.sp, fontWeight = FontWeight.Medium),
+    displaySmall = TextStyle(fontSize = 32.sp, fontWeight = FontWeight.SemiBold),
+    headlineMedium = TextStyle(fontSize = 24.sp, fontWeight = FontWeight.SemiBold),
+    titleLarge = TextStyle(fontSize = 19.sp, fontWeight = FontWeight.Medium),
+    titleMedium = TextStyle(fontSize = 16.sp, fontWeight = FontWeight.Medium),
+    bodyLarge = TextStyle(fontSize = 16.sp, lineHeight = 22.sp),
+    bodyMedium = TextStyle(fontSize = 14.sp, lineHeight = 20.sp),
+    labelLarge = TextStyle(fontSize = 14.sp, fontWeight = FontWeight.Medium),
 )
 
 @Composable

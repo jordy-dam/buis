@@ -17,6 +17,7 @@ import androidx.tv.material3.MaterialTheme
 import androidx.tv.material3.Surface
 import androidx.tv.material3.Text
 import nl.jordy.iptv.ui.theme.Accent
+import nl.jordy.iptv.ui.theme.SurfaceFocus
 import nl.jordy.iptv.ui.theme.SurfaceRaised
 import nl.jordy.iptv.ui.theme.TextSecondary
 
@@ -40,11 +41,11 @@ private fun Chip(text: String, selected: Boolean, onClick: () -> Unit) {
     Surface(
         onClick = onClick,
         shape = ClickableSurfaceDefaults.shape(RoundedCornerShape(50)),
-        scale = ClickableSurfaceDefaults.scale(focusedScale = 1.05f),
-        border = ClickableSurfaceDefaults.border(focusedBorder = Focus.border),
+        scale = ClickableSurfaceDefaults.scale(focusedScale = 1.03f),
+        border = ClickableSurfaceDefaults.border(focusedBorder = Focus.quiet(RoundedCornerShape(50))),
         colors = ClickableSurfaceDefaults.colors(
             containerColor = if (selected) SurfaceRaised else Color.Transparent,
-            focusedContainerColor = SurfaceRaised,
+            focusedContainerColor = SurfaceFocus,
         ),
     ) {
         Text(

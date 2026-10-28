@@ -28,6 +28,9 @@ import kotlinx.coroutines.delay
 import nl.jordy.iptv.data.xtream.EpgEntry
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import nl.jordy.iptv.ui.theme.SurfaceFocus
+import androidx.compose.ui.graphics.Shape
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.key.onPreviewKeyEvent
 import androidx.compose.ui.input.key.type
 import androidx.compose.ui.input.key.KeyEventType
@@ -56,11 +59,16 @@ import nl.jordy.iptv.ui.theme.TextSecondary
 
 private val tileShape = RoundedCornerShape(10.dp)
 
-/** The single focus treatment of the app: scale ~1.1, accent outline, soft accent glow. */
+/**
+ * Two focus treatments. Artwork (posters, avatars, episodes): scale ~1.1, accent outline, soft
+ * glow, because one tile is picked out of a wall of images. Rows in lists: [quiet], a lighter
+ * surface and a thin light line, so focus never looks like the accent used for "selected" and progress.
+ */
 object Focus {
     const val SCALE = 1.1f
     val border = Border(BorderStroke(3.dp, Accent), shape = tileShape)
     val glow = Glow(elevationColor = Accent.copy(alpha = 0.35f), elevation = 12.dp)
+    fun quiet(shape: Shape) = Border(BorderStroke(1.dp, Color.White.copy(alpha = 0.35f)), shape = shape)
 }
 
 /**
@@ -88,7 +96,7 @@ fun PosterTile(
     onClick: () -> Unit,
     onLongClick: () -> Unit,
     modifier: Modifier = Modifier,
-    width: Dp = 104.dp,
+    width: Dp = 92.dp,
     favorite: Boolean = false,
     progress: Float? = null,
 ) {
@@ -143,12 +151,11 @@ fun ChannelTile(
     Surface(
         onClick = onClick,
         onLongClick = onLongClick,
-        modifier = modifier.fillMaxWidth().height(48.dp).onMenuKey(onLongClick),
+        modifier = modifier.fillMaxWidth().height(42.dp).onMenuKey(onLongClick),
         shape = ClickableSurfaceDefaults.shape(RoundedCornerShape(8.dp)),
         scale = ClickableSurfaceDefaults.scale(focusedScale = 1.02f),
-        border = ClickableSurfaceDefaults.border(focusedBorder = Border(BorderStroke(2.dp, Accent), shape = RoundedCornerShape(8.dp))),
-        glow = ClickableSurfaceDefaults.glow(focusedGlow = Focus.glow),
-        colors = ClickableSurfaceDefaults.colors(containerColor = SurfaceColor, focusedContainerColor = SurfaceRaised),
+        border = ClickableSurfaceDefaults.border(focusedBorder = Focus.quiet(RoundedCornerShape(8.dp))),
+        colors = ClickableSurfaceDefaults.colors(containerColor = SurfaceColor, focusedContainerColor = SurfaceFocus),
     ) {
         Box(Modifier.fillMaxSize()) {
             Row(Modifier.fillMaxSize().padding(horizontal = 8.dp), verticalAlignment = Alignment.CenterVertically) {
@@ -160,7 +167,7 @@ fun ChannelTile(
                     Text("$number", style = MaterialTheme.typography.bodyMedium, color = TextSecondary, textAlign = TextAlign.End, modifier = Modifier.width(32.dp))
                 }
                 Spacer(Modifier.width(10.dp))
-                Box(Modifier.height(32.dp).aspectRatio(16f / 9f).background(SurfaceRaised, RoundedCornerShape(4.dp)), contentAlignment = Alignment.Center) {
+                Box(Modifier.height(28.dp).aspectRatio(16f / 9f).background(SurfaceRaised, RoundedCornerShape(4.dp)), contentAlignment = Alignment.Center) {
                     Text(name.take(2).uppercase(), style = MaterialTheme.typography.labelLarge, color = TextSecondary)
                     if (logoUrl != null) {
                         AsyncImage(model = logoUrl, contentDescription = null, contentScale = ContentScale.Fit, modifier = Modifier.fillMaxSize().padding(3.dp))
@@ -194,6 +201,39 @@ fun ChannelTile(
                     Modifier.align(Alignment.BottomStart).fillMaxWidth(now.progress()).height(2.dp)
                         .background(Accent.copy(alpha = 0.45f)),
                 )
+            }
+        }
+    }
+}
+
+/**
+ * A favourite channel on Home: 240×60, logo, name and what's on, so three or four fit in a row.
+ */
+@Composable
+fun ChannelCard(name: String, logoUrl: String?, now: EpgEntry?, onClick: () -> Unit, modifier: Modifier = Modifier) {
+    Surface(
+        onClick = onClick,
+        modifier = modifier.width(240.dp).height(60.dp),
+        shape = ClickableSurfaceDefaults.shape(RoundedCornerShape(8.dp)),
+        scale = ClickableSurfaceDefaults.scale(focusedScale = 1.04f),
+        border = ClickableSurfaceDefaults.border(focusedBorder = Focus.quiet(RoundedCornerShape(8.dp))),
+        colors = ClickableSurfaceDefaults.colors(containerColor = SurfaceColor, focusedContainerColor = SurfaceFocus),
+    ) {
+        Box(Modifier.fillMaxSize()) {
+            Row(Modifier.fillMaxSize().padding(horizontal = 10.dp), verticalAlignment = Alignment.CenterVertically) {
+                Box(Modifier.height(32.dp).aspectRatio(16f / 9f).background(SurfaceRaised, RoundedCornerShape(4.dp)), contentAlignment = Alignment.Center) {
+                    Text(name.take(2).uppercase(), style = MaterialTheme.typography.labelLarge, color = TextSecondary)
+                    if (logoUrl != null) {
+                        AsyncImage(model = logoUrl, contentDescription = null, contentScale = ContentScale.Fit, modifier = Modifier.fillMaxSize().padding(3.dp))
+                    }
+                }
+                Column(Modifier.padding(start = 10.dp)) {
+                    Text(name, style = MaterialTheme.typography.titleMedium, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                    Text(now?.title ?: " ", style = MaterialTheme.typography.bodyMedium, color = TextSecondary, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                }
+            }
+            if (now != null) {
+                Box(Modifier.align(Alignment.BottomStart).fillMaxWidth(now.progress()).height(2.dp).background(Accent.copy(alpha = 0.45f)))
             }
         }
     }
@@ -250,11 +290,11 @@ fun ListItemSurface(
         onClick = onClick,
         modifier = modifier.fillMaxWidth(),
         shape = ClickableSurfaceDefaults.shape(RoundedCornerShape(8.dp)),
-        scale = ClickableSurfaceDefaults.scale(focusedScale = 1.03f),
-        border = ClickableSurfaceDefaults.border(focusedBorder = Focus.border),
+        scale = ClickableSurfaceDefaults.scale(focusedScale = 1.02f),
+        border = ClickableSurfaceDefaults.border(focusedBorder = Focus.quiet(RoundedCornerShape(8.dp))),
         colors = ClickableSurfaceDefaults.colors(
             containerColor = if (selected) SurfaceRaised else androidx.compose.ui.graphics.Color.Transparent,
-            focusedContainerColor = SurfaceRaised,
+            focusedContainerColor = SurfaceFocus,
         ),
     ) {
         Text(
@@ -263,7 +303,7 @@ fun ListItemSurface(
             color = if (selected) Accent else MaterialTheme.colorScheme.onSurface,
             maxLines = 1,
             overflow = TextOverflow.Ellipsis,
-            modifier = Modifier.padding(horizontal = 16.dp, vertical = 12.dp),
+            modifier = Modifier.padding(horizontal = 14.dp, vertical = 9.dp),
         )
     }
 }

@@ -15,7 +15,10 @@ import nl.jordy.iptv.BuildConfig
 import nl.jordy.iptv.data.epg.EpgGuide
 import nl.jordy.iptv.data.epg.XmltvProbe
 import nl.jordy.iptv.data.settings.CountryFilter
+import nl.jordy.iptv.data.profile.Pin
 import nl.jordy.iptv.data.profile.ProfileRepository
+import nl.jordy.iptv.ui.profiles.PinDialog
+import androidx.compose.runtime.rememberCoroutineScope
 import nl.jordy.iptv.data.settings.UserPrefs
 import nl.jordy.iptv.data.xtream.NameParser
 import nl.jordy.iptv.ui.components.Focus
@@ -59,10 +62,12 @@ import nl.jordy.iptv.data.auth.CredentialStore
 import nl.jordy.iptv.data.db.AppDatabase
 import nl.jordy.iptv.data.repo.EpgRepository
 import nl.jordy.iptv.data.repo.LibraryRepository
+import nl.jordy.iptv.data.repo.MovieEnricher
 import nl.jordy.iptv.ui.components.PrimaryButton
 import nl.jordy.iptv.ui.components.SecondaryButton
 import nl.jordy.iptv.ui.theme.Accent
 import nl.jordy.iptv.ui.theme.SurfaceColor
+import nl.jordy.iptv.ui.theme.SurfaceFocus
 import nl.jordy.iptv.ui.theme.SurfaceRaised
 import nl.jordy.iptv.ui.theme.TextSecondary
 import java.text.NumberFormat
@@ -88,12 +93,26 @@ class SettingsViewModel @Inject constructor(
     private val library: LibraryRepository,
     private val epg: EpgRepository,
     private val guide: EpgGuide,
+    enricher: MovieEnricher,
 ) : ViewModel() {
+    /** "1.234 van 19.826 films": how far the background fetch of film details is. */
+    val filmInfo = enricher.progress.map { (done, total) ->
+        val n = NumberFormat.getIntegerInstance(Locale.forLanguageTag("nl-NL"))
+        if (total == 0) "Geen films in je voorkeurslanden." else "${n.format(done)} van ${n.format(total)} films" + if (done >= total) "" else " · wordt op de achtergrond aangevuld"
+    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), "")
+
     private val _state = MutableStateFlow(SettingsState())
     val state = _state.asStateFlow()
 
     val prefs = profiles.prefs.stateIn(viewModelScope, SharingStarted.Eagerly, UserPrefs())
     val profileName = profiles.current.map { it?.name.orEmpty() }.stateIn(viewModelScope, SharingStarted.Eagerly, "")
+
+    /** The watching profile's id and the PIN checks before it may be edited (see [ProfileRepository.editGates]). */
+    suspend fun editGates(): Pair<Long, List<List<String>>> {
+        val all = profiles.all()
+        val me = all.first { it.id == profiles.currentId() }
+        return me.id to ProfileRepository.editGates(me, all)
+    }
 
     /** "Bijgewerkt 21:04 · 528 zenders", or what's going on with the guide right now. */
     val guideStatus = combine(guide.status, guide.info) { status, info ->
@@ -169,13 +188,21 @@ class SettingsViewModel @Inject constructor(
  */
 @OptIn(ExperimentalComposeUiApi::class)
 @Composable
-fun SettingsScreen(onRefreshCatalog: () -> Unit, onLoggedOut: () -> Unit, vm: SettingsViewModel = hiltViewModel()) {
+fun SettingsScreen(onRefreshCatalog: () -> Unit, onLoggedOut: () -> Unit, onEditProfile: (Long) -> Unit, vm: SettingsViewModel = hiltViewModel()) {
+    val scope = rememberCoroutineScope()
+    // PIN checks still to pass before "Profiel bewerken" opens, as in "Wie kijkt er?".
+    var gates by remember { mutableStateOf<Pair<Long, List<List<String>>>?>(null) }
+    fun openEdit() = scope.launch {
+        val (id, g) = vm.editGates()
+        if (g.isEmpty()) onEditProfile(id) else gates = id to g
+    }
     val state by vm.state.collectAsStateWithLifecycle()
     val prefs by vm.prefs.collectAsStateWithLifecycle()
     val profileName by vm.profileName.collectAsStateWithLifecycle()
     val countries by vm.countries.collectAsStateWithLifecycle()
     val epgCheck by vm.epgCheck.collectAsStateWithLifecycle()
     val guideStatus by vm.guideStatus.collectAsStateWithLifecycle()
+    val filmInfo by vm.filmInfo.collectAsStateWithLifecycle()
     var confirmLogout by remember { mutableStateOf(false) }
     var pickCountries by remember { mutableStateOf(false) }
 
@@ -190,11 +217,16 @@ fun SettingsScreen(onRefreshCatalog: () -> Unit, onLoggedOut: () -> Unit, vm: Se
 
         Header("Voor $profileName")
         SettingRow(
+            "Profiel bewerken",
+            "Naam, kleur, pincode en kinderprofiel.",
+            onClick = { openEdit() },
+            modifier = Modifier.focusRequester(first),
+        )
+        SettingRow(
             "Voorkeurslanden",
             "Staan bovenaan in Live TV, Films, Series en Zoeken.",
             value = prefs.preferredCountries.sorted().joinToString(", ") { NameParser.countryName(it) },
             onClick = { pickCountries = true },
-            modifier = Modifier.focusRequester(first),
         )
         SettingRow(
             "Alleen voorkeurslanden tonen",
@@ -210,6 +242,7 @@ fun SettingsScreen(onRefreshCatalog: () -> Unit, onLoggedOut: () -> Unit, vm: Se
             onClick = onRefreshCatalog,
         )
         SettingRow("Gids vernieuwen", guideStatus, onClick = vm::refreshGuide)
+        SettingRow("Filmgegevens", "Genres per film, voor het filter bij Films.", value = filmInfo)
 
         SettingRow("Server", value = state.server)
         SettingRow("Gebruiker", value = state.username)
@@ -226,6 +259,20 @@ fun SettingsScreen(onRefreshCatalog: () -> Unit, onLoggedOut: () -> Unit, vm: Se
         }
     }
 
+    gates?.let { (id, remaining) ->
+        val hashes = remaining.first()
+        PinDialog(
+            title = if (remaining.size > 1 || hashes.size > 1) "Pincode van een volwassene" else "Pincode van $profileName",
+            onPin = { pin ->
+                if (hashes.any { Pin.verify(pin, it) }) {
+                    val rest = remaining.drop(1)
+                    if (rest.isEmpty()) { gates = null; onEditProfile(id) } else gates = id to rest
+                    null
+                } else "Onjuiste pincode"
+            },
+            onDismiss = { gates = null },
+        )
+    }
     if (pickCountries) {
         CountryDialog(countries, prefs.preferredCountries, vm::toggleCountry, onDismiss = { pickCountries = false })
     }
@@ -275,8 +322,8 @@ internal fun SettingRow(
         modifier = modifier.fillMaxWidth(),
         shape = ClickableSurfaceDefaults.shape(RoundedCornerShape(10.dp)),
         scale = ClickableSurfaceDefaults.scale(focusedScale = 1.02f),
-        border = ClickableSurfaceDefaults.border(focusedBorder = Focus.border),
-        colors = ClickableSurfaceDefaults.colors(containerColor = SurfaceColor, focusedContainerColor = SurfaceRaised),
+        border = ClickableSurfaceDefaults.border(focusedBorder = Focus.quiet(RoundedCornerShape(10.dp))),
+        colors = ClickableSurfaceDefaults.colors(containerColor = SurfaceColor, focusedContainerColor = SurfaceFocus),
     ) { content() }
 }
 

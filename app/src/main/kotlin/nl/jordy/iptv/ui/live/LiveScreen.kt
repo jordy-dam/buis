@@ -153,7 +153,7 @@ fun LiveScreen(onPlay: (PlayerRoute) -> Unit, vm: LiveViewModel = hiltViewModel(
             onClick = { channelFocus.requestFocus() },
             filter = filtered,
             onToggleFilter = vm::toggleShowAll,
-            modifier = Modifier.width(240.dp).fillMaxHeight().focusRequester(categoryFocus),
+            modifier = Modifier.width(208.dp).fillMaxHeight().focusRequester(categoryFocus),
         )
         Column(Modifier.padding(start = 16.dp).fillMaxSize()) {
         // "Straks" and the time slot of the focused channel, in a fixed strip: rows never grow.
@@ -205,7 +205,7 @@ private fun NowNextStrip(channel: LiveChannelEntity?, load: suspend (Int) -> Pai
     val fmt = remember { DateTimeFormatter.ofPattern("HH:mm").withZone(ZoneId.systemDefault()) }
     fun time(sec: Long) = fmt.format(Instant.ofEpochSecond(sec))
     val (now, next) = if (channel != null) rememberNowAndNext(channel.streamId, load) else null to null
-    Column(Modifier.fillMaxWidth().height(52.dp).padding(start = 12.dp, top = 2.dp)) {
+    Column(Modifier.fillMaxWidth().height(44.dp).padding(start = 12.dp, top = 2.dp)) {
         when {
             channel == null -> Text("Kies een zender", style = MaterialTheme.typography.bodyLarge, color = TextSecondary)
             now == null && next == null -> Text(channel.name, style = MaterialTheme.typography.titleMedium, maxLines = 1)

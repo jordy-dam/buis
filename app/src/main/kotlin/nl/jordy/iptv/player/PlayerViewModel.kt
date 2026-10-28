@@ -33,6 +33,7 @@ import nl.jordy.iptv.data.auth.CredentialStore
 import nl.jordy.iptv.data.db.AppDatabase
 import nl.jordy.iptv.data.db.LiveChannelEntity
 import nl.jordy.iptv.data.repo.EpgRepository
+import nl.jordy.iptv.data.repo.MovieEnricher
 import nl.jordy.iptv.data.repo.LibraryRepository
 import nl.jordy.iptv.data.xtream.ContentType
 import nl.jordy.iptv.data.xtream.EpgEntry
@@ -63,6 +64,7 @@ class PlayerViewModel @Inject constructor(
     private val db: AppDatabase,
     private val library: LibraryRepository,
     private val epg: EpgRepository,
+    private val enricher: MovieEnricher,
 ) : ViewModel() {
 
     val route = savedState.toRoute<PlayerRoute>()
@@ -105,6 +107,8 @@ class PlayerViewModel @Inject constructor(
     private var playbackStarted = false
 
     init {
+        // Film details are fetched in the background; not while someone is watching.
+        enricher.playing.update { it + 1 }
         player.addListener(object : Player.Listener {
             override fun onPlaybackStateChanged(state: Int) {
                 _state.update { it.copy(buffering = state == Player.STATE_BUFFERING) }
@@ -266,5 +270,6 @@ class PlayerViewModel @Inject constructor(
     override fun onCleared() {
         saveNow()
         player.release()
+        enricher.playing.update { it - 1 }
     }
 }

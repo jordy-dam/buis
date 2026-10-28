@@ -124,5 +124,19 @@ class ProfileRepository @Inject constructor(
          */
         fun managementLock(profiles: List<ProfileEntity>): List<String> =
             if (profiles.none { it.kids }) emptyList() else profiles.filter { !it.kids }.mapNotNull { it.pinHash }
+
+        /**
+         * The PIN checks before [profile] may be edited, in order; each entry is a set of hashes of
+         * which one must match. A grown-up's PIN (when management is locked) and the profile's own
+         * PIN; one entry when they're the same PIN.
+         */
+        fun editGates(profile: ProfileEntity, profiles: List<ProfileEntity>): List<List<String>> {
+            val lock = managementLock(profiles)
+            val own = profile.pinHash
+            return listOfNotNull(
+                lock.takeIf { it.isNotEmpty() && own !in it },
+                own?.let { listOf(it) },
+            )
+        }
     }
 }

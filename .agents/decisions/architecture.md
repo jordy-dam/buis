@@ -65,3 +65,9 @@
 **Why:** Measured on the tv with the debug build: 20% janky frames, p90 85 ms, p99 400 ms, almost all "slow UI thread" and one slow bitmap upload. Images and caching weren't the problem (Coil caches by default); a debuggable Compose app on a 32-bit CPU was. The release APK is 7.6 MB instead of 54 MB.
 **Alternatives rejected:** A custom image cache (the measurement didn't point there); a baseline profile now (extra module; first see what R8 gives).
 **Revisit if:** the tv still janks on release (then add a baseline profile), or something breaks only under R8. `run-as` no longer works on the tv, so reading its database needs a debug install.
+
+## 2026-10-28 — Film details fetched in the background from the provider
+**Decision:** `MovieEnricher` calls `get_vod_info` for every film in the household's preferred countries, 250 ms apart, paused while a player is open, resumable, failed films retried after a day, into `movie_info` (schema 5; keyed by stream id, so it survives catalog syncs). Opening a film writes its details there too. Started when the shell starts.
+**Why:** The provider's film list has no genre; only `get_vod_info` has it. About 20k NL films means about 1.5 h the first time, then only new films. It stays between the tv and the provider, needs no key, and gives genre, cast and director for phase 3.
+**Alternatives rejected:** TMDB now (external service, an API key, matching titles; kept as an option for phase 3 if the provider's genres prove thin); fetching on demand per category (slow chips, many bursts).
+**Revisit if:** the provider rate-limits or blocks the requests (lower the pace), or the genres turn out mostly empty.

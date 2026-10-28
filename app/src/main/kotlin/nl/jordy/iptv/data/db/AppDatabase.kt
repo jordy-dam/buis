@@ -22,13 +22,16 @@ import androidx.sqlite.db.SupportSQLiteDatabase
         EpgProgrammeEntity::class,
         EpgChannelEntity::class,
         EpgInfoEntity::class,
+        MovieInfoEntity::class,
     ],
-    version = 4,
+    version = 5,
     exportSchema = true,
     autoMigrations = [
         AutoMigration(from = 1, to = 2, spec = AppDatabase.CatalogResync::class),
         // Guide tables only; filled by the first guide refresh.
         AutoMigration(from = 3, to = 4),
+        // Film details table only; filled in the background.
+        AutoMigration(from = 4, to = 5),
     ],
 )
 abstract class AppDatabase : RoomDatabase() {
@@ -40,6 +43,7 @@ abstract class AppDatabase : RoomDatabase() {
     abstract fun syncInfo(): SyncInfoDao
     abstract fun search(): SearchDao
     abstract fun epg(): EpgDao
+    abstract fun movieInfo(): MovieInfoDao
 
     /**
      * The catalog is a cache of the provider: after a schema change it's emptied and the next

@@ -28,8 +28,20 @@ end; wants a page per service and genre filtering.
 - Emulator walk-through, debug and release: channel rows, Films/Series list + grid, chips, Back chain;
   release plays films and live with the FFmpeg decoder loaded; no crashes.
 
+## Measured on the tv after installing (release, a few minutes of browsing)
+| | Debug (2c) | Release + R8 (2d) |
+|---|---|---|
+| Janky frames | 20.0% | 5.2% |
+| p90 frame time | 85 ms | 36 ms |
+| p95 | 150 ms | 48 ms |
+| p99 | 400 ms | 150 ms |
+
+The tv's own load average was around 20 during the measurement (other apps and services), which
+the app can't influence. The first seconds after a fresh install are still slow: ART compiles the
+code on first use. A baseline profile would fix that if it bothers.
+
 ## For Jordy on the tv
-1. Does it feel faster? (I'll compare gfxinfo with the debug baseline.)
+1. Does it feel faster? (Measured above.)
 2. Films/Series: are the right categories under "Diensten" and "Genres"?
 3. Channel rows: heart, quality label and ↺ readable from the couch?
 

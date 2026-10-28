@@ -36,6 +36,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import dagger.hilt.android.lifecycle.HiltViewModel
 import nl.jordy.iptv.data.epg.EpgGuide
 import nl.jordy.iptv.data.profile.ProfileRepository
+import nl.jordy.iptv.data.repo.MovieEnricher
 import nl.jordy.iptv.ui.components.AvatarCircle
 import nl.jordy.iptv.ui.home.HomeScreen
 import javax.inject.Inject
@@ -68,9 +69,9 @@ import nl.jordy.iptv.ui.live.LiveScreen
 import nl.jordy.iptv.ui.search.SearchScreen
 import nl.jordy.iptv.ui.settings.SettingsScreen
 import nl.jordy.iptv.ui.theme.Accent
-import nl.jordy.iptv.ui.theme.BuisWordmark
 import nl.jordy.iptv.ui.theme.SafeArea
 import nl.jordy.iptv.ui.theme.SurfaceColor
+import nl.jordy.iptv.ui.theme.SurfaceFocus
 import nl.jordy.iptv.ui.theme.SurfaceRaised
 import nl.jordy.iptv.ui.theme.TextSecondary
 import nl.jordy.iptv.ui.vod.MoviesScreen
@@ -98,6 +99,7 @@ fun ShellScreen(
     onOpenMovie: (Int) -> Unit,
     onOpenSeries: (Int) -> Unit,
     onRefreshCatalog: () -> Unit,
+    onEditProfile: (Long) -> Unit,
     onLoggedOut: () -> Unit,
     vm: ShellViewModel = hiltViewModel(),
 ) {
@@ -129,7 +131,7 @@ fun ShellScreen(
 
     // The rail steps back to icons while you browse, and opens again when focus comes back to it.
     var railOpen by remember { mutableStateOf(true) }
-    val railWidth by animateDpAsState(if (railOpen) 200.dp else 72.dp, tween(150, easing = FastOutSlowInEasing), label = "rail")
+    val railWidth by animateDpAsState(if (railOpen) 176.dp else 64.dp, tween(150, easing = FastOutSlowInEasing), label = "rail")
 
     // Walking down the rail doesn't build every screen on the way: a tab opens once focus rests on
     // it for a moment, or at once on OK or Right.
@@ -172,9 +174,9 @@ fun ShellScreen(
                 .focusGroup(),
             verticalArrangement = Arrangement.spacedBy(4.dp),
         ) {
-            // Same height open or closed, so the items don't move up and down with the rail.
-            Box(Modifier.height(40.dp).padding(start = 12.dp, bottom = 8.dp)) { if (railOpen) BuisWordmark() }
+            // Who's watching, top left: the switch point. The BUIS logo lives on "Wie kijkt er?".
             profile?.let { ProfileItem(it.name, it.avatar, railOpen, onSwitchProfile) }
+            Spacer(Modifier.height(12.dp))
             Tab.entries.forEach { t ->
                 if (t == Tab.SETTINGS) Spacer(Modifier.weight(1f))
                 RailItem(
@@ -205,7 +207,7 @@ fun ShellScreen(
                 Tab.SERIES -> SeriesScreen(onOpenSeries = onOpenSeries)
                 Tab.FAVORITES -> FavoritesScreen(onPlay = onPlay, onOpenMovie = onOpenMovie, onOpenSeries = onOpenSeries)
                 Tab.SEARCH -> SearchScreen(onPlay = onPlay, onOpenMovie = onOpenMovie, onOpenSeries = onOpenSeries)
-                Tab.SETTINGS -> SettingsScreen(onRefreshCatalog = onRefreshCatalog, onLoggedOut = onLoggedOut)
+                Tab.SETTINGS -> SettingsScreen(onRefreshCatalog = onRefreshCatalog, onLoggedOut = onLoggedOut, onEditProfile = onEditProfile)
             }
         }
     }
@@ -216,12 +218,14 @@ fun ShellScreen(
 }
 
 @HiltViewModel
-class ShellViewModel @Inject constructor(profiles: ProfileRepository, guide: EpgGuide) : ViewModel() {
+class ShellViewModel @Inject constructor(profiles: ProfileRepository, guide: EpgGuide, enricher: MovieEnricher) : ViewModel() {
     val profile = profiles.current
 
     init {
         // Once a day, in the background; until then channel rows use the short EPG.
         guide.refreshIfStale()
+        // Film details for the genre filter: resumes where it stopped, then only new films.
+        enricher.start()
     }
 }
 
@@ -234,9 +238,9 @@ private fun ProfileItem(name: String, avatar: Int, open: Boolean, onClick: () ->
     Surface(
         onClick = onClick,
         shape = ClickableSurfaceDefaults.shape(RoundedCornerShape(8.dp)),
-        scale = ClickableSurfaceDefaults.scale(focusedScale = 1.05f),
-        border = ClickableSurfaceDefaults.border(focusedBorder = Focus.border),
-        colors = ClickableSurfaceDefaults.colors(containerColor = androidx.compose.ui.graphics.Color.Transparent, focusedContainerColor = SurfaceRaised),
+        scale = ClickableSurfaceDefaults.scale(focusedScale = 1.03f),
+        border = ClickableSurfaceDefaults.border(focusedBorder = Focus.quiet(RoundedCornerShape(8.dp))),
+        colors = ClickableSurfaceDefaults.colors(containerColor = androidx.compose.ui.graphics.Color.Transparent, focusedContainerColor = SurfaceFocus),
     ) {
         Row(Modifier.padding(horizontal = 8.dp, vertical = 6.dp), verticalAlignment = Alignment.CenterVertically) {
             AvatarCircle(name, avatar, 32.dp)
@@ -260,11 +264,11 @@ private fun RailItem(tab: Tab, selected: Boolean, open: Boolean, onFocus: () -> 
         onClick = onClick,
         modifier = modifier.onFocusChanged { if (it.isFocused) onFocus() },
         shape = ClickableSurfaceDefaults.shape(RoundedCornerShape(8.dp)),
-        scale = ClickableSurfaceDefaults.scale(focusedScale = 1.05f),
-        border = ClickableSurfaceDefaults.border(focusedBorder = Focus.border),
+        scale = ClickableSurfaceDefaults.scale(focusedScale = 1.03f),
+        border = ClickableSurfaceDefaults.border(focusedBorder = Focus.quiet(RoundedCornerShape(8.dp))),
         colors = ClickableSurfaceDefaults.colors(
             containerColor = if (selected) SurfaceRaised else androidx.compose.ui.graphics.Color.Transparent,
-            focusedContainerColor = SurfaceRaised,
+            focusedContainerColor = SurfaceFocus,
         ),
     ) {
         Row(Modifier.padding(horizontal = 12.dp, vertical = 9.dp)) {

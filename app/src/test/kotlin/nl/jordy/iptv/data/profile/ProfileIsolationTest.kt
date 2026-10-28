@@ -119,6 +119,18 @@ class ProfileIsolationTest {
     }
 
     @Test
+    fun `editing from Instellingen asks the same PINs as the picker`() {
+        val dad = nl.jordy.iptv.data.db.ProfileEntity(1, "Papa", 0, pinHash = "h1")
+        val mum = nl.jordy.iptv.data.db.ProfileEntity(2, "Mama", 1, pinHash = "h2")
+        val kid = nl.jordy.iptv.data.db.ProfileEntity(3, "Kind", 2, kids = true)
+        val open = nl.jordy.iptv.data.db.ProfileEntity(4, "Gast", 3)
+        assertEquals("no kids: only your own PIN", listOf(listOf("h1")), ProfileRepository.editGates(dad, listOf(dad, open)))
+        assertEquals("no PIN, no kids: open", emptyList<List<String>>(), ProfileRepository.editGates(open, listOf(dad, open)))
+        assertEquals("your own PIN is also a grown-up's", listOf(listOf("h1")), ProfileRepository.editGates(dad, listOf(dad, mum, kid)))
+        assertEquals("a kid needs a grown-up", listOf(listOf("h1", "h2")), ProfileRepository.editGates(kid, listOf(dad, mum, kid)))
+    }
+
+    @Test
     fun `profile management is locked by grown-up PINs only once there is a kids profile`() {
         val dad = nl.jordy.iptv.data.db.ProfileEntity(1, "Papa", 0, pinHash = "h1")
         val mum = nl.jordy.iptv.data.db.ProfileEntity(2, "Mama", 1)

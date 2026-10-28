@@ -50,6 +50,15 @@ interface CatalogDao {
     @Query("SELECT * FROM movie WHERE streamId = :streamId LIMIT 1")
     suspend fun movie(streamId: Int): MovieEntity?
 
+    /** A category's films with a genre (from [MovieInfoEntity]), in either of two spellings. */
+    @Query(
+        "SELECT m.* FROM movie m JOIN movie_info i ON i.streamId = m.streamId " +
+            "WHERE m.categoryId = :categoryId AND (i.genre LIKE :pattern OR i.genre LIKE :alt) ORDER BY m.sortIndex",
+    )
+    fun moviesPagedByGenre(categoryId: String, pattern: String, alt: String): PagingSource<Int, MovieEntity>
+    @Query("SELECT i.genre FROM movie m JOIN movie_info i ON i.streamId = m.streamId WHERE m.categoryId = :categoryId")
+    fun movieGenres(categoryId: String): Flow<List<String?>>
+
     @Query("SELECT * FROM series WHERE categoryId = :categoryId ORDER BY sortIndex")
     fun seriesPaged(categoryId: String): PagingSource<Int, SeriesEntity>
     /** A category's series with a genre, in either of two spellings (see [nl.jordy.iptv.data.repo.Genres]). */
@@ -185,4 +194,30 @@ interface EpgDao {
     )
     suspend fun upcoming(streamId: Int, now: Long, limit: Int = 2): List<EpgProgrammeEntity>
 
+}
+
+@Dao
+interface MovieInfoDao {
+    @Upsert suspend fun upsert(item: MovieInfoEntity)
+
+    /**
+     * Films in the given countries without details yet (or whose last attempt failed before
+     * [retryBefore]), in a stable order so a restart continues where it stopped.
+     */
+    @Query(
+        "SELECT DISTINCT m.streamId FROM movie m JOIN category c ON c.type = 'MOVIE' AND c.id = m.categoryId " +
+            "LEFT JOIN movie_info i ON i.streamId = m.streamId " +
+            "WHERE c.country IN (:countries) AND (i.streamId IS NULL OR (i.failed = 1 AND i.fetchedAt < :retryBefore)) " +
+            "ORDER BY m.streamId LIMIT :limit",
+    )
+    suspend fun pending(countries: List<String>, retryBefore: Long, limit: Int): List<Int>
+
+    @Query("SELECT COUNT(DISTINCT m.streamId) FROM movie m JOIN category c ON c.type = 'MOVIE' AND c.id = m.categoryId WHERE c.country IN (:countries)")
+    fun total(countries: List<String>): Flow<Int>
+
+    @Query(
+        "SELECT COUNT(DISTINCT m.streamId) FROM movie m JOIN category c ON c.type = 'MOVIE' AND c.id = m.categoryId " +
+            "JOIN movie_info i ON i.streamId = m.streamId AND i.failed = 0 WHERE c.country IN (:countries)",
+    )
+    fun done(countries: List<String>): Flow<Int>
 }

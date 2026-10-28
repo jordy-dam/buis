@@ -42,7 +42,7 @@ import nl.jordy.iptv.ui.components.rememberNowAndNext
 import nl.jordy.iptv.data.xtream.ContentType
 import nl.jordy.iptv.data.xtream.NameParser
 import nl.jordy.iptv.ui.PlayerRoute
-import nl.jordy.iptv.ui.components.ChannelTile
+import nl.jordy.iptv.ui.components.ChannelCard
 import nl.jordy.iptv.ui.components.PosterTile
 import nl.jordy.iptv.ui.components.lastInRow
 import nl.jordy.iptv.ui.theme.Rows
@@ -160,14 +160,13 @@ fun HomeScreen(onPlay: (PlayerRoute) -> Unit, onOpenMovie: (Int) -> Unit, vm: Ho
                     modifier = Modifier.focusRestorer(),
                 ) {
                     items(s.channels, key = { it.itemId }) { f ->
-                        ChannelTile(
+                        ChannelCard(
                             name = NameParser.parse(f.name).title,
                             logoUrl = f.imageUrl,
                             now = rememberNowAndNext(f.itemId, vm::nowAndNext).first,
                             // Zapping from here goes through the favourite channels, as on Favorieten.
                             onClick = { onPlay(PlayerRoute(PlayerRoute.Kind.LIVE, f.itemId, f.name, categoryId = PlayerRoute.FAVORITES_CATEGORY)) },
-                            onLongClick = {},
-                            modifier = Modifier.width(420.dp).lastInRow(f == s.channels.last()),
+                            modifier = Modifier.lastInRow(f == s.channels.last()),
                         )
                     }
                 }

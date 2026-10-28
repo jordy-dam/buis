@@ -51,6 +51,7 @@ fun AppNavHost(start: Any) {
                 onOpenMovie = { nav.navigate(MovieDetailRoute(it)) },
                 onOpenSeries = { nav.navigate(SeriesDetailRoute(it)) },
                 onRefreshCatalog = { nav.navigate(SyncRoute) { popUpTo(ShellRoute) { inclusive = true } } },
+                onEditProfile = { nav.navigate(ProfileEditRoute(it)) },
                 onLoggedOut = { nav.navigate(LoginRoute) { popUpTo(ShellRoute) { inclusive = true } } },
             )
         }

@@ -42,8 +42,8 @@ class FocusMemory {
     fun consume(key: String): Boolean = (pending == key).also { if (it) pending = null }
 }
 
-/** Grid posters: four columns fit even while the rail is open. */
-val GridPosterWidth: Dp = 96.dp
+/** Grid posters: five columns fit even while the rail is open. */
+val GridPosterWidth: Dp = 84.dp
 
 /**
  * Films and Series, the same way as Live TV: categories (services and genres first) on the left,
@@ -83,16 +83,16 @@ fun <T : Any> CategoryBrowser(
             onClick = { runCatching { gridFocus.requestFocus() } },
             filter = filter,
             onToggleFilter = onToggleFilter,
-            modifier = Modifier.width(240.dp).fillMaxHeight().focusRequester(listFocus),
+            modifier = Modifier.width(208.dp).fillMaxHeight().focusRequester(listFocus),
         )
         Column(Modifier.padding(start = 16.dp).fillMaxSize().onFocusChanged { gridHasFocus = it.hasFocus }) {
             above()
             LazyVerticalGrid(
-                columns = GridCells.Fixed(4),
+                columns = GridCells.Fixed(5),
                 modifier = Modifier.fillMaxSize().focusRequester(gridFocus).focusRestorer(),
-                contentPadding = PaddingValues(start = 8.dp, end = 8.dp, top = 8.dp, bottom = 48.dp),
-                horizontalArrangement = Arrangement.spacedBy(16.dp),
-                verticalArrangement = Arrangement.spacedBy(16.dp),
+                contentPadding = PaddingValues(start = 4.dp, end = 4.dp, top = 8.dp, bottom = 48.dp),
+                horizontalArrangement = Arrangement.spacedBy(12.dp),
+                verticalArrangement = Arrangement.spacedBy(12.dp),
             ) {
                 items(items.itemCount, key = items.itemKey { "$selected/${itemKey(it)}" }) { index ->
                     val item = items[index] ?: return@items

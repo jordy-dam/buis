@@ -73,10 +73,20 @@ class MoviesViewModel @Inject constructor(db: AppDatabase, profiles: ProfileRepo
 
     private val picked = MutableStateFlow<String?>(null)
     val selected = selectedOf(picked, sections).stateIn(viewModelScope, SharingStarted.Eagerly, null)
-    fun select(id: String) { picked.value = id }
+    fun select(id: String) {
+        if (picked.value != id) genre.value = null // a genre belongs to the category it was picked in
+        picked.value = id
+    }
 
-    val items: Flow<PagingData<MovieEntity>> = selected.filterNotNull().flatMapLatest { id ->
-        Pager(pagingConfig) { dao.moviesPaged(id) }.flow
+    /** Film genres come from [nl.jordy.iptv.data.repo.MovieEnricher], so chips appear as details arrive. */
+    val genre = MutableStateFlow<String?>(null)
+    val genres = selected.filterNotNull().flatMapLatest { id -> dao.movieGenres(id).map { Genres.top(it) } }
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
+
+    val items: Flow<PagingData<MovieEntity>> = combine(selected.filterNotNull(), genre) { id, g -> id to g }.flatMapLatest { (id, g) ->
+        Pager(pagingConfig) {
+            if (g == null) dao.moviesPaged(id) else Genres.patterns(g).let { (a, b) -> dao.moviesPagedByGenre(id, a, b) }
+        }.flow
     }.cachedIn(viewModelScope)
 
     val favorites = library.favoriteIds(ContentType.MOVIE).map { it.toSet() }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptySet())
@@ -129,8 +139,12 @@ fun MoviesScreen(onOpenMovie: (Int) -> Unit, vm: MoviesViewModel = hiltViewModel
     val selected by vm.selected.collectAsStateWithLifecycle()
     val favorites by vm.favorites.collectAsStateWithLifecycle()
     val progress by vm.progress.collectAsStateWithLifecycle()
+    val genres by vm.genres.collectAsStateWithLifecycle()
+    val genre by vm.genre.collectAsStateWithLifecycle()
     val items = vm.items.collectAsLazyPagingItems()
-    CategoryBrowser(sections, filtered, vm::toggleShowAll, selected, vm::select, items, { it.streamId }, vm.focusMemory, tile = { movie, modifier ->
+    CategoryBrowser(sections, filtered, vm::toggleShowAll, selected, vm::select, items, { it.streamId }, vm.focusMemory, above = {
+        GenreChips(genres, genre, { vm.genre.value = it })
+    }, tile = { movie, modifier ->
         PosterTile(
             title = movie.name,
             imageUrl = movie.posterUrl,

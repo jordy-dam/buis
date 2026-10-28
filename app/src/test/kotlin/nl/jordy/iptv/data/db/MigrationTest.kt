@@ -86,6 +86,21 @@ class MigrationTest {
         }
     }
 
+    @Test
+    fun `4 to 5 adds film details and keeps profiles, positions and the guide`() {
+        helper.createDatabase(DB, 4).use { db ->
+            db.execSQL("INSERT INTO profile (id, name, avatar, pinHash, preferredCountries, onlyPreferred, kids, lastUsedAt, createdAt) VALUES (1, 'Anna', 0, NULL, 'NL', 1, 0, 5, 1)")
+            db.execSQL("INSERT INTO playback_position (profileId, type, itemId, positionMs, durationMs, updatedAt) VALUES (1, 'MOVIE', 5001, 62000, 180000, 2)")
+            db.execSQL("INSERT INTO epg_programme (channelId, start, stop, title, description) VALUES ('npo1.nl', 1, 2, 'Journaal', NULL)")
+        }
+        helper.runMigrationsAndValidate(DB, 5, true).use { db ->
+            assertEquals(1, db.count("profile"))
+            assertEquals(1, db.count("playback_position"))
+            assertEquals("the guide isn't thrown away", 1, db.count("epg_programme"))
+            assertEquals(0, db.count("movie_info"))
+        }
+    }
+
     private fun SupportSQLiteDatabase.insertPhase1Data() {
         execSQL("INSERT INTO favorite (type, itemId, name, imageUrl, addedAt) VALUES ('LIVE', 101, '┃NL┃ NPO 1 HD', NULL, 1)")
         execSQL("INSERT INTO playback_position (type, itemId, positionMs, durationMs, updatedAt) VALUES ('MOVIE', 5001, 62000, 180000, 2)")

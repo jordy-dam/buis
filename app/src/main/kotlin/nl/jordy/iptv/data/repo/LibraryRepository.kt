@@ -40,7 +40,11 @@ class LibraryRepository @Inject constructor(
         movieInfo[streamId]?.let { return it }
         val c = credentials.current() ?: return null
         return runCatching { XtreamParser.movieInfo(client.get(c, "get_vod_info", "vod_id" to "$streamId")) }
-            .getOrNull()?.also { movieInfo[streamId] = it }
+            .getOrNull()?.also {
+                movieInfo[streamId] = it
+                // An opened film counts for the genre filter too; no need to fetch it again later.
+                db.movieInfo().upsert(it.toEntity(streamId, System.currentTimeMillis()))
+            }
     }
 
     fun clearCache() = movieInfo.clear()

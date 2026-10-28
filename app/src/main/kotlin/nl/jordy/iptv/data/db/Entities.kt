@@ -192,3 +192,21 @@ data class EpgInfoEntity(
     /** Live streams that have a guide after this refresh. */
     val streams: Int,
 )
+
+/**
+ * Per-film details from the provider's `get_vod_info`, fetched in the background (see
+ * [nl.jordy.iptv.data.repo.MovieEnricher]) or when a film is opened. Kept across catalog syncs:
+ * it's keyed by stream id only, and it took hours to collect.
+ */
+@Entity(tableName = "movie_info")
+data class MovieInfoEntity(
+    @PrimaryKey val streamId: Int,
+    val genre: String?,
+    val cast: String?,
+    val director: String?,
+    val plot: String?,
+    val rating: Double?,
+    val fetchedAt: Long,
+    /** The request failed; retried after a day. */
+    @ColumnInfo(defaultValue = "0") val failed: Boolean = false,
+)
