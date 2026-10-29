@@ -28,6 +28,7 @@ import nl.jordy.iptv.ui.components.TvTextField
 import nl.jordy.iptv.data.repo.FollowRepository
 import nl.jordy.iptv.data.repo.FollowMatch
 import nl.jordy.iptv.ui.reminders.FollowDialog
+import nl.jordy.iptv.data.auth.SubscriptionData
 import kotlinx.coroutines.flow.mapLatest
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -63,11 +64,9 @@ import androidx.tv.material3.MaterialTheme
 import androidx.tv.material3.Surface
 import androidx.tv.material3.Text
 import dagger.hilt.android.lifecycle.HiltViewModel
-import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.withContext
 import nl.jordy.iptv.data.auth.CredentialStore
 import nl.jordy.iptv.data.db.AppDatabase
 import nl.jordy.iptv.data.repo.EpgRepository
@@ -109,6 +108,7 @@ class SettingsViewModel @Inject constructor(
     private val profiles: ProfileRepository,
     private val xmltvProbe: XmltvProbe,
     private val credentials: CredentialStore,
+    private val subscription: SubscriptionData,
     private val db: AppDatabase,
     private val library: LibraryRepository,
     private val epg: EpgRepository,
@@ -206,8 +206,9 @@ class SettingsViewModel @Inject constructor(
      * only make sense for its ids, and viewing history shouldn't outlive the login it belongs to.
      * The next sync creates a fresh first profile.
      */
+    /** Forgets the subscription and the provider's catalog; profiles, history and film details stay (see [SubscriptionData]). */
     fun logout(then: () -> Unit) = viewModelScope.launch {
-        withContext(Dispatchers.IO) { db.clearAllTables() }
+        subscription.onLogout(credentials.current())
         library.clearCache()
         epg.clearCache()
         credentials.clear()
@@ -299,7 +300,7 @@ fun SettingsScreen(onRefreshCatalog: () -> Unit, onLoggedOut: () -> Unit, onEdit
         SettingRow("Gebruiker", value = state.username)
         SettingRow(
             "Uitloggen",
-            "Wist de catalogus en alle profielen, met hun favorieten en kijkgeschiedenis, op deze tv.",
+            "Vergeet dit abonnement. Profielen, favorieten, kijkgeschiedenis en filmgegevens blijven op deze tv.",
             onClick = { confirmLogout = true },
             destructive = true,
         )
@@ -418,7 +419,8 @@ private fun LogoutDialog(onConfirm: () -> Unit, onDismiss: () -> Unit) {
         ) {
             Text("Uitloggen?", style = MaterialTheme.typography.headlineMedium)
             Text(
-                "De catalogus en alle profielen, met hun favorieten en kijkgeschiedenis, worden van deze tv gewist.",
+                "Je profielen, favorieten, kijkgeschiedenis, zoektermen en filmgegevens blijven bewaard; alleen de inloggegevens en de catalogus gaan weg. " +
+                    "Log je daarna in bij een andere provider, dan beginnen favorieten en kijkgeschiedenis opnieuw: die horen bij de zenders en films van deze provider.",
                 style = MaterialTheme.typography.bodyLarge,
                 color = TextSecondary,
             )

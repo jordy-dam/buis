@@ -236,3 +236,10 @@ Tested: unit 142 (one programme only, toggle off, cleanup, merge, migration 11â†
 12:30 Sport 1035 marks only that one, long-press on Journaal 1035 marks every Journaal 1035.
 Text size: Jordy keeps the smaller step ("perfect zo").
 - On the tv (release, 2026-10-29 ~12:20): starts, schema 12 migrated, terms and Home intact ("Straks voor jou" shows SBS 6, Ziggo Sport 3, ESPN 2). Titles followed with the old guide OK (e.g. "De Bondgenoten") stay as Volgen terms until removed in the Volgen dialog.
+
+## Uitloggen keeps the household (2026-10-29)
+`SubscriptionData`: logout clears only the catalog and guide tables; a login on a different server (host:port,
+remembered at logout/login) also clears favourites, positions, one-off reminders, pins and film details.
+Tested: unit 145 (logout keeps profile/favourites/position/genres; same panel new account keeps all; other
+provider clears id data, keeps profiles and terms). Emulator: Uitloggen dialog with the new text, log out,
+log in again with the mock account â†’ Bas, Verder kijken, Straks voor jou and favourites all still there.

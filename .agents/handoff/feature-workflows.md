@@ -30,7 +30,7 @@ Phase 1 — done and tested on the real tv. Phase 2a — built and installed on 
 - Player: Media3 + FFmpeg audio, resume for films and episodes (also after a force-stop)
 - Favourites: long-press OK or Menu on any tile; Favorieten tab; zapping inside favourite channels
 - Back chain player → detail → list → Live TV → "Afsluiten?" dialog; focus restored on return
-- Instellingen (bottom of the rail): "Voor <naam>" (countries, filter) and "Voor iedereen" (catalog, subscription, "Uitloggen" wipes the database incl. profiles)
+- Instellingen (bottom of the rail): "Voor <naam>" (countries, filter) and "Voor iedereen" (catalog, subscription, "Uitloggen" forgets the subscription and catalog but keeps profiles, history and film details; another server clears favourites, history and film details)
 - Profiles (2b): "Wie kijkt er?" on launch with 2+ profiles, avatar at the top of the rail, per-profile favourites/positions/countries, optional PIN, kids profile hiding adult categories
 - Home (2b): start tab with "Verder kijken", "Favoriete zenders", "Recent toegevoegd"
 - Guide (2c): full XMLTV in Room, refreshed on start (>20 h), after a sync and via "Gids vernieuwen"; `NU ·` + progress on every channel, "Straks" strip, aliases for channels without an EPG id

@@ -119,3 +119,9 @@
 **Why:** Jordy: OK set a reminder on every airing with that title; he wants just the selected one.
 **Alternatives rejected:** Following the exact title (matches repeats); a dialog asking "dit programma of alles?" (one more step for the common case).
 **Revisit if:** people want reminders for a whole series from the Home row too.
+
+## 2026-10-29 — Uitloggen keeps the household; another provider clears only what points at its ids
+**Decision:** Supersedes "Uitloggen wipes the database incl. profiles" (2b). Logging out forgets the credentials and the provider's catalog and guide only. Profiles, follow terms, sleep timers stay always. Favourites, resume positions, one-off reminders, pins and film details (genres, TMDB ids) stay while the server (host:port) stays the same, so a renewed or new account on the same panel keeps everything; a login on a different server clears those, because the provider's ids then mean other films and channels. The confirmation dialog stays (focus on Annuleren) and says what stays. No separate backup: nothing is lost by logging out any more, and installs are always updates.
+**Why:** Jordy: an accidental logout or a new subscription would throw away profiles, history and hours of fetched film genres for nothing.
+**Alternatives rejected:** A backup/export (a second mechanism to trust and restore; keeping the data is simpler); keeping provider-id data across providers (favourites would open the wrong channel); a separate "Alles wissen" option (not needed now; Android's "clear data" remains for giving the tv away).
+**Revisit if:** the tv changes hands (then a deliberate wipe option), or a provider renumbers its streams on the same server.

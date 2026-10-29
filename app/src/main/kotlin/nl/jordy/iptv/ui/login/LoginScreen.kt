@@ -43,6 +43,7 @@ import nl.jordy.iptv.R
 import nl.jordy.iptv.ui.theme.SafeArea
 import nl.jordy.iptv.ui.theme.TextSecondary
 import javax.inject.Inject
+import nl.jordy.iptv.data.auth.SubscriptionData
 
 data class LoginState(val busy: Boolean = false, val error: String? = null, val done: Boolean = false)
 
@@ -50,6 +51,7 @@ data class LoginState(val busy: Boolean = false, val error: String? = null, val 
 class LoginViewModel @Inject constructor(
     private val client: XtreamClient,
     private val store: CredentialStore,
+    private val subscription: SubscriptionData,
 ) : ViewModel() {
     private val _state = MutableStateFlow(LoginState())
     val state = _state.asStateFlow()
@@ -72,6 +74,8 @@ class LoginViewModel @Inject constructor(
                 LoginResult.NotXtream -> "De server antwoordt, maar niet als een Xtream-server. Controleer het adres en de poort."
             }
             if (error == null) {
+                // Another provider than last time: its ids differ, so favourites and history start afresh.
+                subscription.onLogin(creds)
                 store.save(creds)
                 _state.value = LoginState(done = true)
             } else {
