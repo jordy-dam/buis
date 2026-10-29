@@ -63,3 +63,27 @@ its own commit, so each can be tested or reverted on its own. Schema 15 → 20.
   terugkijken (history), reminder (bell) and followed (eye) in the guide. Recording has no icon: BUIS can't record.
 - Screensaver can't be picked in the tv's own settings: Google TV only offers Ambient mode there. It's set
   with one adb command (`settings put secure screensaver_components …`), still waiting for Jordy's OK.
+
+## Round after the tv: lost profiles, one player surface (2026-10-29, evening)
+- **"Profiles gone" at the fifth** (6d83b0a): no data was lost. Five profiles + "+" wrap into two rows,
+  and the picker's FlowRow had less height than two rows need, so it silently left out the second row
+  (FlowRow's default overflow). Reproduced on the emulator (5 rows in the database, 3 tiles on screen).
+  Plain rows now; a Robolectric Compose test renders 1–8 profiles at 960 × 540 dp and fails on the old
+  layout. The profiles come back on the tv with this build.
+- **Picker** (d1f7bee): kids and PIN as badges on the avatar (ChildCare, Lock) instead of caption lines,
+  more air under the title; "Profielen beheren" lines up the same way.
+- **Icons** (8f525f6): the rail's icons sat below their labels (top-aligned row) and the selected one was
+  black (Unspecified tint); SettingRow icons take the row colour and share the title's centre line.
+- **Buttons** (570f71b): pop-up/player choices one size (48 dp); tall labels sat ~3 dp high because a tv
+  Button lays its content at the top, now grown by padding; light focus fill on the translucent
+  `PopupSurface` (SurfaceRaised at 82 %).
+- **Player** (88b64a7): one bar with focusable controls; paused, it stays; audio/subtitles open in place
+  above their button; the clock sits in the bar (it was only visible in a 3 s overlay that the Opties panel
+  also hid, so switching it on showed nothing). Pop-ups in the player take focus like the reminder.
+  Decision in `.agents/decisions/product.md`; spec rule "One place, one layout" rewritten.
+- **Slower** (761c159): the film-details re-fetch after the 19 → 20 migration wrote every film on its own,
+  which re-ran the Films grid's paging query, the genre chips and Instellingen 4× a second for ~1.5 h.
+  Now written in groups of 20. Ticks in the player are plain arithmetic (no I/O); the player's position
+  ticker now only runs while the bar shows; CornerCard dropped its intrinsic-width pass.
+- Not verified: the 20k-film load itself (the mock has 4 films with a country), the black Opties icons
+  Jordy saw (white on the emulator; tints are now explicit everywhere), quality badges (mock list has none).
