@@ -1,5 +1,9 @@
 package nl.jordy.iptv.ui.live
 
+import androidx.compose.foundation.layout.size
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Visibility
+import androidx.compose.material.icons.filled.NotificationsActive
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.focusGroup
 import androidx.compose.foundation.layout.Arrangement
@@ -396,9 +400,10 @@ private fun GuidePanel(
                                         maxLines = 1,
                                         overflow = TextOverflow.Ellipsis,
                                     )
+                                    // A bell for a reminder on this programme, an eye when its title is followed.
                                     when {
-                                        reminded -> Text("Herinnering staat aan", style = MaterialTheme.typography.labelLarge, color = live)
-                                        follows -> Text("Je volgt dit", style = MaterialTheme.typography.labelLarge, color = live)
+                                        reminded -> androidx.tv.material3.Icon(Icons.Filled.NotificationsActive, contentDescription = "Herinnering", tint = live, modifier = Modifier.size(18.dp))
+                                        follows -> androidx.tv.material3.Icon(Icons.Filled.Visibility, contentDescription = "Je volgt dit", tint = live, modifier = Modifier.size(18.dp))
                                     }
                                     if (focused && !p.description.isNullOrBlank()) {
                                         Text(p.description!!, style = MaterialTheme.typography.bodyMedium, color = TextSecondary, maxLines = 3, overflow = TextOverflow.Ellipsis)

@@ -19,6 +19,30 @@ import nl.jordy.iptv.data.profile.Pin
 import nl.jordy.iptv.data.profile.ProfileRepository
 import nl.jordy.iptv.player.BreakTimer
 import nl.jordy.iptv.player.SleepTimer
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Person
+import androidx.compose.material.icons.filled.Public
+import androidx.compose.material.icons.filled.FilterAlt
+import androidx.compose.material.icons.filled.Audiotrack
+import androidx.compose.material.icons.filled.Subtitles
+import androidx.compose.material.icons.filled.Snooze
+import androidx.compose.material.icons.filled.Bedtime
+import androidx.compose.material.icons.filled.EventRepeat
+import androidx.compose.material.icons.filled.LocalCafe
+import androidx.compose.material.icons.filled.HourglassEmpty
+import androidx.compose.material.icons.filled.Visibility
+import androidx.compose.material.icons.filled.History
+import androidx.compose.material.icons.filled.Refresh
+import androidx.compose.material.icons.filled.EventNote
+import androidx.compose.material.icons.filled.Movie
+import androidx.compose.material.icons.filled.NetworkCheck
+import androidx.compose.material.icons.filled.Info
+import androidx.compose.material.icons.filled.Dns
+import androidx.compose.material.icons.filled.AccountCircle
+import androidx.compose.material.icons.filled.Logout
+import androidx.compose.material.icons.filled.DeleteForever
+import androidx.compose.material.icons.filled.BugReport
+import androidx.compose.material.icons.filled.Wallpaper
 import androidx.compose.ui.window.DialogProperties
 import nl.jordy.iptv.ui.dream.DreamScreen
 import nl.jordy.iptv.ui.dream.DreamPosters
@@ -292,104 +316,105 @@ fun SettingsScreen(onRefreshCatalog: () -> Unit, onLoggedOut: () -> Unit, onEdit
         Header("Voor $profileName") { profile?.let { AvatarCircle(it.name, it.avatar, 28.dp, face = it.face) } }
         SettingRow(
             "Profiel bewerken",
-            "Naam, kleur, pincode, kinderprofiel",
+            leading = Icons.Filled.Person,
             onClick = { openEdit() },
             modifier = Modifier.focusRequester(first),
         )
         SettingRow(
             "Voorkeurslanden",
-            "Staan overal bovenaan",
+            leading = Icons.Filled.Public,
             value = prefs.preferredCountries.sorted().joinToString(", ") { NameParser.countryName(it) },
             onClick = { pickCountries = true },
         )
         SettingRow(
-            "Alleen voorkeurslanden tonen",
-            "Andere landen via \"Alle landen tonen\"",
+            "Alleen voorkeurslanden",
+            leading = Icons.Filled.FilterAlt,
             toggle = prefs.onlyPreferred,
             onClick = vm::toggleOnlyPreferred,
         )
         SettingRow(
             "Geluid",
-            "Voorkeurstaal; per titel via ▼ in de speler",
+            leading = Icons.Filled.Audiotrack,
             value = TrackLabels.name(prefs.audioLang, TrackLabels.AUDIO_CHOICES),
             onClick = vm::cycleAudioLang,
         )
         SettingRow(
             "Ondertitels",
-            "Gaan aan als de titel ze heeft",
+            leading = Icons.Filled.Subtitles,
             value = TrackLabels.name(prefs.subtitleLang, TrackLabels.SUBTITLE_CHOICES),
             onClick = vm::cycleSubtitleLang,
         )
         SettingRow(
             "Slaaptimer",
-            "Stopt na zo lang zonder knop",
+            leading = Icons.Filled.Snooze,
             value = if (prefs.sleepMinutes == 0) "Uit" else "${prefs.sleepMinutes} min",
             onClick = vm::cycleSleepTimer,
         )
         SettingRow(
             "Bedtijd",
-            "Eén keer: doorkijken of naar bed?",
+            leading = Icons.Filled.Bedtime,
             value = Bedtime.timeName(prefs.bedtime),
             onClick = vm::cycleBedtime,
         )
         if (prefs.bedtime >= 0) {
             SettingRow(
                 "Bedtijd op",
-                "Zo–do = avonden voor een werkdag",
+                leading = Icons.Filled.EventRepeat,
                 value = Bedtime.daysName(prefs.bedtimeDays),
                 onClick = vm::cycleBedtimeDays,
             )
         }
         SettingRow(
             "Pauzemoment",
-            "Even pauze na zo lang kijken",
+            leading = Icons.Filled.LocalCafe,
             value = if (prefs.breakMinutes == 0) "Uit" else "${prefs.breakMinutes} min",
             onClick = vm::cycleBreak,
         )
         if (prefs.breakMinutes > 0) {
             SettingRow(
                 "Pauzeduur",
-                "Daarna speelt het vanzelf verder",
+                leading = Icons.Filled.HourglassEmpty,
                 value = "${prefs.breakLength} min",
                 onClick = vm::cycleBreakLength,
             )
         }
         SettingRow(
             "Volgen",
-            "Seintje 5 minuten voor de start",
+            leading = Icons.Filled.Visibility,
             value = followTerms.joinToString(", ").ifEmpty { "Niets" },
             onClick = { editFollows = true },
         )
         SettingRow(
             "Kijkgeschiedenis",
-            "Wat je keek, en je weekoverzicht",
+            leading = Icons.Filled.History,
             onClick = onOpenHistory,
         )
 
-        Header("Voor iedereen", "Het abonnement, de catalogus en de gids delen alle profielen.") {
+        Header("Voor iedereen") {
             Image(painterResource(R.drawable.ic_buis), contentDescription = null, modifier = Modifier.size(28.dp))
         }
         SettingRow(
             "Catalogus vernieuwen",
             state.lastSync?.let { "Bijgewerkt $it · ${state.counts}" } ?: "Nog nooit opgehaald.",
+            leading = Icons.Filled.Refresh,
             onClick = onRefreshCatalog,
         )
-        SettingRow("Gids vernieuwen", guideStatus, onClick = vm::refreshGuide)
-        SettingRow("Filmgegevens", "Voor genres en lengte bij Films", value = filmInfo)
-        SettingRow("Zenderstatus", "Haperende zenders en een oplossing", onClick = onOpenChannelHealth)
+        SettingRow("Gids vernieuwen", guideStatus, onClick = vm::refreshGuide, leading = Icons.Filled.EventNote)
+        SettingRow("Filmgegevens", value = filmInfo, leading = Icons.Filled.Movie)
+        SettingRow("Zenderstatus", onClick = onOpenChannelHealth, leading = Icons.Filled.NetworkCheck)
 
-        SettingRow("Versie", value = "${BuildConfig.VERSION_NAME} · ${BuildConfig.GIT_SHA} · ${BuildConfig.BUILD_DATE}")
-        SettingRow("Server", value = state.server)
-        SettingRow("Gebruiker", value = state.username)
+        SettingRow("Versie", value = "${BuildConfig.VERSION_NAME} · ${BuildConfig.GIT_SHA} · ${BuildConfig.BUILD_DATE}", leading = Icons.Filled.Info)
+        SettingRow("Server", value = state.server, leading = Icons.Filled.Dns)
+        SettingRow("Gebruiker", value = state.username, leading = Icons.Filled.AccountCircle)
         SettingRow(
             "Uitloggen",
-            "Profielen en geschiedenis blijven",
+            leading = Icons.Filled.Logout,
             onClick = { confirmLogout = true },
             destructive = true,
         )
         SettingRow(
             "Alles wissen",
-            "Alles weg, ook profielen",
+            leading = Icons.Filled.DeleteForever,
             onClick = {
                 scope.launch {
                     val lock = vm.wipeLock()
@@ -401,8 +426,8 @@ fun SettingsScreen(onRefreshCatalog: () -> Unit, onLoggedOut: () -> Unit, onEdit
 
         if (BuildConfig.DEBUG) {
             Header("Ontwikkeling")
-            SettingRow("EPG controleren", epgCheck ?: "Gidsdekking van je voorkeurszenders", onClick = vm::checkEpg)
-            SettingRow("Screensaver bekijken", "Voorbeeld; Terug sluit hem", onClick = { dreamPreview = true })
+            SettingRow("EPG controleren", epgCheck, onClick = vm::checkEpg, leading = Icons.Filled.BugReport)
+            SettingRow("Screensaver bekijken", onClick = { dreamPreview = true }, leading = Icons.Filled.Wallpaper)
         }
     }
 
@@ -503,11 +528,14 @@ internal fun SettingRow(
     /** On/off settings show a switch instead of a value. */
     toggle: Boolean? = null,
     modifier: Modifier = Modifier,
+    /** An icon in front: in the player an icon says more than a word ("Geluid"), so [title] may be empty. */
+    leading: androidx.compose.ui.graphics.vector.ImageVector? = null,
 ) {
     val content: @Composable () -> Unit = {
         Row(Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 12.dp), verticalAlignment = Alignment.CenterVertically) {
+            leading?.let { androidx.tv.material3.Icon(it, contentDescription = null, modifier = Modifier.padding(end = 14.dp).size(26.dp)) }
             Column(Modifier.weight(1f)) {
-                Text(title, style = MaterialTheme.typography.titleMedium, color = if (destructive) danger() else androidx.compose.ui.graphics.Color.Unspecified)
+                if (title.isNotEmpty()) Text(title, style = MaterialTheme.typography.titleMedium, color = if (destructive) danger() else androidx.compose.ui.graphics.Color.Unspecified)
                 description?.let { Text(it, style = MaterialTheme.typography.bodyMedium, color = TextSecondary) }
             }
             // Values you can change are blue; plain information stays grey.

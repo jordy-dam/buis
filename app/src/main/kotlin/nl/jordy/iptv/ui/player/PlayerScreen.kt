@@ -63,6 +63,22 @@ import androidx.compose.ui.viewinterop.AndroidView
 import androidx.media3.common.text.CueGroup
 import androidx.media3.ui.SubtitleView
 import nl.jordy.iptv.ui.components.BreakIcons
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Audiotrack
+import androidx.compose.material.icons.filled.Forward30
+import androidx.compose.material.icons.filled.KeyboardArrowDown
+import androidx.compose.material.icons.filled.KeyboardArrowLeft
+import androidx.compose.material.icons.filled.KeyboardArrowRight
+import androidx.compose.material.icons.filled.KeyboardArrowUp
+import androidx.compose.material.icons.filled.LiveTv
+import androidx.compose.material.icons.filled.Pause
+import androidx.compose.material.icons.filled.PlayArrow
+import androidx.compose.material.icons.filled.Replay10
+import androidx.compose.material.icons.filled.RestartAlt
+import androidx.compose.material.icons.filled.Schedule
+import androidx.compose.material.icons.filled.Subtitles
+import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.tv.material3.Icon
 import nl.jordy.iptv.ui.components.CornerCard
 import nl.jordy.iptv.ui.components.PrimaryButton
 import androidx.compose.foundation.Image
@@ -306,15 +322,18 @@ private fun LiveInfo(state: nl.jordy.iptv.player.PlayerUiState) {
         ProgressBar(elapsed.toFloat() / total, Modifier.width(480.dp))
     }
     state.next?.let { Text("Straks ${clock.format(Instant.ofEpochSecond(it.start))}  ${it.title}", style = MaterialTheme.typography.bodyLarge, color = TextSecondary) }
-    Text(
-        when {
-            state.replaying -> "⟲ ${REPLAY_MS / 1000} s terug gespoeld   OK naar live   ◀ vasthouden: verder terug"
-            else -> "▲▼ andere zender   ◀ " + (state.previous?.let { "terug naar $it, " } ?: "") + "vasthouden: terugspoelen" +
-                (if (state.canRestart) "   OK vanaf begin" else "") + "   ▶ opties"
-        },
-        style = MaterialTheme.typography.bodyMedium,
-        color = TextSecondary,
-    )
+    if (state.replaying) {
+        Hints(Hint(Icons.Filled.Replay10, text = "${REPLAY_MS / 1000} s terug"), Hint(Icons.Filled.LiveTv, text = "OK"))
+    } else {
+        Hints(
+            Hint(Icons.Filled.KeyboardArrowUp, Icons.Filled.KeyboardArrowDown),
+            Hint(Icons.Filled.KeyboardArrowLeft, text = state.previous),
+            // Holding Left rewinds: the replay icon sits right after it.
+            Hint(Icons.Filled.Replay10),
+            *(if (state.canRestart) arrayOf(Hint(Icons.Filled.RestartAlt, text = "OK")) else emptyArray()),
+            Hint(Icons.Filled.KeyboardArrowRight, Icons.Filled.Subtitles, Icons.Filled.Audiotrack),
+        )
+    }
     state.replayHint?.let { Text(it, style = MaterialTheme.typography.bodyMedium, color = Live) }
 }
 
@@ -332,7 +351,7 @@ private fun CatchupInfo(state: nl.jordy.iptv.player.PlayerUiState, programme: Ep
     if (duration > 0) ProgressBar(position.toFloat() / duration)
     Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
         Text("${if (playing) "▶" else "❚❚"}  ${formatTime(position)}", style = MaterialTheme.typography.titleMedium)
-        Text("◀ 10s   OK pauze   30s ▶   ▼ opties   Terug: live", style = MaterialTheme.typography.bodyMedium, color = TextSecondary)
+        Hints(Hint(Icons.Filled.Replay10), Hint(if (playing) Icons.Filled.Pause else Icons.Filled.PlayArrow), Hint(Icons.Filled.Forward30), OptionsHint, Hint(Icons.Filled.LiveTv, text = "Terug"))
     }
 }
 
@@ -378,24 +397,25 @@ private fun BreakCard(secondsLeft: Int, modifier: Modifier) {
 private fun OptionsPanel(state: PlayerUiState, vm: PlayerViewModel, modifier: Modifier) {
     val first = remember { FocusRequester() }
     Column(
-        modifier.width(560.dp).background(SurfaceRaised, RoundedCornerShape(16.dp)).padding(20.dp),
+        // Narrower than the cards: icons and values only.
+        modifier.width(420.dp).background(SurfaceRaised, RoundedCornerShape(16.dp)).padding(16.dp),
         verticalArrangement = Arrangement.spacedBy(6.dp),
     ) {
-        Text("Opties", style = MaterialTheme.typography.labelLarge, color = Live)
         // Every row takes focus, also with nothing to choose: a panel where only one row reacts feels stuck.
         SettingRow(
-            "Geluid",
+            "",
             value = state.audioSelected?.let { state.audio.getOrNull(it)?.label } ?: "Standaard",
             onClick = vm::nextAudio,
+            leading = Icons.Filled.Audiotrack,
             modifier = Modifier.focusRequester(first),
         )
         SettingRow(
-            "Ondertitels",
+            "",
             value = if (state.subtitles.isEmpty()) "Geen" else state.subtitleSelected?.let { state.subtitles.getOrNull(it)?.label } ?: "Uit",
             onClick = vm::nextSubtitle,
+            leading = Icons.Filled.Subtitles,
         )
-        SettingRow("Klok", toggle = state.showClock, onClick = vm::toggleClock)
-        Text("Geluid en ondertitels gelden voor deze titel", style = MaterialTheme.typography.bodyMedium, color = TextSecondary)
+        SettingRow("", toggle = state.showClock, onClick = vm::toggleClock, leading = Icons.Filled.Schedule)
     }
     LaunchedEffect(Unit) { runCatching { first.requestFocus() } }
 }
@@ -444,6 +464,23 @@ private fun IntroCard(to: Long, modifier: Modifier) {
     }
 }
 
+/** One key hint: icons, sometimes a word ("OK", a channel name); the keys themselves are left to the icons. */
+private class Hint(vararg val icons: ImageVector, val text: String? = null)
+
+private val OptionsHint = Hint(Icons.Filled.KeyboardArrowDown, Icons.Filled.Subtitles, Icons.Filled.Audiotrack)
+
+@Composable
+private fun Hints(vararg hints: Hint) {
+    Row(horizontalArrangement = Arrangement.spacedBy(24.dp), verticalAlignment = Alignment.CenterVertically) {
+        hints.forEach { h ->
+            Row(horizontalArrangement = Arrangement.spacedBy(4.dp), verticalAlignment = Alignment.CenterVertically) {
+                h.icons.forEach { Icon(it, contentDescription = null, tint = TextSecondary, modifier = Modifier.size(22.dp)) }
+                h.text?.let { Text(it, style = MaterialTheme.typography.bodyMedium, color = TextSecondary) }
+            }
+        }
+    }
+}
+
 @Composable
 private fun SleepCard(secondsLeft: Int, modifier: Modifier) {
     CornerCard(
@@ -475,7 +512,7 @@ private fun VodInfo(title: String, position: Long, duration: Long, playing: Bool
     if (duration > 0) ProgressBar(position.toFloat() / duration)
     Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
         Text("${if (playing) "▶" else "❚❚"}  ${formatTime(position)}", style = MaterialTheme.typography.titleMedium)
-        Text("◀ 10s   OK pauze   30s ▶   ▼ opties", style = MaterialTheme.typography.bodyMedium, color = TextSecondary)
+        Hints(Hint(Icons.Filled.Replay10), Hint(if (playing) Icons.Filled.Pause else Icons.Filled.PlayArrow), Hint(Icons.Filled.Forward30), OptionsHint)
         Text(if (duration > 0) formatTime(duration) else "", style = MaterialTheme.typography.titleMedium, color = TextSecondary)
     }
 }

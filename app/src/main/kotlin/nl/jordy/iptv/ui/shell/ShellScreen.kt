@@ -1,5 +1,15 @@
 package nl.jordy.iptv.ui.shell
 
+import androidx.compose.foundation.layout.size
+import androidx.compose.material.icons.Icons
+import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.material.icons.filled.Search
+import androidx.compose.material.icons.filled.Home
+import androidx.compose.material.icons.filled.LiveTv
+import androidx.compose.material.icons.filled.Movie
+import androidx.compose.material.icons.filled.VideoLibrary
+import androidx.compose.material.icons.filled.Favorite
+import androidx.compose.material.icons.filled.Settings
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.LocalActivity
 import androidx.compose.foundation.background
@@ -77,17 +87,16 @@ import nl.jordy.iptv.ui.vod.MoviesScreen
 import nl.jordy.iptv.ui.vod.SeriesScreen
 
 /** Tabs of the rail. Home is the start tab: the watching profile's own rows. */
-enum class Tab(val label: String, val icon: String) {
+enum class Tab(val label: String, val icon: ImageVector) {
     // First, like Google TV: the fastest way into 100k items is one step from the top.
-    SEARCH("Zoeken", "⌕"),
-    HOME("Home", "⌂"),
-    LIVE("Live TV", "▶"),
-    MOVIES("Films", "■"),
-    SERIES("Series", "≡"),
-    // U+FE0E: text-style heart; without it Android draws a red emoji that ignores the theme.
-    FAVORITES("Favorieten", "♥︎"),
+    SEARCH("Zoeken", Icons.Filled.Search),
+    HOME("Home", Icons.Filled.Home),
+    LIVE("Live TV", Icons.Filled.LiveTv),
+    MOVIES("Films", Icons.Filled.Movie),
+    SERIES("Series", Icons.Filled.VideoLibrary),
+    FAVORITES("Favorieten", Icons.Filled.Favorite),
     // Pinned to the bottom of the rail, away from the content tabs.
-    SETTINGS("Instellingen", "⚙︎"),
+    SETTINGS("Instellingen", Icons.Filled.Settings),
 }
 
 @OptIn(ExperimentalComposeUiApi::class)
@@ -268,7 +277,7 @@ private fun RailItem(tab: Tab, selected: Boolean, open: Boolean, onFocus: () -> 
         colors = Focus.bar(container = if (selected) Brand.copy(alpha = 0.35f) else androidx.compose.ui.graphics.Color.Transparent),
     ) {
         Row(Modifier.padding(horizontal = 12.dp, vertical = 9.dp)) {
-            Text(tab.icon, color = if (selected) androidx.compose.ui.graphics.Color.Unspecified else TextSecondary, modifier = Modifier.width(24.dp))
+            androidx.tv.material3.Icon(tab.icon, contentDescription = null, tint = if (selected) androidx.compose.ui.graphics.Color.Unspecified else TextSecondary, modifier = Modifier.width(24.dp).size(22.dp))
             if (open) {
                 Text(
                     tab.label,

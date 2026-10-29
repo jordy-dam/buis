@@ -1,5 +1,8 @@
 package nl.jordy.iptv.ui.components
 
+import androidx.compose.material.icons.filled.Favorite
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.History
 import android.view.KeyEvent
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
@@ -184,7 +187,7 @@ fun ChannelTile(
             Row(Modifier.fillMaxSize().padding(horizontal = 8.dp), verticalAlignment = Alignment.CenterVertically) {
                 // Favourite first, in a fixed slot, so numbers and names line up with or without it.
                 Box(Modifier.width(18.dp), contentAlignment = Alignment.Center) {
-                    if (favorite) Text("♥︎", color = Heart, style = MaterialTheme.typography.labelLarge)
+                    if (favorite) androidx.tv.material3.Icon(Icons.Filled.Favorite, contentDescription = "Favoriet", tint = Heart, modifier = Modifier.size(16.dp))
                 }
                 if (number != null) {
                     Text("$number", style = MaterialTheme.typography.bodyMedium, color = TextSecondary, textAlign = TextAlign.End, modifier = Modifier.width(32.dp))
@@ -217,7 +220,8 @@ fun ChannelTile(
                 )
                 // Always the same width, empty or not: the "NU" text must never shift between rows.
                 Row(Modifier.width(72.dp), horizontalArrangement = Arrangement.End, verticalAlignment = Alignment.CenterVertically) {
-                    if (catchup) Text("↺︎", color = TextSecondary, style = MaterialTheme.typography.titleMedium, modifier = Modifier.padding(end = 6.dp))
+                    // Terugkijken: the programme can be watched from its start.
+                    if (catchup) androidx.tv.material3.Icon(Icons.Filled.History, contentDescription = "Terugkijken", tint = TextSecondary, modifier = Modifier.padding(end = 6.dp).size(18.dp))
                     if (quality != null) QualityLabel(quality)
                 }
             }
@@ -333,7 +337,7 @@ fun ListItemSurface(
 @Composable
 fun FavoriteBadge(modifier: Modifier = Modifier) {
     Box(modifier.size(28.dp).background(Heart, RoundedCornerShape(14.dp)), contentAlignment = Alignment.Center) {
-        Text("♥︎", color = TextPrimary, style = MaterialTheme.typography.labelLarge)
+        androidx.tv.material3.Icon(Icons.Filled.Favorite, contentDescription = "Favoriet", tint = TextPrimary, modifier = Modifier.size(16.dp))
     }
 }
 
