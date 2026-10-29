@@ -120,6 +120,12 @@ data class ProfileEntity(
     @ColumnInfo(defaultValue = "0") val breakMinutes: Int = 0,
     /** How long that break lasts, in minutes. */
     @ColumnInfo(defaultValue = "1") val breakLength: Int = 1,
+    /** Audio language the player picks when the stream has it ("nl", "en"); empty = the stream's default. */
+    @ColumnInfo(defaultValue = "") val audioLang: String = "",
+    /** Subtitle language the player switches on when the stream has it; empty = subtitles off. */
+    @ColumnInfo(defaultValue = "") val subtitleLang: String = "",
+    /** A small clock in the player bar. */
+    @ColumnInfo(defaultValue = "1") val showClock: Boolean = true,
     /** Categories pinned to the top of Films/Series, as [nl.jordy.iptv.data.settings.CategoryGroups.pinKey]s, comma-separated. */
     @ColumnInfo(defaultValue = "") val pinnedCategories: String = "",
     /** The profile with the highest value is the active one; picking a profile bumps it. */

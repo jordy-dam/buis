@@ -19,6 +19,7 @@ import nl.jordy.iptv.data.profile.Pin
 import nl.jordy.iptv.data.profile.ProfileRepository
 import nl.jordy.iptv.player.BreakTimer
 import nl.jordy.iptv.player.SleepTimer
+import nl.jordy.iptv.player.TrackLabels
 import nl.jordy.iptv.ui.profiles.PinDialog
 import androidx.compose.runtime.rememberCoroutineScope
 import nl.jordy.iptv.data.settings.UserPrefs
@@ -187,6 +188,8 @@ class SettingsViewModel @Inject constructor(
         val choices = if (BuildConfig.DEBUG) BreakTimer.DEBUG_CHOICES else BreakTimer.CHOICES
         profiles.setBreakMinutes(BreakTimer.nextChoice(prefs.value.breakMinutes, choices))
     }
+    fun cycleAudioLang() = viewModelScope.launch { profiles.setAudioLang(TrackLabels.next(prefs.value.audioLang, TrackLabels.AUDIO_CHOICES)) }
+    fun cycleSubtitleLang() = viewModelScope.launch { profiles.setSubtitleLang(TrackLabels.next(prefs.value.subtitleLang, TrackLabels.SUBTITLE_CHOICES)) }
     fun cycleBreakLength() = viewModelScope.launch {
         profiles.setBreakLength(BreakTimer.nextChoice(prefs.value.breakLength, BreakTimer.LENGTHS))
     }
@@ -293,6 +296,18 @@ fun SettingsScreen(onRefreshCatalog: () -> Unit, onLoggedOut: () -> Unit, onEdit
             "Andere landen blijven bereikbaar via \"Alle landen tonen\" onderaan elke lijst.",
             toggle = prefs.onlyPreferred,
             onClick = vm::toggleOnlyPreferred,
+        )
+        SettingRow(
+            "Geluid",
+            "Taal die de speler kiest als de film of serie hem heeft; Standaard volgt de taal van de tv. In de speler kies je per titel (▼ opties).",
+            value = TrackLabels.name(prefs.audioLang, TrackLabels.AUDIO_CHOICES),
+            onClick = vm::cycleAudioLang,
+        )
+        SettingRow(
+            "Ondertitels",
+            "Gaan aan in deze taal als de film of serie ze heeft.",
+            value = TrackLabels.name(prefs.subtitleLang, TrackLabels.SUBTITLE_CHOICES),
+            onClick = vm::cycleSubtitleLang,
         )
         SettingRow(
             "Slaaptimer",

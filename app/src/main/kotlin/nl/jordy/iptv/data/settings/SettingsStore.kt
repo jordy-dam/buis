@@ -23,6 +23,11 @@ data class UserPrefs(
     val breakMinutes: Int = 0,
     /** How long the break lasts, in minutes. */
     val breakLength: Int = 1,
+    /** Preferred audio language, empty = the stream's default. */
+    val audioLang: String = "",
+    /** Preferred subtitle language, empty = off. */
+    val subtitleLang: String = "",
+    val showClock: Boolean = true,
 )
 
 private val Context.settings by preferencesDataStore("settings")

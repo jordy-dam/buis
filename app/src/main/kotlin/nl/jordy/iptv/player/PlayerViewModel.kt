@@ -10,7 +10,11 @@ import androidx.lifecycle.viewModelScope
 import androidx.media3.common.MediaItem
 import androidx.media3.common.MimeTypes
 import androidx.media3.common.PlaybackException
+import androidx.media3.common.C
 import androidx.media3.common.Player
+import androidx.media3.common.TrackSelectionOverride
+import androidx.media3.common.Tracks
+import nl.jordy.iptv.data.settings.UserPrefs
 import androidx.media3.common.util.UnstableApi
 import androidx.media3.datasource.DefaultHttpDataSource
 import androidx.media3.exoplayer.DefaultLoadControl
@@ -68,7 +72,17 @@ data class PlayerUiState(
     val canRestart: Boolean = false,
     /** Live: watching this programme from its start instead of live. */
     val catchup: EpgEntry? = null,
+    /** Audio tracks the stream offers; [audioSelected] indexes into it. */
+    val audio: List<TrackOption> = emptyList(),
+    val audioSelected: Int? = null,
+    /** Subtitle tracks the stream offers; [subtitleSelected] null = off. */
+    val subtitles: List<TrackOption> = emptyList(),
+    val subtitleSelected: Int? = null,
+    val showClock: Boolean = true,
 )
+
+/** One audio or subtitle track: its name and where it sits in the player's track groups. */
+data class TrackOption(val label: String, val group: Int, val track: Int)
 
 /** [secondsLeft] counts down to the next episode; null means it waits for OK ("Kijk je nog?"). */
 data class NextUpCard(val code: String, val title: String, val secondsLeft: Int?)
@@ -137,6 +151,8 @@ class PlayerViewModel @Inject constructor(
         // Film details are fetched in the background; not while someone is watching.
         enricher.playing.update { it + 1 }
         player.addListener(object : Player.Listener {
+            override fun onTracksChanged(tracks: Tracks) = readTracks(tracks)
+
             override fun onPlaybackStateChanged(state: Int) {
                 _state.update { it.copy(buffering = state == Player.STATE_BUFFERING) }
             }
@@ -171,6 +187,9 @@ class PlayerViewModel @Inject constructor(
         val prefs = profiles.currentPrefs()
         sleepTimer = SleepTimer(prefs.sleepMinutes, SystemClock.elapsedRealtime())
         if (!isLive) breakTimer = BreakTimer(prefs.breakMinutes, prefs.breakLength)
+        profilePrefs = prefs
+        applyProfileTracks()
+        _state.update { it.copy(showClock = prefs.showClock) }
         when (route.kind) {
             PlayerRoute.Kind.LIVE -> {
                 liveSources = LiveSources(base, c)
@@ -503,13 +522,89 @@ class PlayerViewModel @Inject constructor(
         cardShownAt = null
         asking = false
         nextEpisode = Autoplay.next(episodes, e.episodeId)
-        _state.update { PlayerUiState(title = "$seriesName – ${e.title}") }
+        _state.update { PlayerUiState(title = "$seriesName – ${e.title}", showClock = it.showClock) }
+        // A track picked in the player was for that episode; the next one starts from the profile's languages.
+        applyProfileTracks()
         viewModelScope.launch { playVod(StreamUrls.episode(base, c, e.episodeId, e.containerExtension), ContentType.SERIES, fromStart = false) }
     }
 
     fun seekBy(ms: Long) {
         val target = (player.currentPosition + ms).coerceAtLeast(0)
         player.seekTo(if (player.duration > 0) target.coerceAtMost(player.duration) else target)
+    }
+
+    // Audio, subtitles and the clock
+
+    private var profilePrefs = UserPrefs()
+
+    /** The profile's languages: the player picks them when the stream has them; otherwise its default. */
+    private fun applyProfileTracks() {
+        val p = profilePrefs
+        player.trackSelectionParameters = player.trackSelectionParameters.buildUpon()
+            .clearOverrides()
+            .setPreferredAudioLanguage(p.audioLang.ifEmpty { null })
+            .setPreferredTextLanguage(p.subtitleLang.ifEmpty { null })
+            .setTrackTypeDisabled(C.TRACK_TYPE_TEXT, p.subtitleLang.isEmpty())
+            .build()
+    }
+
+    private fun readTracks(tracks: Tracks) {
+        val audio = mutableListOf<TrackOption>()
+        val subs = mutableListOf<TrackOption>()
+        var audioSelected: Int? = null
+        var subSelected: Int? = null
+        tracks.groups.forEachIndexed { g, group ->
+            for (t in 0 until group.length) {
+                if (!group.isTrackSupported(t)) continue
+                val f = group.getTrackFormat(t)
+                when (group.type) {
+                    C.TRACK_TYPE_AUDIO -> {
+                        if (group.isTrackSelected(t)) audioSelected = audio.size
+                        audio += TrackOption(TrackLabels.audio(f.language, f.label, f.channelCount, audio.size), g, t)
+                    }
+                    C.TRACK_TYPE_TEXT -> {
+                        if (group.isTrackSelected(t)) subSelected = subs.size
+                        val forced = f.selectionFlags and C.SELECTION_FLAG_FORCED != 0
+                        subs += TrackOption(TrackLabels.subtitle(f.language, f.label, forced, subs.size), g, t)
+                    }
+                }
+            }
+        }
+        _state.update { it.copy(audio = audio, audioSelected = audioSelected, subtitles = subs, subtitleSelected = subSelected) }
+    }
+
+    private fun override(option: TrackOption): TrackSelectionOverride? =
+        player.currentTracks.groups.getOrNull(option.group)?.let { TrackSelectionOverride(it.mediaTrackGroup, option.track) }
+
+    /** OK on "Geluid": the next audio track, for this title only. */
+    fun nextAudio() {
+        val s = _state.value
+        if (s.audio.size < 2) return
+        val next = s.audio[((s.audioSelected ?: -1) + 1) % s.audio.size]
+        val o = override(next) ?: return
+        player.trackSelectionParameters = player.trackSelectionParameters.buildUpon().setOverrideForType(o).build()
+    }
+
+    /** OK on "Ondertitels": off, then each track, then off again; for this title only. */
+    fun nextSubtitle() {
+        val s = _state.value
+        if (s.subtitles.isEmpty()) return
+        val nextIndex = (s.subtitleSelected ?: -1) + 1
+        val builder = player.trackSelectionParameters.buildUpon()
+        val next = s.subtitles.getOrNull(nextIndex)
+        if (next == null) {
+            builder.setTrackTypeDisabled(C.TRACK_TYPE_TEXT, true)
+        } else {
+            val o = override(next) ?: return
+            builder.setTrackTypeDisabled(C.TRACK_TYPE_TEXT, false).setOverrideForType(o)
+        }
+        player.trackSelectionParameters = builder.build()
+    }
+
+    fun toggleClock() {
+        val on = !_state.value.showClock
+        _state.update { it.copy(showClock = on) }
+        viewModelScope.launch { profiles.setShowClock(on) }
     }
 
     fun togglePause() {

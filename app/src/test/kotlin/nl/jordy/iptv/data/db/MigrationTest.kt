@@ -228,6 +228,22 @@ class MigrationTest {
         }
     }
 
+    @Test
+    fun `14 to 15 adds track languages and the clock with today's behaviour`() {
+        helper.createDatabase(DB, 14).use { db ->
+            db.execSQL("INSERT INTO profile (id, name, avatar, face, pinHash, preferredCountries, onlyPreferred, kids, lastUsedAt, createdAt, sleepMinutes, breakMinutes, breakLength, pinnedCategories) VALUES (1, 'Anna', 3, 2, NULL, 'NL', 1, 0, 5, 1, 0, 60, 5, '')")
+        }
+        helper.runMigrationsAndValidate(DB, 15, true).use { db ->
+            db.query("SELECT audioLang, subtitleLang, showClock, breakLength FROM profile").use {
+                it.moveToFirst()
+                assertEquals("stream default audio", "", it.getString(0))
+                assertEquals("subtitles off", "", it.getString(1))
+                assertEquals(1, it.getInt(2))
+                assertEquals(5, it.getInt(3))
+            }
+        }
+    }
+
     private fun SupportSQLiteDatabase.insertPhase1Data() {
         execSQL("INSERT INTO favorite (type, itemId, name, imageUrl, addedAt) VALUES ('LIVE', 101, '┃NL┃ NPO 1 HD', NULL, 1)")
         execSQL("INSERT INTO playback_position (type, itemId, positionMs, durationMs, updatedAt) VALUES ('MOVIE', 5001, 62000, 180000, 2)")

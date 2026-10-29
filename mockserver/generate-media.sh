@@ -22,10 +22,23 @@ for i in 0 1 2 3; do
     -hls_segment_filename "$dir/seg%03d.ts" "$dir/index.m3u8"
 done
 
+# Two audio tracks (Dutch 330 Hz in AC3, English 550 Hz in AAC) and Dutch subtitles, so the player's
+# "Geluid" and "Ondertitels" choices have something to pick from.
+subs="$OUT/movie.nl.srt"
+: > "$subs"
+for i in $(seq 0 17); do
+  printf '%d\n00:%02d:%02d,000 --> 00:%02d:%02d,000\nOndertitel %d: test van BUIS\n\n' \
+    $((i + 1)) $((i * 10 / 60)) $((i * 10 % 60)) $(((i * 10 + 8) / 60)) $(((i * 10 + 8) % 60)) $((i + 1)) >> "$subs"
+done
 ffmpeg -loglevel error -y \
   -f lavfi -i "testsrc2=size=1280x720:rate=25" \
   -f lavfi -i "sine=frequency=330:sample_rate=48000" \
-  -t 180 -c:v libx264 -preset veryfast -b:v 1200k -c:a ac3 -b:a 128k -ac 2 \
+  -f lavfi -i "sine=frequency=550:sample_rate=48000" \
+  -i "$subs" \
+  -map 0:v -map 1:a -map 2:a -map 3:s \
+  -t 180 -c:v libx264 -preset veryfast -b:v 1200k \
+  -c:a:0 ac3 -b:a:0 128k -ac 2 -c:a:1 aac -b:a:1 128k -c:s mov_text \
+  -metadata:s:a:0 language=nld -metadata:s:a:1 language=eng -metadata:s:s:0 language=nld \
   -movflags +faststart "$OUT/movie.mp4"
 
 # Placeholder artwork: posters (2:3), backdrops (16:9), channel logos (square).

@@ -54,6 +54,13 @@ import androidx.tv.material3.MaterialTheme
 import androidx.tv.material3.Text
 import kotlinx.coroutines.delay
 import nl.jordy.iptv.player.PlayerViewModel
+import nl.jordy.iptv.player.PlayerUiState
+import nl.jordy.iptv.ui.settings.SettingRow
+import androidx.compose.runtime.produceState
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.viewinterop.AndroidView
+import androidx.media3.common.text.CueGroup
+import androidx.media3.ui.SubtitleView
 import nl.jordy.iptv.ui.components.BreakIcons
 import nl.jordy.iptv.ui.components.CornerCard
 import nl.jordy.iptv.ui.components.PrimaryButton
@@ -70,6 +77,7 @@ import nl.jordy.iptv.ui.theme.Live
 import nl.jordy.iptv.ui.theme.TextOnLight
 import nl.jordy.iptv.ui.theme.TextPrimary
 import nl.jordy.iptv.ui.theme.SafeArea
+import nl.jordy.iptv.ui.theme.SurfaceRaised
 import nl.jordy.iptv.ui.theme.TextSecondary
 import java.time.Instant
 import java.time.ZoneId
@@ -87,6 +95,8 @@ fun PlayerScreen(onExit: () -> Unit, vm: PlayerViewModel = hiltViewModel()) {
     var overlayVisible by remember { mutableStateOf(true) }
     var position by remember { mutableLongStateOf(0L) }
     var duration by remember { mutableLongStateOf(0L) }
+    // Audio, subtitles and the clock: Down in a film or episode, Right in live (Down zaps there).
+    var optionsOpen by remember { mutableStateOf(false) }
 
     LaunchedEffect(overlayTick) {
         overlayVisible = true
@@ -139,6 +149,7 @@ fun PlayerScreen(onExit: () -> Unit, vm: PlayerViewModel = hiltViewModel()) {
     BackHandler(enabled = state.nextUp != null) { vm.dismissNextUp() }
     // Back on the break card: no break this time, play on.
     BackHandler(enabled = state.breakSecondsLeft != null) { vm.endBreak() }
+    BackHandler(enabled = optionsOpen) { optionsOpen = false; focus.requestFocus() }
     LaunchedEffect(state.finished) { if (state.finished) onExit() }
 
     Box(
@@ -153,6 +164,8 @@ fun PlayerScreen(onExit: () -> Unit, vm: PlayerViewModel = hiltViewModel()) {
                 val wasAsking = state.sleepSecondsLeft != null
                 vm.userActive()
                 if (wasAsking) return@onKeyEvent true
+                // The options panel has focus: its rows handle the keys.
+                if (optionsOpen) return@onKeyEvent false
                 // During the break only OK (and play) end it; someone walking past the remote doesn't.
                 if (state.breakSecondsLeft != null) {
                     if (code == KeyEvent.KEYCODE_DPAD_CENTER || code == KeyEvent.KEYCODE_ENTER ||
@@ -170,6 +183,7 @@ fun PlayerScreen(onExit: () -> Unit, vm: PlayerViewModel = hiltViewModel()) {
                     KeyEvent.KEYCODE_DPAD_UP, KeyEvent.KEYCODE_CHANNEL_UP -> { vm.zap(+1); true }
                     KeyEvent.KEYCODE_DPAD_DOWN, KeyEvent.KEYCODE_CHANNEL_DOWN -> { vm.zap(-1); true }
                     KeyEvent.KEYCODE_DPAD_LEFT, KeyEvent.KEYCODE_LAST_CHANNEL -> { vm.previousChannel(); true }
+                    KeyEvent.KEYCODE_DPAD_RIGHT -> { optionsOpen = true; true }
                     // First OK shows the info with "OK · vanaf begin"; OK while it shows starts it.
                     KeyEvent.KEYCODE_DPAD_CENTER, KeyEvent.KEYCODE_ENTER -> { if (overlayVisible && state.canRestart) vm.watchFromStart(); true }
                     KeyEvent.KEYCODE_INFO -> true
@@ -180,7 +194,8 @@ fun PlayerScreen(onExit: () -> Unit, vm: PlayerViewModel = hiltViewModel()) {
                     KeyEvent.KEYCODE_MEDIA_PAUSE -> { vm.player.pause(); true }
                     KeyEvent.KEYCODE_DPAD_LEFT, KeyEvent.KEYCODE_MEDIA_REWIND -> { vm.seekBy(-10_000); true }
                     KeyEvent.KEYCODE_DPAD_RIGHT, KeyEvent.KEYCODE_MEDIA_FAST_FORWARD -> { vm.seekBy(30_000); true }
-                    KeyEvent.KEYCODE_DPAD_UP, KeyEvent.KEYCODE_DPAD_DOWN, KeyEvent.KEYCODE_INFO -> true
+                    KeyEvent.KEYCODE_DPAD_DOWN -> { optionsOpen = true; true }
+                    KeyEvent.KEYCODE_DPAD_UP, KeyEvent.KEYCODE_INFO -> true
                     else -> false
                 }
                 if (handled) overlayTick++
@@ -194,6 +209,7 @@ fun PlayerScreen(onExit: () -> Unit, vm: PlayerViewModel = hiltViewModel()) {
             surfaceType = SURFACE_TYPE_SURFACE_VIEW,
             modifier = Modifier.fillMaxSize().resizeWithContentScale(ContentScale.Fit, presentation.videoSizeDp),
         )
+        Subtitles(vm.player, raised = overlayVisible && state.error == null && !optionsOpen, Modifier.fillMaxSize())
 
         if (state.buffering && state.error == null) {
             Text("Laden…", style = MaterialTheme.typography.titleLarge, color = TextSecondary, modifier = Modifier.align(Alignment.Center))
@@ -210,7 +226,7 @@ fun PlayerScreen(onExit: () -> Unit, vm: PlayerViewModel = hiltViewModel()) {
         }
 
         AnimatedVisibility(
-            visible = overlayVisible && state.error == null,
+            visible = overlayVisible && state.error == null && !optionsOpen,
             enter = fadeIn(),
             exit = fadeOut(),
             modifier = Modifier.align(Alignment.BottomCenter),
@@ -222,10 +238,16 @@ fun PlayerScreen(onExit: () -> Unit, vm: PlayerViewModel = hiltViewModel()) {
                     .padding(start = SafeArea, end = SafeArea, bottom = SafeArea, top = 96.dp),
                 verticalArrangement = Arrangement.spacedBy(8.dp),
             ) {
-                when {
-                    state.catchup != null -> CatchupInfo(state, state.catchup!!, position, duration, vm.player.isPlaying)
-                    vm.isLive -> LiveInfo(state)
-                    else -> VodInfo(state.title, position, duration, vm.player.isPlaying)
+                Box(Modifier.fillMaxWidth()) {
+                    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                        when {
+                            state.catchup != null -> CatchupInfo(state, state.catchup!!, position, duration, vm.player.isPlaying)
+                            vm.isLive -> LiveInfo(state)
+                            else -> VodInfo(state.title, position, duration, vm.player.isPlaying)
+                        }
+                    }
+                    // Subtle, level with the title: a glance at the time without a second bar.
+                    if (state.showClock) ClockText(Modifier.align(Alignment.TopEnd))
                 }
             }
         }
@@ -233,6 +255,7 @@ fun PlayerScreen(onExit: () -> Unit, vm: PlayerViewModel = hiltViewModel()) {
         // One card at a time, in the corner every card uses. The sleep timer wins: it stops playback.
         val corner = Modifier.align(Alignment.BottomEnd).padding(SafeArea)
         when {
+            optionsOpen -> OptionsPanel(state, vm, corner)
             state.sleepSecondsLeft != null -> SleepCard(state.sleepSecondsLeft!!, corner)
             state.breakSecondsLeft != null -> BreakCard(state.breakSecondsLeft!!, corner)
             state.nextUp != null -> NextEpisodeCard(state.nextUp!!, corner)
@@ -254,7 +277,7 @@ private fun LiveInfo(state: nl.jordy.iptv.player.PlayerUiState) {
     }
     state.next?.let { Text("Straks ${clock.format(Instant.ofEpochSecond(it.start))}  ${it.title}", style = MaterialTheme.typography.bodyLarge, color = TextSecondary) }
     Text(
-        "▲▼ andere zender" + (state.previous?.let { "   ◀ terug naar $it" } ?: "") + (if (state.canRestart) "   OK vanaf begin" else ""),
+        "▲▼ andere zender" + (state.previous?.let { "   ◀ terug naar $it" } ?: "") + (if (state.canRestart) "   OK vanaf begin" else "") + "   ▶ opties",
         style = MaterialTheme.typography.bodyMedium,
         color = TextSecondary,
     )
@@ -274,7 +297,7 @@ private fun CatchupInfo(state: nl.jordy.iptv.player.PlayerUiState, programme: Ep
     if (duration > 0) ProgressBar(position.toFloat() / duration)
     Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
         Text("${if (playing) "▶" else "❚❚"}  ${formatTime(position)}", style = MaterialTheme.typography.titleMedium)
-        Text("◀ 10s   OK pauze   30s ▶   Terug: live", style = MaterialTheme.typography.bodyMedium, color = TextSecondary)
+        Text("◀ 10s   OK pauze   30s ▶   ▼ opties   Terug: live", style = MaterialTheme.typography.bodyMedium, color = TextSecondary)
     }
 }
 
@@ -312,6 +335,74 @@ private fun BreakCard(secondsLeft: Int, modifier: Modifier) {
     }
 }
 
+/**
+ * Audio, subtitles and the clock, in the corner with the same surface as the cards. Rows like in
+ * Instellingen: OK steps to the next choice. Back closes it.
+ */
+@Composable
+private fun OptionsPanel(state: PlayerUiState, vm: PlayerViewModel, modifier: Modifier) {
+    val first = remember { FocusRequester() }
+    Column(
+        modifier.width(560.dp).background(SurfaceRaised, RoundedCornerShape(16.dp)).padding(20.dp),
+        verticalArrangement = Arrangement.spacedBy(6.dp),
+    ) {
+        Text("Opties", style = MaterialTheme.typography.labelLarge, color = Live)
+        val audioClickable = state.audio.size > 1
+        val subsClickable = state.subtitles.isNotEmpty()
+        SettingRow(
+            "Geluid",
+            value = state.audioSelected?.let { state.audio.getOrNull(it)?.label } ?: "Standaard",
+            onClick = if (audioClickable) vm::nextAudio else null,
+            modifier = if (audioClickable) Modifier.focusRequester(first) else Modifier,
+        )
+        SettingRow(
+            "Ondertitels",
+            value = if (!subsClickable) "Geen" else state.subtitleSelected?.let { state.subtitles.getOrNull(it)?.label } ?: "Uit",
+            onClick = if (subsClickable) vm::nextSubtitle else null,
+            modifier = if (subsClickable && !audioClickable) Modifier.focusRequester(first) else Modifier,
+        )
+        SettingRow(
+            "Klok",
+            toggle = state.showClock,
+            onClick = vm::toggleClock,
+            modifier = if (!audioClickable && !subsClickable) Modifier.focusRequester(first) else Modifier,
+        )
+        Text("Geluid en ondertitels gelden voor deze titel. Vaste talen: Instellingen → Voor jou.", style = MaterialTheme.typography.bodyMedium, color = TextSecondary)
+    }
+    LaunchedEffect(Unit) { runCatching { first.requestFocus() } }
+}
+
+@Composable
+private fun ClockText(modifier: Modifier) {
+    val now by produceState(System.currentTimeMillis()) {
+        while (true) {
+            value = System.currentTimeMillis()
+            delay(10_000)
+        }
+    }
+    Text(clock.format(Instant.ofEpochMilli(now)), style = MaterialTheme.typography.titleMedium, color = TextSecondary, modifier = modifier)
+}
+
+/**
+ * Compose has no subtitle renderer yet: Media3's own view, fed with the player's cues. [raised]
+ * lifts the text above the info bar while it shows, so the two never overlap. The view itself gets
+ * shorter: many subtitle formats place cues at a fixed fraction of the height, which ignores padding.
+ */
+@OptIn(UnstableApi::class)
+@Composable
+private fun Subtitles(player: Player, raised: Boolean, modifier: Modifier) {
+    val context = LocalContext.current
+    val view = remember { SubtitleView(context).apply { setUserDefaultStyle(); setUserDefaultTextSize() } }
+    DisposableEffect(player) {
+        val listener = object : Player.Listener {
+            override fun onCues(cueGroup: CueGroup) = view.setCues(cueGroup.cues)
+        }
+        player.addListener(listener)
+        onDispose { player.removeListener(listener) }
+    }
+    AndroidView({ view }, modifier.padding(bottom = if (raised) 170.dp else 0.dp))
+}
+
 @Composable
 private fun SleepCard(secondsLeft: Int, modifier: Modifier) {
     CornerCard(
@@ -343,7 +434,7 @@ private fun VodInfo(title: String, position: Long, duration: Long, playing: Bool
     if (duration > 0) ProgressBar(position.toFloat() / duration)
     Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
         Text("${if (playing) "▶" else "❚❚"}  ${formatTime(position)}", style = MaterialTheme.typography.titleMedium)
-        Text("◀ 10s   OK pauze   30s ▶", style = MaterialTheme.typography.bodyMedium, color = TextSecondary)
+        Text("◀ 10s   OK pauze   30s ▶   ▼ opties", style = MaterialTheme.typography.bodyMedium, color = TextSecondary)
         Text(if (duration > 0) formatTime(duration) else "", style = MaterialTheme.typography.titleMedium, color = TextSecondary)
     }
 }

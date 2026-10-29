@@ -28,6 +28,9 @@ val ProfileEntity.prefs
         sleepMinutes = sleepMinutes,
         breakMinutes = breakMinutes,
         breakLength = breakLength,
+        audioLang = audioLang,
+        subtitleLang = subtitleLang,
+        showClock = showClock,
     )
 
 /**
@@ -120,6 +123,9 @@ class ProfileRepository @Inject constructor(
     suspend fun setSleepMinutes(minutes: Int) = updateCurrent { it.copy(sleepMinutes = minutes) }
     suspend fun setBreakMinutes(minutes: Int) = updateCurrent { it.copy(breakMinutes = minutes) }
     suspend fun setBreakLength(minutes: Int) = updateCurrent { it.copy(breakLength = minutes) }
+    suspend fun setAudioLang(code: String) = updateCurrent { it.copy(audioLang = code) }
+    suspend fun setSubtitleLang(code: String) = updateCurrent { it.copy(subtitleLang = code) }
+    suspend fun setShowClock(on: Boolean) = updateCurrent { it.copy(showClock = on) }
 
     /** What the active profile pinned in Films and Series. */
     val pinned: Flow<Set<String>> = current.filterNotNull().map { it.pinnedSet() }.distinctUntilChanged()
