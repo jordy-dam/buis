@@ -1,6 +1,6 @@
 # 2026-10-29 — Pauzemoment
 
-Status: **built and emulator-tested (2026-10-29); not on the tv.** Branch `feat/pauzemoment`. Idea from `docs/brainstorm.md`.
+Status: **built, emulator-tested, on the tv since 2026-10-29 13:24 (release); Jordy's tv test pending.** Branch `feat/pauzemoment`. Idea from `docs/brainstorm.md`.
 
 ## Why
 Jordy: after an hour of a film or a run of episodes, BUIS should take a short break by itself so

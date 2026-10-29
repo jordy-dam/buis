@@ -12,7 +12,7 @@ Everything through phase 2g is on the tv and Jordy is happy with it. The code is
 `git@github-personal:jordy-dam/buis.git` (private, personal account), `main` = current state (776e166).
 Plan and per-part notes: `docs/plans/2026-10-29-phase-2g-volgen.md`. Decisions: `.agents/decisions/product.md`.
 New since: `docs/brainstorm.md` (open idea list) and **Pauzemoment** on branch `feat/pauzemoment`
-(plan `docs/plans/2026-10-29-pauzemoment.md`): built and emulator-tested, **not on the tv, not merged**.
+(plan `docs/plans/2026-10-29-pauzemoment.md`): built, emulator-tested and **on the tv since 13:24 (release, 6acd0b4); not merged, not pushed**.
 
 ## State
 **Where we are:**
@@ -31,13 +31,12 @@ New since: `docs/brainstorm.md` (open idea list) and **Pauzemoment** on branch `
 - On `feat/pauzemoment` (schema 13): Pauzemoment per profile, and the reminder, next-episode, break and
   sleep-timer cards share `CornerCard` (bottom right, one at a time in the player).
 
-**Last completed step:** Pauzemoment built and checked on the emulator; committed on `feat/pauzemoment`.
+**Last completed step:** Pauzemoment installed on the tv (release from `feat/pauzemoment`, 6acd0b4, schema 13); started fine.
 
 **Mid-flight:** nothing — clean break. Jordy still has to set `main` as default branch on github.com.
 
 ## Next up
-1. Pauzemoment on the tv: release build from `feat/pauzemoment`, install only when Jordy says so. Then merge
-   to `main`. Ask Jordy: does a mid-film pause annoy, is the corner card style right for all four cards?
+1. Wait for Jordy's tv test of Pauzemoment, then merge `feat/pauzemoment` to `main` and push. Ask Jordy: does a mid-film pause annoy, is the corner card style right for all four cards?
 2. Start other new work from `main` on a fresh branch. Ideas: `docs/brainstorm.md` (next pick: Home Assistant).
 3. Wait for Jordy's report on vanaf begin on real channels (↺ on Viaplay F1/ESPN? seeking in timeshift?) — fix only if needed.
 4. Candidates when he asks: number-key zapping (parked), auto-play into a Home "Jouw diensten" row,
