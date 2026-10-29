@@ -40,7 +40,7 @@ the catalog), icon buttons on cards and detail, no text glyphs left, and the ico
 spec's design principles. On the tv since 16:47 (release f8f255f).
 - Round after Jordy's tv look (sub-agent, 6d83b0a..9468887): picker showed only 3 of 5 profiles (FlowRow dropped a
   row — no data lost), badges for kids/PIN, one player control surface with focusable controls, pop-ups ask with
-  buttons, translucent PopupSurface, icon alignment, film-detail writes batched (the slowness). Release built, not on tv.
+  buttons, translucent PopupSurface, icon alignment, film-detail writes batched (the slowness). On the tv since 17:49 (release b193773).
 
 **Mid-flight:** nothing — clean break. Jordy still has to set `main` as default branch on github.com.
 
