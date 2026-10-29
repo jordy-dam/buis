@@ -8,6 +8,11 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.ui.input.key.nativeKeyCode
+import androidx.compose.ui.input.key.key
+import androidx.compose.ui.input.key.type
+import androidx.compose.ui.input.key.KeyEventType
+import androidx.compose.ui.input.key.onPreviewKeyEvent
 import androidx.compose.foundation.layout.padding
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -100,8 +105,32 @@ fun ProfilePickerScreen(
         runCatching { focus.getOrNull(i)?.requestFocus() }
     }
 
+    // The easter egg listens without taking keys away; only the code's last OK is its own.
+    val code = remember { TestbeeldCode() }
+    var testbeeld by remember { mutableStateOf(false) }
+    // Buttons click on release: the code's last OK must not also press the focused button.
+    var swallowRelease by remember { mutableStateOf(false) }
+    if (testbeeld) {
+        TestbeeldOverlay(onDone = {
+            testbeeld = false
+            val i = s.profiles.indexOfFirst { it.id == s.lastUsedId }.coerceAtLeast(0)
+            runCatching { focus.getOrNull(i)?.requestFocus() }
+        })
+        return
+    }
     Column(
-        Modifier.fillMaxSize().padding(SafeArea),
+        Modifier.fillMaxSize().padding(SafeArea).onPreviewKeyEvent { e ->
+            when (e.type) {
+                KeyEventType.KeyDown -> e.nativeKeyEvent.repeatCount == 0 && code.feed(e.key.nativeKeyCode).also {
+                    if (it) {
+                        swallowRelease = true
+                        testbeeld = true
+                    }
+                }
+                KeyEventType.KeyUp -> swallowRelease.also { swallowRelease = false }
+                else -> false
+            }
+        },
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.spacedBy(32.dp, Alignment.CenterVertically),
     ) {
