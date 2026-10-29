@@ -47,10 +47,33 @@ import nl.jordy.iptv.ui.components.PosterTile
 import nl.jordy.iptv.ui.components.lastInRow
 import nl.jordy.iptv.ui.theme.Rows
 import nl.jordy.iptv.ui.theme.TextSecondary
+import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.withFrameNanos
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
+import androidx.compose.ui.window.Dialog
+import kotlinx.coroutines.launch
+import nl.jordy.iptv.ui.components.PrimaryButton
+import nl.jordy.iptv.ui.components.SecondaryButton
+import nl.jordy.iptv.ui.theme.SurfaceColor
 import javax.inject.Inject
 
 /** A "Verder kijken" tile: a film or an episode, ready to resume. */
-data class ContinueItem(val key: String, val title: String, val imageUrl: String?, val progress: Float, val remainingMs: Long, val play: PlayerRoute)
+data class ContinueItem(
+    val key: String,
+    val title: String,
+    val imageUrl: String?,
+    val progress: Float,
+    val remainingMs: Long,
+    val play: PlayerRoute,
+    /** Which saved position this is, so it can be removed from the row. */
+    val type: ContentType,
+    val itemId: Int,
+)
 
 data class HomeState(
     val continueWatching: List<ContinueItem> = emptyList(),
@@ -63,11 +86,13 @@ data class HomeState(
 @HiltViewModel
 class HomeViewModel @Inject constructor(
     private val db: AppDatabase,
-    library: LibraryRepository,
+    private val library: LibraryRepository,
     profiles: ProfileRepository,
     private val epg: EpgRepository,
 ) : ViewModel() {
     suspend fun nowAndNext(streamId: Int) = epg.nowAndNext(streamId)
+
+    fun removeFromContinue(c: ContinueItem) = viewModelScope.launch { library.forgetPosition(c.type, c.itemId) }
 
     private val continueWatching = library.recentPositions(ROW_SIZE).map { positions -> positions.mapNotNull { resolve(it) } }
 
@@ -86,13 +111,13 @@ class HomeViewModel @Inject constructor(
         val left = (p.durationMs - p.positionMs).coerceAtLeast(0)
         return when (p.type) {
             ContentType.MOVIE -> db.catalog().movie(p.itemId)?.let { m ->
-                ContinueItem("m${m.streamId}", m.name, m.posterUrl, progress, left, PlayerRoute(PlayerRoute.Kind.MOVIE, m.streamId, m.name, m.containerExtension))
+                ContinueItem("m${m.streamId}", m.name, m.posterUrl, progress, left, PlayerRoute(PlayerRoute.Kind.MOVIE, m.streamId, m.name, m.containerExtension), p.type, p.itemId)
             }
             ContentType.SERIES -> {
                 val e = db.episodes().episode(p.itemId) ?: return null
                 val s = db.catalog().series(e.seriesId)
                 val title = "${s?.name ?: e.title} · S${e.season} A${e.number}"
-                ContinueItem("e${e.episodeId}", title, s?.coverUrl ?: e.imageUrl, progress, left, PlayerRoute(PlayerRoute.Kind.EPISODE, e.episodeId, title, e.containerExtension))
+                ContinueItem("e${e.episodeId}", title, s?.coverUrl ?: e.imageUrl, progress, left, PlayerRoute(PlayerRoute.Kind.EPISODE, e.episodeId, title, e.containerExtension), p.type, p.itemId)
             }
             ContentType.LIVE -> null
         }
@@ -110,6 +135,29 @@ fun HomeScreen(onPlay: (PlayerRoute) -> Unit, onOpenMovie: (Int) -> Unit, vm: Ho
     val loaded by vm.state.collectAsStateWithLifecycle()
     val s = loaded ?: return
     var focusedContinue by remember { mutableStateOf<ContinueItem?>(null) }
+    var confirmRemove by remember { mutableStateOf<ContinueItem?>(null) }
+    // After a removal the tile is gone: focus moves to its neighbour, or it would be lost.
+    val tileFocus = remember { mutableMapOf<String, FocusRequester>() }
+    var refocus by remember { mutableStateOf<String?>(null) }
+    LaunchedEffect(s.continueWatching) {
+        val key = refocus ?: return@LaunchedEffect
+        refocus = null
+        withFrameNanos { }
+        runCatching { tileFocus[key]?.requestFocus() }
+    }
+    confirmRemove?.let { c ->
+        RemoveDialog(
+            title = c.title,
+            onConfirm = {
+                val list = s.continueWatching
+                val i = list.indexOf(c)
+                refocus = (list.getOrNull(i + 1) ?: list.getOrNull(i - 1))?.key
+                vm.removeFromContinue(c)
+                confirmRemove = null
+            },
+            onDismiss = { confirmRemove = null },
+        )
+    }
     LazyColumn(contentPadding = PaddingValues(bottom = 48.dp), verticalArrangement = Arrangement.spacedBy(Rows.sectionGap)) {
         if (s.isEmpty) {
             item {
@@ -134,8 +182,9 @@ fun HomeScreen(onPlay: (PlayerRoute) -> Unit, onOpenMovie: (Int) -> Unit, vm: Ho
                             imageUrl = c.imageUrl,
                             progress = c.progress,
                             onClick = { onPlay(c.play) },
-                            onLongClick = {},
+                            onLongClick = { confirmRemove = c },
                             modifier = Modifier.lastInRow(c == s.continueWatching.last())
+                                .focusRequester(tileFocus.getOrPut(c.key) { FocusRequester() })
                                 .onFocusChanged { if (it.isFocused) focusedContinue = c else if (focusedContinue == c) focusedContinue = null },
                         )
                     }
@@ -193,6 +242,30 @@ fun HomeScreen(onPlay: (PlayerRoute) -> Unit, onOpenMovie: (Int) -> Unit, vm: Ho
             }
         }
     }
+}
+
+/** Long-press on a "Verder kijken" tile. Focus starts on Verwijderen: it's what the long-press was for. */
+@Composable
+private fun RemoveDialog(title: String, onConfirm: () -> Unit, onDismiss: () -> Unit) {
+    val remove = remember { FocusRequester() }
+    Dialog(onDismissRequest = onDismiss) {
+        Column(
+            Modifier.background(SurfaceColor, RoundedCornerShape(16.dp)).padding(32.dp).width(520.dp),
+            verticalArrangement = Arrangement.spacedBy(20.dp),
+        ) {
+            Text("Uit Verder kijken halen?", style = MaterialTheme.typography.headlineMedium)
+            Text(
+                "$title verdwijnt uit deze rij. Kijk je hem later toch, dan begint hij vooraan.",
+                style = MaterialTheme.typography.bodyLarge,
+                color = TextSecondary,
+            )
+            Row(horizontalArrangement = Arrangement.spacedBy(16.dp)) {
+                PrimaryButton("Verwijderen", onConfirm, Modifier.focusRequester(remove))
+                SecondaryButton("Annuleren", onDismiss)
+            }
+        }
+    }
+    LaunchedEffect(Unit) { remove.requestFocus() }
 }
 
 /** "1 u 56 min", "12 min", "1 min". */

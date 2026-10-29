@@ -110,5 +110,8 @@ class LibraryRepository @Inject constructor(
         }
     }
 
+    /** "Uit Verder kijken": forget where the active profile was; the next play starts at the beginning. */
+    suspend fun forgetPosition(type: ContentType, id: Int) = db.playback().delete(profiles.currentId(), type, id)
+
     suspend fun currentProfileId(): Long = profiles.currentId()
 }

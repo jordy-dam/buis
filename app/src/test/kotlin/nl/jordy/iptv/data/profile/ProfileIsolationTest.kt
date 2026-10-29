@@ -150,4 +150,20 @@ class ProfileIsolationTest {
         assertEquals(emptyList<String>(), ProfileRepository.managementLock(listOf(dad, mum)))
         assertEquals("the kid's own PIN doesn't unlock management", listOf("h1"), ProfileRepository.managementLock(listOf(dad, mum, kid)))
     }
+
+    @Test
+    fun `removing a film from Verder kijken only removes it for that profile`() = runTest {
+        profiles.ensureOne()
+        val anna = profiles.currentId()
+        val bas = profiles.create("Bas", 1, kids = false, pinHash = null)
+        library.reportProgress(anna, ContentType.MOVIE, 5001, positionMs = 600_000, durationMs = 6_000_000)
+        library.reportProgress(bas, ContentType.MOVIE, 5001, positionMs = 900_000, durationMs = 6_000_000)
+
+        profiles.select(bas)
+        library.forgetPosition(ContentType.MOVIE, 5001)
+        assertTrue(library.recentPositions(20).first().isEmpty())
+
+        profiles.select(anna)
+        assertEquals(600_000L, library.savedPosition(ContentType.MOVIE, 5001)?.positionMs)
+    }
 }

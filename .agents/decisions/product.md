@@ -89,3 +89,9 @@
 **Why:** Jordy uses "vanaf begin" often in another app. Putting it behind the overlay keeps OK harmless for someone who only wants to see what's on. The panel alone separates "mine" from the catalog clearly enough (Jordy's call).
 **Alternatives rejected:** A dedicated button on the remote (the TCL remote has no free key everyone knows); starting catch-up on the first OK (too easy to trigger by accident); guessing the tv's time zone for the timeshift start (panels count in their own zone, which can differ).
 **Revisit if:** the provider's timeshift can't seek or needs a different URL form, or a guide grid arrives (then past programmes get "Terugkijken" there).
+
+## 2026-10-29 — Remove a title from "Verder kijken"
+**Decision:** Long-press OK or Menu on a "Verder kijken" tile asks to remove it; removing forgets the profile's resume position (no separate "hidden" flag), so the next play starts at the beginning. Only that profile's position goes.
+**Why:** Jordy wants films he won't finish out of the row. The same gesture already means "do something with this item" (favourite, pin).
+**Alternatives rejected:** Hiding while keeping the position (a second state to explain for a rare case); removing without asking (too easy to hit by accident on a remote).
+**Revisit if:** people want to hide but still resume later.

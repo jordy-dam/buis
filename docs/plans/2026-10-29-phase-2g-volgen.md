@@ -160,3 +160,9 @@ so the focus-follow after pinning scrolls to it.
   "Vanaf begin" on the reminder banner (part 4). Not known yet: whether Jordy's panel allows seeking
   inside a timeshift stream; the real-tv test will show it.
 - Installed on the tv (release, 2026-10-29 10:44): install succeeded and the app process started; the screen was not checked because the tv sat in its idle screensaver with the auto-standby countdown. First open re-syncs the catalog.
+
+## Uit Verder kijken (2026-10-29)
+Long-press OK or Menu on a "Verder kijken" tile asks "Uit Verder kijken halen?" (focus on Verwijderen);
+it forgets that profile's position, so a later play starts at the beginning. Focus moves to the next
+tile (or the previous one). Tested: unit 124 (removal is per profile); emulator: dialog, removal of the
+only tile, row disappears and focus lands on the rail. Moving focus to a neighbour tile not walked.
