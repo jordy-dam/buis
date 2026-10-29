@@ -1,6 +1,6 @@
 # 2026-10-29 — Phase 2g: volgen
 
-Status: **part 1 (colours, light-bar focus, vorige zender) built and emulator-tested; not on the tv.
+Status: **part 1 (colours, light-bar focus, vorige zender) built and on the tv (2026-10-29).
 Parts 2–4 not built.** Branch `feat/phase-2a`. Decision: `.agents/decisions/product.md` (2g part 1).
 
 ## Why
@@ -106,3 +106,6 @@ channels are in the Ziggo cable list, which has a guide.
   and red heart on the focus bar, checked by pixel), film detail buttons, Left back and forth inside a category and
   across two categories with Up/Down zapping the restored list. Release build made, not installed.
 - Not done from the plan's "Done when": Instellingen and the profile editor only looked at in code, not on screen.
+- On the tv (release): Home shows the light bar and amber progress. Seen there: the "VIAPLAY FORMULE 1"
+  favourite card shows no programme, so that channel lacks guide data from the provider's EPG; part 4
+  (volgen) must find F1 through the Ziggo cable channel or a channel alias.
