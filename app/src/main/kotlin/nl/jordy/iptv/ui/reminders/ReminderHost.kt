@@ -38,7 +38,11 @@ import nl.jordy.iptv.data.repo.FollowRepository
 import nl.jordy.iptv.ui.PlayerRoute
 import nl.jordy.iptv.ui.components.CornerCard
 import nl.jordy.iptv.ui.components.PrimaryButton
-import nl.jordy.iptv.ui.components.SecondaryButton
+import nl.jordy.iptv.ui.components.IconButton
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.RestartAlt
+import androidx.compose.material.icons.filled.Settings
 import nl.jordy.iptv.ui.components.ignoreHeldKey
 import nl.jordy.iptv.ui.theme.Live
 import nl.jordy.iptv.ui.theme.SurfaceColor
@@ -146,14 +150,15 @@ fun ReminderHost(active: Boolean, onWatch: (PlayerRoute) -> Unit, vm: ReminderVi
                 vm.dismiss(watched = true)
                 onWatch(live)
             }, Modifier.focusRequester(watch))
+            // Secondary actions as icons: restart, later (close), the follow settings.
             if (started && m.hasArchive) {
-                SecondaryButton("Vanaf begin", {
+                IconButton(Icons.Filled.RestartAlt, "Vanaf begin", {
                     vm.dismiss(watched = true)
                     onWatch(live.copy(fromStart = true))
                 })
             }
-            SecondaryButton("Later", { vm.dismiss(watched = false) })
-            SecondaryButton("Volgen aanpassen", {
+            IconButton(Icons.Filled.Close, "Later", { vm.dismiss(watched = false) })
+            IconButton(Icons.Filled.Settings, "Volgen aanpassen", {
                 vm.dismiss(watched = true)
                 editFollows = true
             })

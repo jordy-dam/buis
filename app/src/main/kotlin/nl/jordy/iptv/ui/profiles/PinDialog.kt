@@ -1,5 +1,7 @@
 package nl.jordy.iptv.ui.profiles
 
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.Backspace
 import android.view.KeyEvent
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
@@ -98,7 +100,7 @@ fun PinDialog(title: String, onPin: (String) -> String?, onDismiss: () -> Unit, 
                             val m = if (c == '1') Modifier.focusRequester(first) else Modifier
                             when (c) {
                                 ' ' -> Box(Modifier.size(PadKey))
-                                '⌫' -> PadKey("⌫", { digits = digits.dropLast(1) }, m)
+                                '⌫' -> PadKey("", { digits = digits.dropLast(1) }, m, icon = Icons.AutoMirrored.Filled.Backspace)
                                 else -> PadKey(c.toString(), { type(c) }, m)
                             }
                         }
@@ -112,7 +114,7 @@ fun PinDialog(title: String, onPin: (String) -> String?, onDismiss: () -> Unit, 
 
 /** A round key with its digit in the middle: outlined at rest, filled like other buttons with focus. */
 @Composable
-private fun PadKey(label: String, onClick: () -> Unit, modifier: Modifier = Modifier) {
+private fun PadKey(label: String, onClick: () -> Unit, modifier: Modifier = Modifier, icon: androidx.compose.ui.graphics.vector.ImageVector? = null) {
     Surface(
         onClick = onClick,
         modifier = modifier.size(PadKey),
@@ -130,7 +132,8 @@ private fun PadKey(label: String, onClick: () -> Unit, modifier: Modifier = Modi
         ),
     ) {
         Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-            Text(label, style = MaterialTheme.typography.titleLarge)
+            if (icon != null) androidx.tv.material3.Icon(icon, contentDescription = "Wissen", modifier = Modifier.size(24.dp))
+            else Text(label, style = MaterialTheme.typography.titleLarge)
         }
     }
 }

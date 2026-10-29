@@ -10,6 +10,8 @@ import androidx.compose.foundation.layout.RowScope
 import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.widthIn
+import androidx.compose.foundation.layout.IntrinsicSize
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
@@ -40,7 +42,8 @@ fun CornerCard(
     actions: @Composable RowScope.() -> Unit,
 ) {
     Column(
-        modifier.width(560.dp).background(SurfaceRaised, RoundedCornerShape(16.dp)).padding(20.dp),
+        // As wide as the content needs, within limits: icon actions keep a card compact.
+        modifier.widthIn(min = 360.dp, max = 560.dp).width(IntrinsicSize.Max).background(SurfaceRaised, RoundedCornerShape(16.dp)).padding(20.dp),
         verticalArrangement = Arrangement.spacedBy(14.dp),
     ) {
         Row(verticalAlignment = Alignment.CenterVertically) {

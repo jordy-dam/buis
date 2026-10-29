@@ -1,5 +1,7 @@
 package nl.jordy.iptv.ui.player
 
+import androidx.compose.material.icons.filled.Stop
+import androidx.compose.material.icons.filled.SkipNext
 import android.view.KeyEvent
 import androidx.activity.compose.BackHandler
 import androidx.annotation.OptIn
@@ -350,7 +352,7 @@ private fun CatchupInfo(state: nl.jordy.iptv.player.PlayerUiState, programme: Ep
     )
     if (duration > 0) ProgressBar(position.toFloat() / duration)
     Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-        Text("${if (playing) "▶" else "❚❚"}  ${formatTime(position)}", style = MaterialTheme.typography.titleMedium)
+        PlayState(playing, position)
         Hints(Hint(Icons.Filled.Replay10), Hint(if (playing) Icons.Filled.Pause else Icons.Filled.PlayArrow), Hint(Icons.Filled.Forward30), OptionsHint, Hint(Icons.Filled.LiveTv, text = "Terug"))
     }
 }
@@ -365,7 +367,7 @@ private fun NextEpisodeCard(card: NextUpCard, modifier: Modifier) {
         visual = { Text(card.code, style = MaterialTheme.typography.titleMedium, color = TextSecondary) },
     ) {
         KeyHint("OK", if (card.secondsLeft == null) "Volgende aflevering" else "Nu kijken", primary = true)
-        KeyHint("Terug", "Stoppen", primary = false)
+        KeyHint("Terug", "Stoppen", primary = false, icon = Icons.Filled.Stop)
     }
 }
 
@@ -385,7 +387,7 @@ private fun BreakCard(secondsLeft: Int, modifier: Modifier) {
         },
     ) {
         KeyHint("OK", "Verder", primary = true)
-        KeyHint("Terug", "Overslaan", primary = false)
+        KeyHint("Terug", "Overslaan", primary = false, icon = Icons.Filled.SkipNext)
     }
 }
 
@@ -460,7 +462,16 @@ private fun IntroCard(to: Long, modifier: Modifier) {
         modifier = modifier,
     ) {
         KeyHint("OK", "Overslaan", primary = true)
-        KeyHint("Terug", "Kijken", primary = false)
+        KeyHint("Terug", "Kijken", primary = false, icon = Icons.Filled.PlayArrow)
+    }
+}
+
+/** Where the film is: play or pause icon and the time. */
+@Composable
+private fun PlayState(playing: Boolean, position: Long) {
+    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+        Icon(if (playing) Icons.Filled.PlayArrow else Icons.Filled.Pause, contentDescription = null, modifier = Modifier.size(20.dp))
+        Text(formatTime(position), style = MaterialTheme.typography.titleMedium)
     }
 }
 
@@ -495,15 +506,20 @@ private fun SleepCard(secondsLeft: Int, modifier: Modifier) {
 
 /** A key and what it does; the primary one looks like the focus bar, so it reads as "this one". */
 @Composable
-private fun KeyHint(key: String, action: String, primary: Boolean) {
+private fun KeyHint(key: String, action: String, primary: Boolean, icon: ImageVector? = null) {
     val shape = RoundedCornerShape(50)
-    Text(
-        "$key · $action",
-        style = MaterialTheme.typography.labelLarge,
-        color = if (primary) TextOnLight else TextPrimary,
-        modifier = (if (primary) Modifier.background(FocusBar, shape) else Modifier.border(1.dp, TextSecondary, shape))
+    val color = if (primary) TextOnLight else TextPrimary
+    // The main action is a word; a second action shows the key and an icon for what it does, like the
+    // icon buttons on cards that take focus.
+    Row(
+        (if (primary) Modifier.background(FocusBar, shape) else Modifier.border(1.dp, TextSecondary, shape))
             .padding(horizontal = 12.dp, vertical = 6.dp),
-    )
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(6.dp),
+    ) {
+        Text(if (icon == null) "$key · $action" else key, style = MaterialTheme.typography.labelLarge, color = color)
+        icon?.let { Icon(it, contentDescription = action, tint = color, modifier = Modifier.size(18.dp)) }
+    }
 }
 
 @Composable
@@ -511,7 +527,7 @@ private fun VodInfo(title: String, position: Long, duration: Long, playing: Bool
     Text(title, style = MaterialTheme.typography.headlineMedium)
     if (duration > 0) ProgressBar(position.toFloat() / duration)
     Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-        Text("${if (playing) "▶" else "❚❚"}  ${formatTime(position)}", style = MaterialTheme.typography.titleMedium)
+        PlayState(playing, position)
         Hints(Hint(Icons.Filled.Replay10), Hint(if (playing) Icons.Filled.Pause else Icons.Filled.PlayArrow), Hint(Icons.Filled.Forward30), OptionsHint)
         Text(if (duration > 0) formatTime(duration) else "", style = MaterialTheme.typography.titleMedium, color = TextSecondary)
     }

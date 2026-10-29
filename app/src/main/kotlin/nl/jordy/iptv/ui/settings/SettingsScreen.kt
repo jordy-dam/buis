@@ -1,5 +1,7 @@
 package nl.jordy.iptv.ui.settings
 
+import androidx.compose.material.icons.filled.Check
+import androidx.compose.material.icons.filled.Close
 import androidx.compose.foundation.background
 import androidx.compose.foundation.focusGroup
 import androidx.compose.foundation.layout.heightIn
@@ -573,7 +575,7 @@ private val SwitchOff = androidx.compose.ui.graphics.Color(0xFF4A4D55)
 private fun danger() = androidx.compose.ui.graphics.Color(if (onLight()) 0xFFB42318 else 0xFFFF8A80)
 
 /**
- * What a step costs, before taking it: ✓ what stays, ✕ what goes. Focus starts on Annuleren, since
+ * What a step costs, before taking it: a check for what stays, a cross for what goes. Focus starts on Annuleren, since
  * both uses throw something away.
  */
 @Composable
@@ -593,8 +595,8 @@ private fun ConsequenceDialog(
             verticalArrangement = Arrangement.spacedBy(8.dp),
         ) {
             Text(title, style = MaterialTheme.typography.headlineMedium, modifier = Modifier.padding(bottom = 8.dp))
-            keeps.forEach { ConsequenceLine("✓", BrandText, it) }
-            loses.forEach { ConsequenceLine("✕", danger(), it) }
+            keeps.forEach { ConsequenceLine(Icons.Filled.Check, BrandText, it) }
+            loses.forEach { ConsequenceLine(Icons.Filled.Close, danger(), it) }
             note?.let { Text(it, style = MaterialTheme.typography.bodyMedium, color = TextSecondary, modifier = Modifier.padding(top = 8.dp)) }
             Row(horizontalArrangement = Arrangement.spacedBy(16.dp), modifier = Modifier.padding(top = 12.dp)) {
                 SecondaryButton("Annuleren", onDismiss, Modifier.focusRequester(cancel))
@@ -606,9 +608,9 @@ private fun ConsequenceDialog(
 }
 
 @Composable
-private fun ConsequenceLine(mark: String, color: androidx.compose.ui.graphics.Color, text: String) {
+private fun ConsequenceLine(mark: androidx.compose.ui.graphics.vector.ImageVector, color: androidx.compose.ui.graphics.Color, text: String) {
     Row(verticalAlignment = Alignment.CenterVertically) {
-        Text(mark, style = MaterialTheme.typography.titleMedium, color = color, modifier = Modifier.width(28.dp))
+        androidx.tv.material3.Icon(mark, contentDescription = null, tint = color, modifier = Modifier.padding(end = 8.dp).size(20.dp))
         Text(text, style = MaterialTheme.typography.bodyLarge)
     }
 }
@@ -625,8 +627,9 @@ private fun CountryDialog(countries: List<String>, selected: Set<String>, onTogg
             LazyColumn(Modifier.weight(1f, fill = false), verticalArrangement = Arrangement.spacedBy(4.dp)) {
                 itemsIndexed(countries) { i, code ->
                     ListItemSurface(
-                        text = (if (code in selected) "✓  " else "     ") + NameParser.countryName(code),
+                        text = NameParser.countryName(code),
                         selected = code in selected,
+                        checked = code in selected,
                         onClick = { onToggle(code) },
                         modifier = if (i == 0) Modifier.focusRequester(first) else Modifier,
                     )

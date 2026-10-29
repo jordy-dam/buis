@@ -1,5 +1,8 @@
 package nl.jordy.iptv.ui.detail
 
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Star
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -62,7 +65,15 @@ fun DetailScaffold(
                 Spacer(Modifier.width(40.dp))
                 Column(Modifier.width(820.dp), verticalArrangement = Arrangement.spacedBy(if (compact) 8.dp else 14.dp)) {
                     Text(title, style = if (compact) MaterialTheme.typography.headlineMedium else MaterialTheme.typography.displaySmall, maxLines = 2, overflow = TextOverflow.Ellipsis)
-                    if (facts.isNotEmpty()) Text(facts.joinToString("   ·   "), style = MaterialTheme.typography.titleMedium, color = TextSecondary)
+                    if (facts.isNotEmpty()) Row(verticalAlignment = Alignment.CenterVertically) {
+                        facts.forEachIndexed { i, f ->
+                            if (i > 0) Text("   ·   ", style = MaterialTheme.typography.titleMedium, color = TextSecondary)
+                            if (f.startsWith(RATING_MARK)) {
+                                androidx.tv.material3.Icon(Icons.Filled.Star, contentDescription = "Beoordeling", tint = TextSecondary, modifier = Modifier.padding(end = 4.dp).size(18.dp))
+                            }
+                            Text(f.removePrefix(RATING_MARK), style = MaterialTheme.typography.titleMedium, color = TextSecondary)
+                        }
+                    }
                     plot?.let { Text(it, style = MaterialTheme.typography.bodyLarge, maxLines = if (compact) 2 else 5, overflow = TextOverflow.Ellipsis) }
                     Spacer(Modifier.width(1.dp))
                     actions()
@@ -73,9 +84,12 @@ fun DetailScaffold(
     }
 }
 
+/** Marks the rating among the facts; the hero draws it as a star icon. */
+internal const val RATING_MARK = "\u0001"
+
 fun facts(year: Int?, rating: Double?, genre: String?, durationSecs: Int?): List<String> = listOfNotNull(
     year?.toString(),
-    rating?.let { "★ " + String.format(Locale.forLanguageTag("nl-NL"), "%.1f", it) },
+    rating?.let { RATING_MARK + String.format(Locale.forLanguageTag("nl-NL"), "%.1f", it) },
     genre,
     durationSecs?.takeIf { it > 0 }?.let { s -> if (s >= 3600) "${s / 3600} u ${s % 3600 / 60} min" else "${s / 60} min" },
 )

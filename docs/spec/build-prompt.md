@@ -55,6 +55,27 @@ raw JSON. Parse XMLTV in streaming fashion (XmlPullParser), never as a whole doc
 - Back always does what you expect: player → detail → list → home → exit confirmation
 - Hide categories and channels: providers ship hundreds of junk categories. The user must be able to hide and reorder them
 - UI language: Dutch
+- **Icons or words: weigh it every time** (2026-10-29). One icon set (Material, filled), no text glyphs
+  (▶ ♥ ↺ ★ ✓: fonts draw them differently and they ignore the theme). For every new action or state, ask
+  whether an icon carries it on its own:
+  - **Icon** when everyone reads it without help: play/pause, 10 s back, 30 s forward, subtitles, audio,
+    clock, favourite (heart), reminder (bell), follow (eye), terugkijken (history), restart, close,
+    settings (gear), search, check. Quality is a badge (SD outline, HD/FHD grey, 4K/8K white).
+  - **Word** for the main action of a screen or card (Afspelen, Kijken, Verder), for both answers to a
+    question (Doorkijken / Naar bed), for anything you can't undo or confirm (Uitloggen, Alles wissen,
+    Annuleren, Blijven), and for values (Nederlands · 5.1, 21:00, België).
+  - Not sure an icon reads? Then it's a word. Never invent an icon for something new (BUIS can't record,
+    so there's no record icon).
+- **One place, one layout** (2026-10-29):
+  - Everything that asks for a moment is a corner card (`CornerCard`): bottom right, one at a time,
+    amber "what · when" line, title, a 16:9 plate on the left when there's something to show, actions
+    underneath. Cards that take focus have buttons; player cards (focus stays on the picture) have key
+    hints. Main action first as a word, other actions as round icon buttons or "key + icon" hints.
+  - Settings-style lists (Instellingen, player Opties): icon, short title, value on the right; no
+    explanatory sentence, only a status line when it changes (Bijgewerkt …).
+  - Player bars: hints as icons in remote order (left action left, OK in the middle, right action right).
+  - Colour means one thing each (blue selected/values, amber live/now, red heart). New meanings don't get
+    a colour; use brightness, an icon or a word.
 
 Reference apps for patterns (don't copy them):
 - **TiviMate**: Live TV + EPG grid, zapping in the player (up/down = next/previous channel)

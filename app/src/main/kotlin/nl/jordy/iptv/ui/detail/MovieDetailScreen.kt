@@ -1,5 +1,9 @@
 package nl.jordy.iptv.ui.detail
 
+import nl.jordy.iptv.ui.components.IconButton
+import nl.jordy.iptv.ui.components.FavoriteButton
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.RestartAlt
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.padding
@@ -134,15 +138,15 @@ fun MovieDetailScreen(onPlay: (PlayerRoute) -> Unit, vm: MovieDetailViewModel = 
                 Row(horizontalArrangement = Arrangement.spacedBy(16.dp)) {
                     if (resumeAt > 0) {
                         PrimaryButton("Hervatten vanaf ${formatTime(resumeAt)}", { play(false) }, Modifier.focusRequester(primary))
-                        SecondaryButton("Vanaf begin", { play(true) })
+                        IconButton(Icons.Filled.RestartAlt, "Vanaf begin", { play(true) })
                     } else {
                         PrimaryButton("Afspelen", { play(true) }, Modifier.focusRequester(primary))
                     }
                     // Language versions of the same film: one button next to Play, the choices in a list.
                     if (versions.size > 1 && version != null) {
-                        SecondaryButton("${version.label.language} · ${versions.size} versies ▾", { pickVersion = true })
+                        SecondaryButton("${version.label.language} · ${versions.size} versies", { pickVersion = true })
                     }
-                    SecondaryButton(if (favorite) "♥︎ In favorieten" else "♡︎ Favoriet", { vm.toggleFavorite() })
+                    FavoriteButton(favorite, vm::toggleFavorite)
                 }
             }
         },

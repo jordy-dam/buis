@@ -17,5 +17,6 @@ class BestQualityTest {
     fun `SD shows too, so an HD and an SD version of a channel can be told apart`() {
         assertEquals("SD", bestQuality(listOf("SD")))
         assertEquals("HD", bestQuality(listOf("SD", "HD")))
+        assertEquals("8K beats 4K", "8K", bestQuality(listOf("4K", "8K")))
     }
 }

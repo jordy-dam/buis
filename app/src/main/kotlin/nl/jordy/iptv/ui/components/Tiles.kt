@@ -1,5 +1,6 @@
 package nl.jordy.iptv.ui.components
 
+import androidx.compose.material.icons.filled.Check
 import nl.jordy.iptv.ui.theme.Background
 import androidx.compose.material.icons.filled.Favorite
 import androidx.compose.material.icons.Icons
@@ -271,21 +272,29 @@ fun ChannelCard(name: String, logoUrl: String?, now: EpgEntry?, onClick: () -> U
 /** A quiet outlined label for picture quality, so it reads as a property, not a button. */
 @Composable
 private fun QualityLabel(text: String) {
-    // Drawn like Material's HD / SD / 4K icons (letters cut out of a filled block); there is no FHD
-    // icon, so all four share this one look instead of mixing icons and text.
+    // Drawn like Material's HD / SD / 4K icons (letters in a block). Better is lighter, not a colour:
+    // colours each mean one thing in BUIS (blue selected, amber live, red heart), and most channels are
+    // HD, so a coloured badge would tint whole lists. SD is only an outline.
+    val shape = RoundedCornerShape(3.dp)
+    val fill = when (text) {
+        "4K", "8K" -> TextPrimary
+        "SD" -> null
+        else -> TextSecondary
+    }
     Text(
         text,
         style = MaterialTheme.typography.labelSmall,
         fontWeight = androidx.compose.ui.text.font.FontWeight.Bold,
-        color = Background,
+        color = if (fill == null) TextSecondary else Background,
         maxLines = 1,
-        modifier = Modifier.background(TextSecondary, RoundedCornerShape(3.dp)).padding(horizontal = 4.dp, vertical = 1.dp),
+        modifier = (if (fill == null) Modifier.border(1.dp, TextSecondary, shape) else Modifier.background(fill, shape))
+            .padding(horizontal = 4.dp, vertical = 1.dp),
     )
 }
 
 /** The best picture quality among a channel's labels, or null; "Multi" and the like aren't qualities. */
 fun bestQuality(badges: List<String>): String? {
-    val rank = listOf("UHD", "4K", "FHD", "HD", "SD")
+    val rank = listOf("8K", "UHD", "4K", "FHD", "HD", "SD")
     return badges.map { it.uppercase() }.filter { it in rank }.minByOrNull { rank.indexOf(it) }
         ?.let { if (it == "UHD") "4K" else it }
 }
@@ -318,6 +327,8 @@ fun ListItemSurface(
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
     onLongClick: (() -> Unit)? = null,
+    /** Multi-select lists: a check in front of picked items (and room for it in front of the others). */
+    checked: Boolean? = null,
 ) {
     Surface(
         onClick = onClick,
@@ -327,14 +338,20 @@ fun ListItemSurface(
         scale = ClickableSurfaceDefaults.scale(focusedScale = 1.02f),
         colors = Focus.bar(container = if (selected) Brand.copy(alpha = 0.35f) else Color.Transparent),
     ) {
-        Text(
-            text,
-            style = MaterialTheme.typography.titleMedium,
-            fontWeight = if (selected) FontWeight.Medium else null,
-            maxLines = 1,
-            overflow = TextOverflow.Ellipsis,
-            modifier = Modifier.padding(horizontal = 14.dp, vertical = 9.dp),
-        )
+        Row(Modifier.padding(horizontal = 14.dp, vertical = 9.dp), verticalAlignment = Alignment.CenterVertically) {
+            if (checked != null) {
+                Box(Modifier.padding(end = 10.dp).size(20.dp)) {
+                    if (checked) androidx.tv.material3.Icon(Icons.Filled.Check, contentDescription = "Gekozen", modifier = Modifier.size(20.dp))
+                }
+            }
+            Text(
+                text,
+                style = MaterialTheme.typography.titleMedium,
+                fontWeight = if (selected) FontWeight.Medium else null,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+            )
+        }
     }
 }
 

@@ -1,10 +1,13 @@
 package nl.jordy.iptv.ui.components
 
+import androidx.compose.material.icons.filled.Favorite
+import androidx.compose.material.icons.filled.FavoriteBorder
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicTextField
@@ -164,6 +167,43 @@ fun SecondaryButton(text: String, onClick: () -> Unit, modifier: Modifier = Modi
 }
 
 /**
+ * A round button with only an icon, for secondary actions everyone recognises (restart, close,
+ * settings). Same height as [PrimaryButton] so d-pad Left/Right stays on one row; [label] is read
+ * out by accessibility services.
+ */
+@Composable
+fun IconButton(
+    icon: androidx.compose.ui.graphics.vector.ImageVector,
+    label: String,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+    /** A colour that means something (red heart for a favourite); default follows the button. */
+    tint: androidx.compose.ui.graphics.Color? = null,
+) {
+    Button(
+        onClick = onClick,
+        // Square, so the circle is a circle; 40dp is PrimaryButton's height.
+        modifier = modifier.size(40.dp),
+        shape = ButtonDefaults.shape(CircleShape),
+        contentPadding = androidx.compose.foundation.layout.PaddingValues(10.dp),
+        scale = ButtonDefaults.scale(focusedScale = Focus.SCALE),
+        border = ButtonDefaults.border(
+            border = Border(BorderStroke(1.dp, TextSecondary), shape = CircleShape),
+            focusedBorder = Border.None,
+        ),
+        colors = ButtonDefaults.colors(
+            containerColor = androidx.compose.ui.graphics.Color.Transparent,
+            contentColor = TextPrimary,
+            focusedContainerColor = FocusFill,
+            focusedContentColor = TextPrimary,
+        ),
+    ) {
+        if (tint != null) androidx.tv.material3.Icon(icon, contentDescription = label, tint = tint, modifier = androidx.compose.ui.Modifier.size(20.dp))
+        else androidx.tv.material3.Icon(icon, contentDescription = label, modifier = androidx.compose.ui.Modifier.size(20.dp))
+    }
+}
+
+/**
  * For a dialog opened by a long-press: the OK that opened it is still held, and its repeats and
  * release would land on the dialog's focused button and confirm it at once. Those are swallowed;
  * the dialog reacts from the first fresh key press on.
@@ -183,3 +223,13 @@ fun Modifier.ignoreHeldKey(): Modifier {
         }
     }
 }
+
+/** The heart: outlined to add, filled red when it's a favourite. */
+@Composable
+fun FavoriteButton(favorite: Boolean, onToggle: () -> Unit, modifier: Modifier = Modifier) = IconButton(
+    if (favorite) androidx.compose.material.icons.Icons.Filled.Favorite else androidx.compose.material.icons.Icons.Filled.FavoriteBorder,
+    if (favorite) "In favorieten" else "Favoriet",
+    onToggle,
+    modifier,
+    tint = if (favorite) nl.jordy.iptv.ui.theme.Heart else null,
+)

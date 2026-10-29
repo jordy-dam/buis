@@ -28,7 +28,7 @@ object NameParser {
     // "… [NL]", "… [DOLBY]", "… (NL GESPROKEN)"; years like "(2024)" are left alone.
     private val trailingTag = Regex("""\s*[$BARS\[(]\s*([^$BARS\[\]()]{2,16}?)\s*[$BARS\])]\s*$""")
     private val year = Regex("""^(19|20)\d{2}$""")
-    private val qualitySuffix = Regex("""\s+(FHD|UHD|4K|HD|SD|HEVC|H265|RAW)\s*$""", RegexOption.IGNORE_CASE)
+    private val qualitySuffix = Regex("""\s+(FHD|UHD|8K|4K|HD|SD|HEVC|H265|RAW)\s*$""", RegexOption.IGNORE_CASE)
     private val decoration = Regex("""^[\s=#*─━_~$BARS-]+|[\s=#*─━_~$BARS-]+$""")
     private val spaces = Regex("""\s{2,}""")
 

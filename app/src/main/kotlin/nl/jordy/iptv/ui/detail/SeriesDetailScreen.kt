@@ -1,5 +1,6 @@
 package nl.jordy.iptv.ui.detail
 
+import nl.jordy.iptv.ui.components.FavoriteButton
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -144,7 +145,7 @@ fun SeriesDetailScreen(onPlay: (PlayerRoute) -> Unit, vm: SeriesDetailViewModel 
                 } else {
                     Text("Geen afleveringen beschikbaar.", style = MaterialTheme.typography.bodyLarge, color = TextSecondary)
                 }
-                SecondaryButton(if (favorite) "♥︎ In favorieten" else "♡︎ Favoriet", { vm.toggleFavorite() })
+                FavoriteButton(favorite, vm::toggleFavorite)
             }
         },
         below = {

@@ -1,5 +1,6 @@
 package nl.jordy.iptv.ui.live
 
+import androidx.compose.material.icons.filled.KeyboardArrowRight
 import androidx.compose.foundation.layout.size
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Visibility
@@ -323,13 +324,20 @@ private fun NowNextStrip(channel: LiveChannelEntity?, load: suspend (Int) -> Pai
                     overflow = TextOverflow.Ellipsis,
                 )
                 next?.let {
-                    Text(
-                        "Straks ${time(it.start)}  ${it.title}" + if (guideHint) "   ·   ▶ gids" else "",
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = TextSecondary,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis,
-                    )
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Text(
+                            "Straks ${time(it.start)}  ${it.title}",
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = TextSecondary,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                            modifier = Modifier.weight(1f, fill = false),
+                        )
+                        if (guideHint) {
+                            androidx.tv.material3.Icon(Icons.Filled.KeyboardArrowRight, contentDescription = null, tint = TextSecondary, modifier = Modifier.padding(start = 16.dp).size(18.dp))
+                            Text("gids", style = MaterialTheme.typography.bodyMedium, color = TextSecondary)
+                        }
+                    }
                 }
             }
         }
