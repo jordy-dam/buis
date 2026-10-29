@@ -5,6 +5,10 @@ import androidx.compose.material.icons.filled.FavoriteBorder
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.height
+import androidx.compose.ui.Alignment
+import androidx.tv.material3.LocalTextStyle
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
@@ -31,6 +35,7 @@ import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.tv.material3.Border
 import androidx.tv.material3.Button
 import androidx.tv.material3.ButtonDefaults
@@ -47,6 +52,7 @@ import nl.jordy.iptv.ui.theme.FocusFill
 import nl.jordy.iptv.ui.theme.SurfaceColor
 import nl.jordy.iptv.ui.theme.SurfaceRaised
 import nl.jordy.iptv.ui.theme.TextPrimary
+import nl.jordy.iptv.ui.theme.TextOnLight
 import nl.jordy.iptv.ui.theme.TextSecondary
 
 /**
@@ -127,20 +133,43 @@ fun TvTextField(
 /** The primary button one step lighter when focused, like every other focus. */
 private val BrandFocus = androidx.compose.ui.graphics.Color(0xFF3F7FC2)
 
+/**
+ * The choices of a pop-up and the player bar are one size bigger than buttons on a screen: they're
+ * read from the couch over a picture. [PrimaryButton] and [IconButton] take `large` for them.
+ */
+val ChoiceSize = 48.dp
+
+/** A 20sp line, its text centred in it (not sitting on the line's proportional baseline). */
+private val LargeLabel
+    @Composable get() = MaterialTheme.typography.titleMedium.copy(
+        lineHeight = 20.sp,
+        lineHeightStyle = androidx.compose.ui.text.style.LineHeightStyle(
+            androidx.compose.ui.text.style.LineHeightStyle.Alignment.Center,
+            androidx.compose.ui.text.style.LineHeightStyle.Trim.None,
+        ),
+    )
+
+/** 14 + the 20dp [LargeLabel] line + 14 = [ChoiceSize]. */
+private val LargePadding = androidx.compose.foundation.layout.PaddingValues(horizontal = 20.dp, vertical = 14.dp)
+
 @Composable
-fun PrimaryButton(text: String, onClick: () -> Unit, modifier: Modifier = Modifier, enabled: Boolean = true) {
+fun PrimaryButton(text: String, onClick: () -> Unit, modifier: Modifier = Modifier, enabled: Boolean = true, large: Boolean = false) {
     Button(
         onClick = onClick,
         enabled = enabled,
         modifier = modifier,
+        // Taller by padding, not by height(): the button lays its content row at the top, so a
+        // fixed height would leave the label sitting high.
+        contentPadding = if (large) LargePadding else ButtonDefaults.ContentPadding,
         scale = ButtonDefaults.scale(focusedScale = Focus.SCALE),
         colors = ButtonDefaults.colors(
             containerColor = Brand,
             contentColor = TextPrimary,
-            focusedContainerColor = BrandFocus,
-            focusedContentColor = TextPrimary,
+            // Over the picture (pop-ups, player) focus is the light fill, unmistakable on any video.
+            focusedContainerColor = if (large) FocusBar else BrandFocus,
+            focusedContentColor = if (large) TextOnLight else TextPrimary,
         ),
-    ) { Text(text) }
+    ) { Text(text, style = if (large) LargeLabel else LocalTextStyle.current) }
 }
 
 /**
@@ -148,10 +177,13 @@ fun PrimaryButton(text: String, onClick: () -> Unit, modifier: Modifier = Modifi
  * button counts as "below" the other, and d-pad Down jumps sideways to it.
  */
 @Composable
-fun SecondaryButton(text: String, onClick: () -> Unit, modifier: Modifier = Modifier) {
+fun SecondaryButton(text: String, onClick: () -> Unit, modifier: Modifier = Modifier, large: Boolean = false) {
     Button(
         onClick = onClick,
         modifier = modifier,
+        // Taller by padding, not by height(): the button lays its content row at the top, so a
+        // fixed height would leave the label sitting high.
+        contentPadding = if (large) LargePadding else ButtonDefaults.ContentPadding,
         scale = ButtonDefaults.scale(focusedScale = Focus.SCALE),
         border = ButtonDefaults.border(
             border = Border(BorderStroke(1.dp, TextSecondary), shape = CircleShape),
@@ -160,10 +192,10 @@ fun SecondaryButton(text: String, onClick: () -> Unit, modifier: Modifier = Modi
         colors = ButtonDefaults.colors(
             containerColor = androidx.compose.ui.graphics.Color.Transparent,
             contentColor = TextPrimary,
-            focusedContainerColor = FocusFill,
-            focusedContentColor = TextPrimary,
+            focusedContainerColor = if (large) FocusBar else FocusFill,
+            focusedContentColor = if (large) TextOnLight else TextPrimary,
         ),
-    ) { Text(text) }
+    ) { Text(text, style = if (large) LargeLabel else LocalTextStyle.current) }
 }
 
 /**
@@ -173,19 +205,22 @@ fun SecondaryButton(text: String, onClick: () -> Unit, modifier: Modifier = Modi
  */
 @Composable
 fun IconButton(
-    icon: androidx.compose.ui.graphics.vector.ImageVector,
+    imageVector: androidx.compose.ui.graphics.vector.ImageVector,
     label: String,
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
     /** A colour that means something (red heart for a favourite); default follows the button. */
     tint: androidx.compose.ui.graphics.Color? = null,
+    /** [ChoiceSize], for pop-ups and the player bar. */
+    large: Boolean = false,
 ) {
+    val icon = if (large) 26.dp else 20.dp
     Button(
         onClick = onClick,
-        // Square, so the circle is a circle; 40dp is PrimaryButton's height.
-        modifier = modifier.size(40.dp),
+        // Square, so the circle is a circle; as high as PrimaryButton of the same size.
+        modifier = modifier.size(if (large) ChoiceSize else 40.dp),
         shape = ButtonDefaults.shape(CircleShape),
-        contentPadding = androidx.compose.foundation.layout.PaddingValues(10.dp),
+        contentPadding = androidx.compose.foundation.layout.PaddingValues(0.dp),
         scale = ButtonDefaults.scale(focusedScale = Focus.SCALE),
         border = ButtonDefaults.border(
             border = Border(BorderStroke(1.dp, TextSecondary), shape = CircleShape),
@@ -194,12 +229,14 @@ fun IconButton(
         colors = ButtonDefaults.colors(
             containerColor = androidx.compose.ui.graphics.Color.Transparent,
             contentColor = TextPrimary,
-            focusedContainerColor = FocusFill,
-            focusedContentColor = TextPrimary,
+            focusedContainerColor = if (large) FocusBar else FocusFill,
+            focusedContentColor = if (large) TextOnLight else TextPrimary,
         ),
     ) {
-        if (tint != null) androidx.tv.material3.Icon(icon, contentDescription = label, tint = tint, modifier = androidx.compose.ui.Modifier.size(20.dp))
-        else androidx.tv.material3.Icon(icon, contentDescription = label, modifier = androidx.compose.ui.Modifier.size(20.dp))
+        // Centred in the whole circle (the button's content row would put it at the start).
+        Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+            androidx.tv.material3.Icon(imageVector, contentDescription = label, tint = tint ?: androidx.tv.material3.LocalContentColor.current, modifier = Modifier.size(icon))
+        }
     }
 }
 
