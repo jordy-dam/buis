@@ -12,7 +12,7 @@ Everything through phase 2g is on the tv and Jordy is happy with it. The code is
 `git@github-personal:jordy-dam/buis.git` (private, personal account), `main` = current state (776e166).
 Plan and per-part notes: `docs/plans/2026-10-29-phase-2g-volgen.md`. Decisions: `.agents/decisions/product.md`.
 New since: `docs/brainstorm.md` (open idea list) and **Pauzemoment** on branch `feat/pauzemoment`
-(plan `docs/plans/2026-10-29-pauzemoment.md`): built, emulator-tested and on the tv since 13:24 (release, 6acd0b4). Pauzeduur setting (schema 14) on the tv since 13:38 (release, e31aaa2). Branch not merged, not pushed.
+(plan `docs/plans/2026-10-29-pauzemoment.md`): built, emulator-tested and on the tv since 13:24 (release, 6acd0b4). Pauzeduur setting (schema 14) and the autoplay-title fix on the tv since 13:46 (release, 29cef3d). Branch not merged, not pushed.
 
 ## State
 **Where we are:**
@@ -31,7 +31,7 @@ New since: `docs/brainstorm.md` (open idea list) and **Pauzemoment** on branch `
 - On `feat/pauzemoment` (schema 13): Pauzemoment per profile, and the reminder, next-episode, break and
   sleep-timer cards share `CornerCard` (bottom right, one at a time in the player).
 
-**Last completed step:** Pauzeduur installed on the tv (release from `feat/pauzemoment`, e31aaa2, schema 14); started fine.
+**Last completed step:** autoplay-title fix installed on the tv (release from `feat/pauzemoment`, 29cef3d, schema 14); started fine.
 
 **Mid-flight:** nothing — clean break. Jordy still has to set `main` as default branch on github.com.
 
