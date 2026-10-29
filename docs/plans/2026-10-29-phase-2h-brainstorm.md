@@ -54,3 +54,12 @@ its own commit, so each can be tested or reverted on its own. Schema 15 → 20.
 - A reminder can still open over the player's options panel (dialog over panel, same corner).
 - Search results and the live channel list don't show quality badges, so "NPO 1" HD and SD look the same.
 - Search history (part of the history idea) wasn't built; only watch history.
+
+## After Jordy's first look on the tv (2026-10-29)
+- Opties panel felt stuck: rows only took focus when there was a choice, so on single-track live only Klok
+  reacted. Every row takes focus now (20a32c9).
+- Instellingen descriptions cut, then replaced by an icon per row; "Versie" (name · commit · day) added.
+- Icons instead of words where they say it (fee9212): player bars, Opties panel, rail, favourites (heart),
+  terugkijken (history), reminder (bell) and followed (eye) in the guide. Recording has no icon: BUIS can't record.
+- Screensaver can't be picked in the tv's own settings: Google TV only offers Ambient mode there. It's set
+  with one adb command (`settings put secure screensaver_components …`), still waiting for Jordy's OK.
