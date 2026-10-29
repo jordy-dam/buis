@@ -37,7 +37,7 @@ New since: `docs/brainstorm.md` (open idea list) and **Pauzemoment** on branch `
 
 **Last completed step:** consistency round built (f8f255f): HD/SD badges (schema 21: the first launch re-syncs
 the catalog), icon buttons on cards and detail, no text glyphs left, and the icon/word + card-layout rule in the
-spec's design principles. Release built, **not on the tv yet** (the tv has fee9212).
+spec's design principles. On the tv since 16:47 (release f8f255f); its first launch re-syncs the catalog.
 
 **Mid-flight:** nothing — clean break. Jordy still has to set `main` as default branch on github.com.
 
