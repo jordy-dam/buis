@@ -71,16 +71,16 @@ private val colors = darkColorScheme(
     border = FocusBar,
 )
 
-// 10-foot type, below the spec's 16sp body at Jordy's request (2e, 2f). 13sp is the floor:
-// smaller is unreadable from the couch.
+// 10-foot type, below the spec's 16sp body at Jordy's request (2e, 2f, and one more step in 2g as a
+// tv test). 12sp is now the floor: below that is unreadable from the couch.
 private val typography = Typography(
-    displaySmall = TextStyle(fontSize = 30.sp, fontWeight = FontWeight.SemiBold),
-    headlineMedium = TextStyle(fontSize = 22.sp, fontWeight = FontWeight.SemiBold),
-    titleLarge = TextStyle(fontSize = 18.sp, fontWeight = FontWeight.Medium),
-    titleMedium = TextStyle(fontSize = 15.sp, fontWeight = FontWeight.Medium),
-    bodyLarge = TextStyle(fontSize = 15.sp, lineHeight = 21.sp),
-    bodyMedium = TextStyle(fontSize = 13.sp, lineHeight = 18.sp),
-    labelLarge = TextStyle(fontSize = 13.sp, fontWeight = FontWeight.Medium),
+    displaySmall = TextStyle(fontSize = 28.sp, fontWeight = FontWeight.SemiBold),
+    headlineMedium = TextStyle(fontSize = 20.sp, fontWeight = FontWeight.SemiBold),
+    titleLarge = TextStyle(fontSize = 17.sp, fontWeight = FontWeight.Medium),
+    titleMedium = TextStyle(fontSize = 14.sp, fontWeight = FontWeight.Medium),
+    bodyLarge = TextStyle(fontSize = 14.sp, lineHeight = 20.sp),
+    bodyMedium = TextStyle(fontSize = 12.sp, lineHeight = 17.sp),
+    labelLarge = TextStyle(fontSize = 12.sp, fontWeight = FontWeight.Medium),
 )
 
 @Composable

@@ -219,3 +219,9 @@ only tile, row disappears and focus lands on the rail. Moving focus to a neighbo
 - Reminder card: "Volgen aanpassen" opens the terms right there. Volgen dialog: Toevoegen on top, terms below.
 - Tested: unit 138 green (guide coverage query). Emulator: pinning "Events · PPV", the guide panel with
   descriptions and the reminder mark, OK sets a reminder, the card with Volgen aanpassen and the dialog.
+
+## Text one step smaller, on the tv (2026-10-29)
+All type styles one step down (bodyMedium/labelLarge 12sp, titleMedium 14sp, headline 20sp) as a tv test
+at Jordy's request; 12sp is the new floor. One place: `typography` in `Theme.kt`.
+On the tv right after installing, Home showed "Straks voor jou" with real matches: "15:00 · ZIGGO SPORT 3 ·
+The Inside Line" and "17:30 · ESPN 2 · Eurojackpot KNVB Beker" (FC Utrecht found through the description).
