@@ -31,7 +31,14 @@ import androidx.compose.ui.window.Dialog
 import androidx.tv.material3.MaterialTheme
 import androidx.tv.material3.Text
 import nl.jordy.iptv.data.profile.Pin
-import nl.jordy.iptv.ui.components.SecondaryButton
+import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.ui.graphics.Color
+import androidx.tv.material3.Border
+import androidx.tv.material3.ClickableSurfaceDefaults
+import androidx.tv.material3.Surface
+import nl.jordy.iptv.ui.components.Focus
+import nl.jordy.iptv.ui.theme.FocusFill
 import nl.jordy.iptv.ui.theme.SurfaceColor
 import nl.jordy.iptv.ui.theme.SurfaceRaised
 import nl.jordy.iptv.ui.theme.TextPrimary
@@ -64,7 +71,7 @@ fun PinDialog(title: String, onPin: (String) -> String?, onDismiss: () -> Unit, 
         Column(
             Modifier
                 .background(SurfaceColor, RoundedCornerShape(16.dp))
-                .padding(32.dp)
+                .padding(28.dp)
                 .width(380.dp)
                 .onPreviewKeyEvent {
                     val code = it.key.nativeKeyCode
@@ -73,7 +80,7 @@ fun PinDialog(title: String, onPin: (String) -> String?, onDismiss: () -> Unit, 
                     } else false
                 },
             horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.spacedBy(18.dp),
+            verticalArrangement = Arrangement.spacedBy(14.dp),
         ) {
             Text(title, style = MaterialTheme.typography.headlineMedium)
             subtitle?.let { Text(it, style = MaterialTheme.typography.bodyMedium, color = TextSecondary) }
@@ -84,14 +91,16 @@ fun PinDialog(title: String, onPin: (String) -> String?, onDismiss: () -> Unit, 
             }
             Text(error ?: " ", style = MaterialTheme.typography.bodyMedium, color = Danger)
             // Phone keypad layout: 0 under 8, erase under 7.
-            listOf("123", "456", "789", "⌫0 ").forEach { row ->
-                Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                    row.forEach { c ->
-                        val m = Modifier.width(PadKey).let { if (c == '1') it.focusRequester(first) else it }
-                        when (c) {
-                            ' ' -> Box(m)
-                            '⌫' -> SecondaryButton("⌫", { digits = digits.dropLast(1) }, m)
-                            else -> SecondaryButton(c.toString(), { type(c) }, m)
+            Column(verticalArrangement = Arrangement.spacedBy(PadGap)) {
+                listOf("123", "456", "789", "⌫0 ").forEach { row ->
+                    Row(horizontalArrangement = Arrangement.spacedBy(PadGap)) {
+                        row.forEach { c ->
+                            val m = if (c == '1') Modifier.focusRequester(first) else Modifier
+                            when (c) {
+                                ' ' -> Box(Modifier.size(PadKey))
+                                '⌫' -> PadKey("⌫", { digits = digits.dropLast(1) }, m)
+                                else -> PadKey(c.toString(), { type(c) }, m)
+                            }
                         }
                     }
                 }
@@ -101,5 +110,32 @@ fun PinDialog(title: String, onPin: (String) -> String?, onDismiss: () -> Unit, 
     LaunchedEffect(Unit) { runCatching { first.requestFocus() } }
 }
 
-private val PadKey = 72.dp
+/** A round key with its digit in the middle: outlined at rest, filled like other buttons with focus. */
+@Composable
+private fun PadKey(label: String, onClick: () -> Unit, modifier: Modifier = Modifier) {
+    Surface(
+        onClick = onClick,
+        modifier = modifier.size(PadKey),
+        shape = ClickableSurfaceDefaults.shape(CircleShape),
+        scale = ClickableSurfaceDefaults.scale(focusedScale = Focus.SCALE),
+        border = ClickableSurfaceDefaults.border(
+            border = Border(BorderStroke(1.dp, TextSecondary), shape = CircleShape),
+            focusedBorder = Border.None,
+        ),
+        colors = ClickableSurfaceDefaults.colors(
+            containerColor = Color.Transparent,
+            contentColor = TextPrimary,
+            focusedContainerColor = FocusFill,
+            focusedContentColor = TextPrimary,
+        ),
+    ) {
+        Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+            Text(label, style = MaterialTheme.typography.titleLarge)
+        }
+    }
+}
+
+// Sized so the whole dialog fits the 540dp-high tv screen with its title, dots and error line.
+private val PadKey = 60.dp
+private val PadGap = 12.dp
 internal val Danger = androidx.compose.ui.graphics.Color(0xFFFF8A80)
