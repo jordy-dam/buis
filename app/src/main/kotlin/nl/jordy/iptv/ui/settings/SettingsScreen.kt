@@ -533,20 +533,24 @@ internal fun SettingRow(
     /** An icon in front: in the player an icon says more than a word ("Geluid"), so [title] may be empty. */
     leading: androidx.compose.ui.graphics.vector.ImageVector? = null,
 ) {
+    // Icon, title and value share one line and one centre; an explanation goes underneath, under the
+    // title, so it never pulls the icon down between its two lines.
     val content: @Composable () -> Unit = {
-        Row(Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 12.dp), verticalAlignment = Alignment.CenterVertically) {
-            leading?.let { androidx.tv.material3.Icon(it, contentDescription = null, modifier = Modifier.padding(end = 14.dp).size(26.dp)) }
-            Column(Modifier.weight(1f)) {
-                if (title.isNotEmpty()) Text(title, style = MaterialTheme.typography.titleMedium, color = if (destructive) danger() else androidx.compose.ui.graphics.Color.Unspecified)
-                description?.let { Text(it, style = MaterialTheme.typography.bodyMedium, color = TextSecondary) }
+        Column(Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 12.dp)) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                // The row's own content colour (light at rest and on focus), never the theme default.
+                leading?.let { androidx.tv.material3.Icon(it, contentDescription = null, tint = androidx.tv.material3.LocalContentColor.current, modifier = Modifier.padding(end = 14.dp).size(24.dp)) }
+                Text(title, style = MaterialTheme.typography.titleMedium, color = if (destructive) danger() else androidx.compose.ui.graphics.Color.Unspecified, modifier = Modifier.weight(1f))
+                // Values you can change are blue; plain information stays grey.
+                value?.let { Text(it, style = MaterialTheme.typography.titleMedium, color = if (onClick != null) BrandText else TextSecondary, modifier = Modifier.padding(start = 24.dp)) }
+                toggle?.let { Switch(it, Modifier.padding(start = 24.dp)) }
             }
-            // Values you can change are blue; plain information stays grey.
-            value?.let { Text(it, style = MaterialTheme.typography.titleMedium, color = if (onClick != null) BrandText else TextSecondary, modifier = Modifier.padding(start = 24.dp)) }
-            toggle?.let { Switch(it, Modifier.padding(start = 24.dp)) }
+            description?.let { Text(it, style = MaterialTheme.typography.bodyMedium, color = TextSecondary, modifier = Modifier.padding(start = if (leading != null) 38.dp else 0.dp)) }
         }
     }
     if (onClick == null) {
-        content()
+        // Not on a Surface, so nothing sets a content colour: give it the light one explicitly.
+        androidx.compose.runtime.CompositionLocalProvider(androidx.tv.material3.LocalContentColor provides TextPrimary) { content() }
         return
     }
     Surface(

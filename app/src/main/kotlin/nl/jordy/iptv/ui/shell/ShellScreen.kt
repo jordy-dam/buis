@@ -276,8 +276,10 @@ private fun RailItem(tab: Tab, selected: Boolean, open: Boolean, onFocus: () -> 
         scale = ClickableSurfaceDefaults.scale(focusedScale = 1.03f),
         colors = Focus.bar(container = if (selected) Brand.copy(alpha = 0.35f) else androidx.compose.ui.graphics.Color.Transparent),
     ) {
-        Row(Modifier.padding(horizontal = 12.dp, vertical = 9.dp)) {
-            androidx.tv.material3.Icon(tab.icon, contentDescription = null, tint = if (selected) androidx.compose.ui.graphics.Color.Unspecified else TextSecondary, modifier = Modifier.width(24.dp).size(22.dp))
+        // Icon and label on one centre line. The selected icon takes the row's light content colour
+        // (Unspecified drew the vector's own black).
+        Row(Modifier.padding(horizontal = 12.dp, vertical = 9.dp), verticalAlignment = Alignment.CenterVertically) {
+            androidx.tv.material3.Icon(tab.icon, contentDescription = null, tint = if (selected) androidx.tv.material3.LocalContentColor.current else TextSecondary, modifier = Modifier.padding(horizontal = 1.dp).size(22.dp))
             if (open) {
                 Text(
                     tab.label,

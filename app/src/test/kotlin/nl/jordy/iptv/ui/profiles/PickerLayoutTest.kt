@@ -2,6 +2,7 @@ package nl.jordy.iptv.ui.profiles
 
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.test.assertCountEquals
@@ -49,7 +50,7 @@ class PickerLayoutTest {
                 PickerLayout(
                     profiles = profiles,
                     managing = false,
-                    focus = List(profiles.size) { FocusRequester() },
+                    focus = remember(profiles.size) { List(profiles.size) { FocusRequester() } },
                     onProfile = {},
                     onAdd = {},
                     onManage = {},
