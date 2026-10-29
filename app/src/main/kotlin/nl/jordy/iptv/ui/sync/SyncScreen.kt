@@ -35,8 +35,8 @@ import nl.jordy.iptv.data.sync.CatalogSync
 import nl.jordy.iptv.data.xtream.ContentType
 import nl.jordy.iptv.ui.components.PrimaryButton
 import nl.jordy.iptv.ui.components.SecondaryButton
-import nl.jordy.iptv.ui.theme.Accent
 import nl.jordy.iptv.ui.theme.SafeArea
+import nl.jordy.iptv.ui.theme.TextPrimary
 import nl.jordy.iptv.ui.theme.TextSecondary
 import java.text.NumberFormat
 import java.util.Locale
@@ -101,7 +101,7 @@ fun SyncScreen(onDone: () -> Unit, onLogout: () -> Unit, vm: SyncViewModel = hil
                 val count = state.counts[type]
                 val active = state.current == type
                 Row(Modifier.padding(top = 4.dp)) {
-                    Text(label, style = MaterialTheme.typography.titleLarge, modifier = Modifier.width(200.dp), color = if (active) Accent else MaterialTheme.colorScheme.onSurface)
+                    Text(label, style = MaterialTheme.typography.titleLarge, modifier = Modifier.width(200.dp), color = if (active) TextPrimary else TextSecondary)
                     Text(
                         when {
                             count == null -> "…"

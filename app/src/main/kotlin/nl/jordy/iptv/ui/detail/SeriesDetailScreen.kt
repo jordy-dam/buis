@@ -189,7 +189,6 @@ private fun EpisodeCard(e: EpisodeEntity, position: PlaybackPositionEntity?, onC
             shape = CardDefaults.shape(RoundedCornerShape(10.dp)),
             scale = CardDefaults.scale(focusedScale = Focus.SCALE),
             border = CardDefaults.border(focusedBorder = Focus.border),
-            glow = CardDefaults.glow(focusedGlow = Focus.glow),
             colors = CardDefaults.colors(containerColor = SurfaceColor),
         ) {
             Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {

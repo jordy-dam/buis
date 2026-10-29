@@ -16,9 +16,7 @@ import androidx.tv.material3.ClickableSurfaceDefaults
 import androidx.tv.material3.MaterialTheme
 import androidx.tv.material3.Surface
 import androidx.tv.material3.Text
-import nl.jordy.iptv.ui.theme.Accent
-import nl.jordy.iptv.ui.theme.SurfaceFocus
-import nl.jordy.iptv.ui.theme.SurfaceRaised
+import nl.jordy.iptv.ui.theme.Brand
 import nl.jordy.iptv.ui.theme.TextSecondary
 
 /** "Alle · Drama · Komedie …" above a grid. OK picks a genre; null is "Alle". */
@@ -44,16 +42,12 @@ fun Chip(text: String, selected: Boolean, modifier: Modifier = Modifier, onClick
         modifier = modifier,
         shape = ClickableSurfaceDefaults.shape(RoundedCornerShape(50)),
         scale = ClickableSurfaceDefaults.scale(focusedScale = 1.03f),
-        border = ClickableSurfaceDefaults.border(focusedBorder = Focus.quiet(RoundedCornerShape(50))),
-        colors = ClickableSurfaceDefaults.colors(
-            containerColor = if (selected) SurfaceRaised else Color.Transparent,
-            focusedContainerColor = SurfaceFocus,
-        ),
+        colors = Focus.bar(container = if (selected) Brand else Color.Transparent),
     ) {
         Text(
             text,
             style = MaterialTheme.typography.labelLarge,
-            color = if (selected) Accent else TextSecondary,
+            color = if (selected) Color.Unspecified else TextSecondary,
             modifier = Modifier.padding(horizontal = 14.dp, vertical = 6.dp),
         )
     }

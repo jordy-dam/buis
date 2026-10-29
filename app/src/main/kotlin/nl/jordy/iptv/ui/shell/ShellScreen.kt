@@ -68,10 +68,9 @@ import nl.jordy.iptv.ui.favorites.FavoritesScreen
 import nl.jordy.iptv.ui.live.LiveScreen
 import nl.jordy.iptv.ui.search.SearchScreen
 import nl.jordy.iptv.ui.settings.SettingsScreen
-import nl.jordy.iptv.ui.theme.Accent
+import nl.jordy.iptv.ui.theme.Brand
 import nl.jordy.iptv.ui.theme.SafeArea
 import nl.jordy.iptv.ui.theme.SurfaceColor
-import nl.jordy.iptv.ui.theme.SurfaceFocus
 import nl.jordy.iptv.ui.theme.SurfaceRaised
 import nl.jordy.iptv.ui.theme.TextSecondary
 import nl.jordy.iptv.ui.vod.MoviesScreen
@@ -239,8 +238,7 @@ private fun ProfileItem(name: String, avatar: Int, face: Int, open: Boolean, onC
         onClick = onClick,
         shape = ClickableSurfaceDefaults.shape(RoundedCornerShape(8.dp)),
         scale = ClickableSurfaceDefaults.scale(focusedScale = 1.03f),
-        border = ClickableSurfaceDefaults.border(focusedBorder = Focus.quiet(RoundedCornerShape(8.dp))),
-        colors = ClickableSurfaceDefaults.colors(containerColor = androidx.compose.ui.graphics.Color.Transparent, focusedContainerColor = SurfaceFocus),
+        colors = Focus.bar(container = androidx.compose.ui.graphics.Color.Transparent),
     ) {
         Row(Modifier.padding(horizontal = 8.dp, vertical = 6.dp), verticalAlignment = Alignment.CenterVertically) {
             AvatarCircle(name, avatar, 32.dp, face = face)
@@ -265,19 +263,15 @@ private fun RailItem(tab: Tab, selected: Boolean, open: Boolean, onFocus: () -> 
         modifier = modifier.onFocusChanged { if (it.isFocused) onFocus() },
         shape = ClickableSurfaceDefaults.shape(RoundedCornerShape(8.dp)),
         scale = ClickableSurfaceDefaults.scale(focusedScale = 1.03f),
-        border = ClickableSurfaceDefaults.border(focusedBorder = Focus.quiet(RoundedCornerShape(8.dp))),
-        colors = ClickableSurfaceDefaults.colors(
-            containerColor = if (selected) SurfaceRaised else androidx.compose.ui.graphics.Color.Transparent,
-            focusedContainerColor = SurfaceFocus,
-        ),
+        colors = Focus.bar(container = if (selected) Brand.copy(alpha = 0.35f) else androidx.compose.ui.graphics.Color.Transparent),
     ) {
         Row(Modifier.padding(horizontal = 12.dp, vertical = 9.dp)) {
-            Text(tab.icon, color = if (selected) Accent else TextSecondary, modifier = Modifier.width(24.dp))
+            Text(tab.icon, color = if (selected) androidx.compose.ui.graphics.Color.Unspecified else TextSecondary, modifier = Modifier.width(24.dp))
             if (open) {
                 Text(
                     tab.label,
                     style = MaterialTheme.typography.titleMedium,
-                    color = if (selected) Accent else MaterialTheme.colorScheme.onSurface,
+                    fontWeight = if (selected) androidx.compose.ui.text.font.FontWeight.Medium else null,
                     maxLines = 1,
                     modifier = Modifier.padding(start = 4.dp),
                 )

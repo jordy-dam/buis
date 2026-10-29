@@ -32,9 +32,9 @@ import androidx.tv.material3.MaterialTheme
 import androidx.tv.material3.Text
 import nl.jordy.iptv.data.profile.Pin
 import nl.jordy.iptv.ui.components.SecondaryButton
-import nl.jordy.iptv.ui.theme.Accent
 import nl.jordy.iptv.ui.theme.SurfaceColor
 import nl.jordy.iptv.ui.theme.SurfaceRaised
+import nl.jordy.iptv.ui.theme.TextPrimary
 import nl.jordy.iptv.ui.theme.TextSecondary
 
 /**
@@ -79,7 +79,7 @@ fun PinDialog(title: String, onPin: (String) -> String?, onDismiss: () -> Unit, 
             subtitle?.let { Text(it, style = MaterialTheme.typography.bodyMedium, color = TextSecondary) }
             Row(horizontalArrangement = Arrangement.spacedBy(16.dp)) {
                 repeat(Pin.LENGTH) { i ->
-                    Box(Modifier.size(18.dp).background(if (i < digits.length) Accent else SurfaceRaised, CircleShape))
+                    Box(Modifier.size(18.dp).background(if (i < digits.length) TextPrimary else SurfaceRaised, CircleShape))
                 }
             }
             Text(error ?: " ", style = MaterialTheme.typography.bodyMedium, color = Danger)

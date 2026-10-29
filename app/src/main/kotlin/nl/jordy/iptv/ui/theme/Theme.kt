@@ -3,6 +3,8 @@ package nl.jordy.iptv.ui.theme
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.luminance
+import androidx.tv.material3.LocalContentColor
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -11,15 +13,32 @@ import androidx.tv.material3.MaterialTheme
 import androidx.tv.material3.Typography
 import androidx.tv.material3.darkColorScheme
 
-/** One accent colour on a near-black background. Everything focusable lights up in the accent. */
-val Accent = Color(0xFF4FC3F7)
-val Background = Color(0xFF0E1114)
-val SurfaceColor = Color(0xFF1A1F24)
-val SurfaceRaised = Color(0xFF252B32)
-/** A focused row in a list: one step lighter than [SurfaceRaised], no accent (that's for "selected"). */
-val SurfaceFocus = Color(0xFF2F3740)
-val TextPrimary = Color(0xFFF2F4F5)
-val TextSecondary = Color(0xFFA9B3BC)
+/*
+ * Neutral greys with three colours that each mean one thing (2g): the logo's blue for buttons and
+ * what's selected, amber for live ("NU", progress, reminders), red for the heart. Focus is not a
+ * colour but a light bar: the focused row turns [FocusBar] with dark text.
+ */
+val Background = Color(0xFF131416)
+val SurfaceColor = Color(0xFF1C1D21)
+val SurfaceRaised = Color(0xFF26282D)
+/** The logo's blue, a touch lighter so it holds up on the dark background. */
+val Brand = Color(0xFF2D6AA8)
+val Heart = Color(0xFFE5484D)
+val FocusBar = Color(0xFFECEBE7)
+val TextPrimary = Color(0xFFF3F3F1)
+val TextOnLight = Color(0xFF131416)
+
+/** True inside the focus bar: the surface switched its content colour to dark. */
+@Composable
+fun onLight(): Boolean = LocalContentColor.current.luminance() < 0.5f
+
+/** Secondary text that stays readable on the focus bar too. */
+val TextSecondary: Color
+    @Composable get() = if (onLight()) Color(0xFF5C5F66) else Color(0xFFA3A6AD)
+
+/** Amber for live things; a dark amber on the focus bar, where the light one disappears. */
+val Live: Color
+    @Composable get() = if (onLight()) Color(0xFF8A5A00) else Color(0xFFF2B544)
 
 /** TV overscan safe area. */
 val SafeArea = 48.dp
@@ -34,15 +53,17 @@ object Rows {
 }
 
 private val colors = darkColorScheme(
-    primary = Accent,
-    onPrimary = Color(0xFF00222F),
+    primary = Brand,
+    onPrimary = TextPrimary,
     background = Background,
     onBackground = TextPrimary,
     surface = SurfaceColor,
     onSurface = TextPrimary,
     surfaceVariant = SurfaceRaised,
-    onSurfaceVariant = TextSecondary,
-    border = Accent,
+    onSurfaceVariant = Color(0xFFA3A6AD),
+    inverseSurface = FocusBar,
+    inverseOnSurface = TextOnLight,
+    border = FocusBar,
 )
 
 // 10-foot type, below the spec's 16sp body at Jordy's request (2e, 2f). 13sp is the floor:

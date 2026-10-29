@@ -56,7 +56,7 @@ import kotlinx.coroutines.delay
 import nl.jordy.iptv.player.PlayerViewModel
 import nl.jordy.iptv.ui.components.PrimaryButton
 import nl.jordy.iptv.ui.components.ProgressBar
-import nl.jordy.iptv.ui.theme.Accent
+import nl.jordy.iptv.ui.theme.Live
 import nl.jordy.iptv.ui.theme.SafeArea
 import nl.jordy.iptv.ui.theme.TextSecondary
 import java.time.Instant
@@ -134,6 +134,7 @@ fun PlayerScreen(onExit: () -> Unit, vm: PlayerViewModel = hiltViewModel()) {
                 val handled = if (vm.isLive) when (code) {
                     KeyEvent.KEYCODE_DPAD_UP, KeyEvent.KEYCODE_CHANNEL_UP -> { vm.zap(+1); true }
                     KeyEvent.KEYCODE_DPAD_DOWN, KeyEvent.KEYCODE_CHANNEL_DOWN -> { vm.zap(-1); true }
+                    KeyEvent.KEYCODE_DPAD_LEFT, KeyEvent.KEYCODE_LAST_CHANNEL -> { vm.previousChannel(); true }
                     KeyEvent.KEYCODE_DPAD_CENTER, KeyEvent.KEYCODE_ENTER, KeyEvent.KEYCODE_INFO -> true
                     else -> false
                 } else when (code) {
@@ -193,7 +194,7 @@ fun PlayerScreen(onExit: () -> Unit, vm: PlayerViewModel = hiltViewModel()) {
 @Composable
 private fun LiveInfo(state: nl.jordy.iptv.player.PlayerUiState) {
     Row(verticalAlignment = Alignment.Bottom) {
-        state.channelNumber?.let { Text("$it  ", style = MaterialTheme.typography.headlineMedium, color = Accent) }
+        state.channelNumber?.let { Text("$it  ", style = MaterialTheme.typography.headlineMedium, color = Live) }
         Text(state.title, style = MaterialTheme.typography.headlineMedium)
     }
     state.now?.let { now ->
@@ -203,7 +204,11 @@ private fun LiveInfo(state: nl.jordy.iptv.player.PlayerUiState) {
         ProgressBar(elapsed.toFloat() / total, Modifier.width(480.dp))
     }
     state.next?.let { Text("Straks ${clock.format(Instant.ofEpochSecond(it.start))}  ${it.title}", style = MaterialTheme.typography.bodyLarge, color = TextSecondary) }
-    Text("▲▼ andere zender", style = MaterialTheme.typography.bodyMedium, color = TextSecondary)
+    Text(
+        "▲▼ andere zender" + (state.previous?.let { "   ◀ terug naar $it" } ?: ""),
+        style = MaterialTheme.typography.bodyMedium,
+        color = TextSecondary,
+    )
 }
 
 @Composable

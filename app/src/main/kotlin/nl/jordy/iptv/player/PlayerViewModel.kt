@@ -47,6 +47,8 @@ data class PlayerUiState(
     val channelNumber: Int? = null,
     val now: EpgEntry? = null,
     val next: EpgEntry? = null,
+    /** Live: the channel Left goes back to. */
+    val previous: String? = null,
     val error: String? = null,
     val buffering: Boolean = true,
 )
@@ -65,6 +67,7 @@ class PlayerViewModel @Inject constructor(
     private val library: LibraryRepository,
     private val epg: EpgRepository,
     private val enricher: MovieEnricher,
+    private val history: ChannelHistory,
 ) : ViewModel() {
 
     val route = savedState.toRoute<PlayerRoute>()
@@ -101,6 +104,8 @@ class PlayerViewModel @Inject constructor(
     private var currentSource: LiveSources.Source? = null
     private var channels: List<LiveChannelEntity> = emptyList()
     private var channelIndex = -1
+    /** The category Up/Down zap through; changes when Left goes back to a channel from another one. */
+    private var zapCategory = route.categoryId
     private var epgJob: Job? = null
     private var zapStartedAt = 0L
     /** Positions are only saved once playback really started at the intended position. */
@@ -150,7 +155,7 @@ class PlayerViewModel @Inject constructor(
 
     private suspend fun loadZapList(): List<LiveChannelEntity> {
         val dao = db.catalog()
-        return when (val cat = route.categoryId) {
+        return when (val cat = zapCategory) {
             null -> emptyList()
             PlayerRoute.FAVORITES_CATEGORY -> {
                 val favs = library.favorites().first().filter { it.type == ContentType.LIVE }
@@ -171,9 +176,25 @@ class PlayerViewModel @Inject constructor(
         playLive(ch.streamId, ch.name)
     }
 
+    /** Left: back to the channel watched before this one, with its own zap list. Left again flips back. */
+    fun previousChannel() {
+        val prev = history.previous ?: return
+        viewModelScope.launch {
+            if (prev.categoryId != zapCategory) {
+                zapCategory = prev.categoryId
+                channels = loadZapList()
+            }
+            channelIndex = channels.indexOfFirst { it.streamId == prev.streamId }
+            playLive(prev.streamId, prev.name)
+        }
+    }
+
     private fun playLive(streamId: Int, name: String) {
         val source = liveSources?.first(streamId) ?: return
-        _state.update { PlayerUiState(title = name, channelNumber = channelIndex.takeIf { it >= 0 }?.plus(1)) }
+        history.watched(ChannelHistory.Entry(streamId, name, zapCategory))
+        _state.update {
+            PlayerUiState(title = name, channelNumber = channelIndex.takeIf { it >= 0 }?.plus(1), previous = history.previous?.name)
+        }
         zapStartedAt = SystemClock.elapsedRealtime()
         setSource(source)
         epgJob?.cancel()

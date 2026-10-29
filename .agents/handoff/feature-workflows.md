@@ -14,7 +14,9 @@ cards, avatar top left, "Profiel bewerken" in Instellingen, film genres via back
 `get_vod_info`) is built and emulator-tested: `docs/plans/2026-10-28-phase-2e-verfijnen.md`.
 2e is on the tv. Phase 2f "eigen gezicht" (logo, icon and banner, five drawn avatars, one tile per
 film with a version choice, text one step smaller, screen kept on while playing) is built and
-emulator-tested: `docs/plans/2026-10-28-phase-2f-eigen-gezicht.md`.
+emulator-tested: `docs/plans/2026-10-28-phase-2f-eigen-gezicht.md`. 2f is on the tv. Phase 2g "volgen" is
+planned in four parts (`docs/plans/2026-10-29-phase-2g-volgen.md`); part 1 (neutral palette with logo
+blue/amber/red, light-bar focus, Left = vorige zender) is built and emulator-tested, not on the tv.
 
 ## Current phase
 Phase 1 — done and tested on the real tv. Phase 2a — built and installed on the tv (not started yet
@@ -35,6 +37,7 @@ Phase 1 — done and tested on the real tv. Phase 2a — built and installed on 
 - Layout (2c): one-line 48dp channel rows, rail collapses to icons in the content, Zoeken first in the rail, 104dp posters
 - Browsing (2d): Films/Series = category list (Diensten, Genres, Overig) + grid; series genre chips; channel rows with heart before the number and a fixed quality/catch-up slot
 - Look (2f): round logo as icon/banner/picker header (`docs/brand/make-logo.sh`), five drawn avatars ("Gezicht"), one tile per film with versions on the detail screen, screen kept on while playing
+- Look and zapping (2g part 1): neutral greys, `Brand`/`Live`/`Heart` colours, focus as a light bar with dark text (`Focus.bar()`, `onLight()`), Left in the live player flips to the previous channel across categories (`ChannelHistory`)
 - Refinements (2e): quiet focus on list rows, one step smaller type/tiles, 5-column grid, Home channel cards, avatar top of the rail, "Profiel bewerken" in Instellingen, film genre chips fed by `MovieEnricher` (status under Instellingen → "Filmgegevens")
 
 ## What's not (yet)

@@ -65,9 +65,8 @@ import nl.jordy.iptv.data.repo.LibraryRepository
 import nl.jordy.iptv.data.repo.MovieEnricher
 import nl.jordy.iptv.ui.components.PrimaryButton
 import nl.jordy.iptv.ui.components.SecondaryButton
-import nl.jordy.iptv.ui.theme.Accent
+import nl.jordy.iptv.ui.theme.onLight
 import nl.jordy.iptv.ui.theme.SurfaceColor
-import nl.jordy.iptv.ui.theme.SurfaceFocus
 import nl.jordy.iptv.ui.theme.SurfaceRaised
 import nl.jordy.iptv.ui.theme.TextSecondary
 import java.text.NumberFormat
@@ -307,10 +306,10 @@ internal fun SettingRow(
     val content: @Composable () -> Unit = {
         Row(Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 12.dp), verticalAlignment = Alignment.CenterVertically) {
             Column(Modifier.weight(1f)) {
-                Text(title, style = MaterialTheme.typography.titleMedium, color = if (destructive) Danger else MaterialTheme.colorScheme.onSurface)
+                Text(title, style = MaterialTheme.typography.titleMedium, color = if (destructive) danger() else androidx.compose.ui.graphics.Color.Unspecified)
                 description?.let { Text(it, style = MaterialTheme.typography.bodyMedium, color = TextSecondary) }
             }
-            value?.let { Text(it, style = MaterialTheme.typography.titleMedium, color = if (onClick != null) Accent else TextSecondary, modifier = Modifier.padding(start = 24.dp)) }
+            value?.let { Text(it, style = MaterialTheme.typography.titleMedium, color = if (onClick != null) androidx.compose.ui.graphics.Color.Unspecified else TextSecondary, modifier = Modifier.padding(start = 24.dp)) }
         }
     }
     if (onClick == null) {
@@ -322,12 +321,13 @@ internal fun SettingRow(
         modifier = modifier.fillMaxWidth(),
         shape = ClickableSurfaceDefaults.shape(RoundedCornerShape(10.dp)),
         scale = ClickableSurfaceDefaults.scale(focusedScale = 1.02f),
-        border = ClickableSurfaceDefaults.border(focusedBorder = Focus.quiet(RoundedCornerShape(10.dp))),
-        colors = ClickableSurfaceDefaults.colors(containerColor = SurfaceColor, focusedContainerColor = SurfaceFocus),
+        colors = Focus.bar(),
     ) { content() }
 }
 
-private val Danger = androidx.compose.ui.graphics.Color(0xFFFF8A80)
+/** Red for "Uitloggen"; darker on the focus bar so it stays readable there. */
+@Composable
+private fun danger() = androidx.compose.ui.graphics.Color(if (onLight()) 0xFFB42318 else 0xFFFF8A80)
 
 @Composable
 private fun LogoutDialog(onConfirm: () -> Unit, onDismiss: () -> Unit) {

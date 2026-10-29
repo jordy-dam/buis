@@ -78,7 +78,6 @@ fun AvatarTile(
             shape = ClickableSurfaceDefaults.shape(CircleShape),
             scale = ClickableSurfaceDefaults.scale(focusedScale = Focus.SCALE),
             border = ClickableSurfaceDefaults.border(focusedBorder = Border(BorderStroke(4.dp, TextPrimary), shape = CircleShape)),
-            glow = ClickableSurfaceDefaults.glow(focusedGlow = Focus.glow),
             colors = ClickableSurfaceDefaults.colors(containerColor = Color.Transparent, focusedContainerColor = Color.Transparent),
         ) { AvatarCircle(name, avatar, size, symbol = symbol, face = face) }
         Text(name, style = MaterialTheme.typography.titleMedium, maxLines = 1, overflow = TextOverflow.Ellipsis, textAlign = TextAlign.Center)

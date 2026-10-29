@@ -1,0 +1,108 @@
+# 2026-10-29 — Phase 2g: volgen
+
+Status: **part 1 (colours, light-bar focus, vorige zender) built and emulator-tested; not on the tv.
+Parts 2–4 not built.** Branch `feat/phase-2a`. Decision: `.agents/decisions/product.md` (2g part 1).
+
+## Why
+Jordy's feedback on 2f on the tv: duplicate films are better but the version choice is clunky and
+too long; everything is very blue; he wants to be told when F1 (Viaplay) or FC Utrecht (ESPN)
+starts while he's using the app, and wants a quick way back to the previous channel. Both sport
+channels are in the Ziggo cable list, which has a guide.
+
+## What to build
+
+### 1. Vorige zender
+- Live player: **Left** jumps to the previous channel, a second Left goes back again (toggle).
+  `KEYCODE_LAST_CHANNEL` does the same for remotes that have it. Left/Right do nothing in live now.
+- The overlay briefly shows "← <previous channel>" so the toggle is discoverable.
+- The previous channel may sit in another category: remember the stream id and its category, not an index.
+
+### 2. Volgen + herinnering
+- **Follow a search term per profile** ("Formule 1", "FC Utrecht"), optionally tied to one channel.
+  Start points: "Herinner me" on a programme in the guide/"Straks" strip (offers to follow its
+  title), and a "Volgen" list in Instellingen → "Voor <naam>".
+- Matching runs over `epg_programme` after every guide refresh, case- and accent-insensitive on the title.
+  This also catches races the 36-hour guide window doesn't show yet when you add the term.
+- **In-app banner 5 minutes before the start**, wherever you are in the app (also in the player on
+  another channel): "Race begint over 5 min · Viaplay F1" with **Kijken** (focused) and **Later**.
+  A second banner at the start time if ignored. No system notifications: only while the app is open.
+- **Home row "Straks voor jou"** with the next matches of what you follow (today and tomorrow).
+
+### 3. Versiekeuze netter
+- The row of long chips becomes **one button** next to Afspelen: "Nederlands gesproken · 3 versies ▾".
+- OK opens a short list; each version is two lines: language in plain Dutch on top
+  ("Nederlands gesproken", "Engels, NL ondertiteld", "Engels"), title and quality small underneath
+  ("The Croods: A New Age · 4K"). The title only shows when the titles differ.
+- Names come from the badges: `NL gesproken` → "Nederlands gesproken", `NL sub` → "<origineel>, NL
+  ondertiteld", none → "Origineel"; quality (4K, HDR) moves to the second line.
+
+### 4. Kleuren
+- Background and surfaces neutral (no blue tint): `#131416`, `#1C1D21`, `#26282D`, focus `#31343A`.
+- **Logo blue `#2D6AA8`** for the primary button and the selected tab/chip.
+- **Amber `#F2B544`** for "NU", progress bars and reminders.
+- **Red `#EF5B5B`** for the heart, everywhere.
+- **Focus becomes a light bar, no border**: the focused row, chip or button fills with `#ECEBE7`
+  and its text turns dark (`#131416`, secondary `#5C5F66`); on it the heart is `#D63C3C` and "NU" a
+  dark amber `#8A5A00` so both keep their contrast. Posters and cards have no fill to change: they
+  scale up as now and get a 3dp light underline bar instead of the outline. Replaces the white line from 2e.
+- Banner background follows the logo blue.
+
+### 5. Volgende aflevering automatisch
+- In the last 20 seconds of an episode (or at the end credits when the provider gives no
+  duration, at the end), a corner card: "Volgende: S2 · A5 <title> over 10 s" with **Nu kijken**
+  and **Stoppen**. No key press → the next episode starts; it rolls over to the next season.
+- Stops after three episodes in a row without a key press ("Kijk je nog?"), so a sleeping household
+  doesn't play a whole season.
+- Not after the last episode of the last season.
+
+### 6. Slaaptimer
+- Instellingen → "Voor <naam>" → **Slaaptimer**: Uit, 30, 60, 90, 120 min (per profile, so a kids
+  profile can have its own bedtime).
+- Counts from the start of playback and restarts on every key press. One minute before the end a
+  banner "Nog aan het kijken?" with **Blijf kijken**; no answer → playback stops, the player closes
+  to Home and the screen may go to the screensaver (keep-screen-on is released).
+
+### 7. Vanaf begin kijken (catch-up)
+- Store `tv_archive` and `tv_archive_duration` from `get_live_streams` (schema 8); the `⏺` name mark
+  stays as a fallback.
+- On a channel with archive: in the live player, **OK** shows the info overlay with **Vanaf begin**
+  for the current programme; in the guide, programmes from the past archive days get **Terugkijken**.
+- Plays through the Xtream timeshift URL
+  (`/timeshift/<user>/<pass>/<minutes>/<YYYY-MM-DD:HH-MM>/<stream>.ts`) with normal seek controls;
+  "Live" in the overlay jumps back to the live stream.
+- The reminder banner gets **Vanaf begin** next to Kijken when you open it after the start.
+
+### Later (not in 2g)
+- Zender kiezen met de cijfertoetsen: useful but rarely used.
+
+## Done when
+- Left in the live player toggles between the last two channels, across categories, in under one zap time.
+- A followed term matching a programme 5 minutes from now shows the banner on Home, in Films and in
+  the player; Kijken starts that channel; Later hides it until the start.
+- A film with 3 versions shows one button; the list reads as languages, not provider tags.
+- No light blue left on screen; hearts are red; focus is the light bar everywhere (rows, chips,
+  buttons, rail, Instellingen) and readable from the couch.
+- An episode ends → the next one starts after 10 s, including across a season; after three unattended
+  episodes it asks first.
+- Slaaptimer of 30 min stops playback after 30 min without a key press, with the warning one minute before.
+- On a channel with archive, Vanaf begin starts the running programme at its start and Live returns.
+- Unit tests: term matching (case, accents, "F1" vs "Formule 1" stays literal), banner timing
+  (5 min, at start, not again after Kijken), the previous-channel toggle, version names, next
+  episode across seasons and the three-episode stop, sleep timer reset on a key press, the
+  timeshift URL (start time in the provider's time zone, duration rounded up).
+
+## Open
+- Does the Ziggo guide say "Formule 1: Grand Prix …" or something generic such as "Live sport"? First
+  check: follow "Formule 1" on the tv and look at "Straks voor jou".
+- Do Viaplay F1 and ESPN have `tv_archive`, and how many days? Jordy uses "vanaf begin" often in
+  another app, so the subscription supports it; which channels do is checked on the first sync.
+- Order of building: colours + focus and vorige zender first (small, visible at once), then volgende
+  aflevering and slaaptimer, then catch-up, then volgen. Each part goes on the tv on its own.
+
+## Part 1 — built (2026-10-29)
+- `Theme.kt`: new palette, `onLight()`, content-aware `TextSecondary` and `Live`; `Focus.bar()` in `Tiles.kt` for every row, chip, button and rail item.
+- `ChannelHistory` (app-wide, last two channels) + `PlayerViewModel.previousChannel()`; Left in the live player.
+- Tested: unit 98 green (new `ChannelHistoryTest`); emulator walk: rail, category list, channel rows (dark amber "NU"
+  and red heart on the focus bar, checked by pixel), film detail buttons, Left back and forth inside a category and
+  across two categories with Up/Down zapping the restored list. Release build made, not installed.
+- Not done from the plan's "Done when": Instellingen and the profile editor only looked at in code, not on screen.

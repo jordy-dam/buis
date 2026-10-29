@@ -35,7 +35,9 @@ import androidx.tv.material3.ClickableSurfaceDefaults
 import androidx.tv.material3.MaterialTheme
 import androidx.tv.material3.Surface
 import androidx.tv.material3.Text
-import nl.jordy.iptv.ui.theme.Accent
+import nl.jordy.iptv.ui.theme.Brand
+import nl.jordy.iptv.ui.theme.FocusBar
+import nl.jordy.iptv.ui.theme.TextOnLight
 import nl.jordy.iptv.ui.theme.SurfaceColor
 import nl.jordy.iptv.ui.theme.SurfaceRaised
 import nl.jordy.iptv.ui.theme.TextPrimary
@@ -86,7 +88,7 @@ fun TvTextField(
             scale = ClickableSurfaceDefaults.scale(focusedScale = 1f),
             border = ClickableSurfaceDefaults.border(
                 border = Border(BorderStroke(1.dp, SurfaceRaised), shape = RoundedCornerShape(8.dp)),
-                focusedBorder = Border(BorderStroke(3.dp, Accent), shape = RoundedCornerShape(8.dp)),
+                focusedBorder = Border(BorderStroke(2.dp, FocusBar), shape = RoundedCornerShape(8.dp)),
             ),
             colors = ClickableSurfaceDefaults.colors(containerColor = SurfaceColor, focusedContainerColor = SurfaceColor),
         ) {
@@ -96,7 +98,7 @@ fun TvTextField(
                     onValueChange = onValueChange,
                     singleLine = true,
                     textStyle = MaterialTheme.typography.bodyLarge.copy(color = TextPrimary),
-                    cursorBrush = SolidColor(Accent),
+                    cursorBrush = SolidColor(TextPrimary),
                     visualTransformation = if (password) PasswordVisualTransformation() else VisualTransformation.None,
                     keyboardOptions = KeyboardOptions(keyboardType = keyboardType, imeAction = imeAction, autoCorrectEnabled = false),
                     keyboardActions = KeyboardActions(onAny = {
@@ -123,8 +125,12 @@ fun PrimaryButton(text: String, onClick: () -> Unit, modifier: Modifier = Modifi
         enabled = enabled,
         modifier = modifier,
         scale = ButtonDefaults.scale(focusedScale = Focus.SCALE),
-        border = ButtonDefaults.border(focusedBorder = Border(BorderStroke(3.dp, TextPrimary))),
-        colors = ButtonDefaults.colors(containerColor = SurfaceRaised, focusedContainerColor = Accent),
+        colors = ButtonDefaults.colors(
+            containerColor = Brand,
+            contentColor = TextPrimary,
+            focusedContainerColor = FocusBar,
+            focusedContentColor = TextOnLight,
+        ),
     ) { Text(text) }
 }
 
@@ -140,13 +146,13 @@ fun SecondaryButton(text: String, onClick: () -> Unit, modifier: Modifier = Modi
         scale = ButtonDefaults.scale(focusedScale = Focus.SCALE),
         border = ButtonDefaults.border(
             border = Border(BorderStroke(1.dp, TextSecondary), shape = CircleShape),
-            focusedBorder = Border(BorderStroke(3.dp, TextPrimary), shape = CircleShape),
+            focusedBorder = Border.None,
         ),
         colors = ButtonDefaults.colors(
             containerColor = androidx.compose.ui.graphics.Color.Transparent,
             contentColor = TextPrimary,
-            focusedContainerColor = SurfaceRaised,
-            focusedContentColor = TextPrimary,
+            focusedContainerColor = FocusBar,
+            focusedContentColor = TextOnLight,
         ),
     ) { Text(text) }
 }

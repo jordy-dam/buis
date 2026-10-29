@@ -28,8 +28,6 @@ import kotlinx.coroutines.delay
 import nl.jordy.iptv.data.xtream.EpgEntry
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import nl.jordy.iptv.ui.theme.SurfaceFocus
-import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.key.onPreviewKeyEvent
 import androidx.compose.ui.input.key.type
@@ -45,13 +43,21 @@ import androidx.tv.material3.Border
 import androidx.tv.material3.Card
 import androidx.tv.material3.CardDefaults
 import androidx.tv.material3.ClickableSurfaceDefaults
-import androidx.tv.material3.Glow
 import androidx.tv.material3.MaterialTheme
 import androidx.tv.material3.Surface
 import androidx.tv.material3.Text
 import coil3.compose.AsyncImage
 import nl.jordy.iptv.data.settings.FilteredCategories
-import nl.jordy.iptv.ui.theme.Accent
+import androidx.compose.ui.text.AnnotatedString
+import androidx.compose.ui.text.SpanStyle
+import androidx.compose.ui.text.buildAnnotatedString
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.withStyle
+import nl.jordy.iptv.ui.theme.Brand
+import nl.jordy.iptv.ui.theme.FocusBar
+import nl.jordy.iptv.ui.theme.Heart
+import nl.jordy.iptv.ui.theme.Live
+import nl.jordy.iptv.ui.theme.TextOnLight
 import nl.jordy.iptv.ui.theme.SurfaceColor
 import nl.jordy.iptv.ui.theme.SurfaceRaised
 import nl.jordy.iptv.ui.theme.TextPrimary
@@ -60,15 +66,23 @@ import nl.jordy.iptv.ui.theme.TextSecondary
 private val tileShape = RoundedCornerShape(10.dp)
 
 /**
- * Two focus treatments. Artwork (posters, avatars, episodes): scale ~1.1, accent outline, soft
- * glow, because one tile is picked out of a wall of images. Rows in lists: [quiet], a lighter
- * surface and a thin light line, so focus never looks like the accent used for "selected" and progress.
+ * Two focus treatments (2g). Artwork (posters, episodes): scale ~1.1 and a thin light outline, as
+ * there's no surface to fill. Everything else (rows, chips, buttons, the rail): [bar], the row turns
+ * light with dark text, no border; [TextSecondary] and [Live] follow along via [onLight].
  */
 object Focus {
     const val SCALE = 1.1f
-    val border = Border(BorderStroke(3.dp, Accent), shape = tileShape)
-    val glow = Glow(elevationColor = Accent.copy(alpha = 0.35f), elevation = 12.dp)
-    fun quiet(shape: Shape) = Border(BorderStroke(1.dp, Color.White.copy(alpha = 0.35f)), shape = shape)
+    val border = Border(BorderStroke(2.dp, FocusBar), shape = tileShape)
+
+    @Composable
+    fun bar(container: Color = SurfaceColor) = ClickableSurfaceDefaults.colors(
+        containerColor = container,
+        contentColor = TextPrimary,
+        focusedContainerColor = FocusBar,
+        focusedContentColor = TextOnLight,
+        pressedContainerColor = FocusBar,
+        pressedContentColor = TextOnLight,
+    )
 }
 
 /**
@@ -109,7 +123,6 @@ fun PosterTile(
         shape = CardDefaults.shape(tileShape),
         scale = CardDefaults.scale(focusedScale = Focus.SCALE),
         border = CardDefaults.border(focusedBorder = Focus.border),
-        glow = CardDefaults.glow(focusedGlow = Focus.glow),
         colors = CardDefaults.colors(containerColor = SurfaceColor),
     ) {
         Box(Modifier.fillMaxSize()) {
@@ -165,14 +178,13 @@ fun ChannelTile(
         modifier = modifier.fillMaxWidth().height(42.dp).onMenuKey(onLongClick),
         shape = ClickableSurfaceDefaults.shape(RoundedCornerShape(8.dp)),
         scale = ClickableSurfaceDefaults.scale(focusedScale = 1.02f),
-        border = ClickableSurfaceDefaults.border(focusedBorder = Focus.quiet(RoundedCornerShape(8.dp))),
-        colors = ClickableSurfaceDefaults.colors(containerColor = SurfaceColor, focusedContainerColor = SurfaceFocus),
+        colors = Focus.bar(),
     ) {
         Box(Modifier.fillMaxSize()) {
             Row(Modifier.fillMaxSize().padding(horizontal = 8.dp), verticalAlignment = Alignment.CenterVertically) {
                 // Favourite first, in a fixed slot, so numbers and names line up with or without it.
                 Box(Modifier.width(18.dp), contentAlignment = Alignment.Center) {
-                    if (favorite) Text("♥︎", color = Accent, style = MaterialTheme.typography.labelLarge)
+                    if (favorite) Text("♥︎", color = Heart, style = MaterialTheme.typography.labelLarge)
                 }
                 if (number != null) {
                     Text("$number", style = MaterialTheme.typography.bodyMedium, color = TextSecondary, textAlign = TextAlign.End, modifier = Modifier.width(32.dp))
@@ -193,8 +205,10 @@ fun ChannelTile(
                     modifier = Modifier.weight(0.42f),
                 )
                 // Same columns on every row, guide or not, so nothing moves when a programme loads.
+                val live = Live
                 Text(
-                    now?.let { "NU · ${it.title}" } ?: "",
+                    now?.let { buildAnnotatedString { withStyle(SpanStyle(color = live, fontWeight = FontWeight.Medium)) { append("NU") }; append(" · ${it.title}") } }
+                        ?: AnnotatedString(""),
                     style = MaterialTheme.typography.bodyMedium,
                     color = TextSecondary,
                     maxLines = 1,
@@ -210,7 +224,7 @@ fun ChannelTile(
             if (now != null) {
                 Box(
                     Modifier.align(Alignment.BottomStart).fillMaxWidth(now.progress()).height(2.dp)
-                        .background(Accent.copy(alpha = 0.45f)),
+                        .background(Live),
                 )
             }
         }
@@ -227,8 +241,7 @@ fun ChannelCard(name: String, logoUrl: String?, now: EpgEntry?, onClick: () -> U
         modifier = modifier.width(240.dp).height(60.dp),
         shape = ClickableSurfaceDefaults.shape(RoundedCornerShape(8.dp)),
         scale = ClickableSurfaceDefaults.scale(focusedScale = 1.04f),
-        border = ClickableSurfaceDefaults.border(focusedBorder = Focus.quiet(RoundedCornerShape(8.dp))),
-        colors = ClickableSurfaceDefaults.colors(containerColor = SurfaceColor, focusedContainerColor = SurfaceFocus),
+        colors = Focus.bar(),
     ) {
         Box(Modifier.fillMaxSize()) {
             Row(Modifier.fillMaxSize().padding(horizontal = 10.dp), verticalAlignment = Alignment.CenterVertically) {
@@ -244,7 +257,7 @@ fun ChannelCard(name: String, logoUrl: String?, now: EpgEntry?, onClick: () -> U
                 }
             }
             if (now != null) {
-                Box(Modifier.align(Alignment.BottomStart).fillMaxWidth(now.progress()).height(2.dp).background(Accent.copy(alpha = 0.45f)))
+                Box(Modifier.align(Alignment.BottomStart).fillMaxWidth(now.progress()).height(2.dp).background(Live))
             }
         }
     }
@@ -302,16 +315,12 @@ fun ListItemSurface(
         modifier = modifier.fillMaxWidth(),
         shape = ClickableSurfaceDefaults.shape(RoundedCornerShape(8.dp)),
         scale = ClickableSurfaceDefaults.scale(focusedScale = 1.02f),
-        border = ClickableSurfaceDefaults.border(focusedBorder = Focus.quiet(RoundedCornerShape(8.dp))),
-        colors = ClickableSurfaceDefaults.colors(
-            containerColor = if (selected) SurfaceRaised else androidx.compose.ui.graphics.Color.Transparent,
-            focusedContainerColor = SurfaceFocus,
-        ),
+        colors = Focus.bar(container = if (selected) Brand.copy(alpha = 0.35f) else Color.Transparent),
     ) {
         Text(
             text,
             style = MaterialTheme.typography.titleMedium,
-            color = if (selected) Accent else MaterialTheme.colorScheme.onSurface,
+            fontWeight = if (selected) FontWeight.Medium else null,
             maxLines = 1,
             overflow = TextOverflow.Ellipsis,
             modifier = Modifier.padding(horizontal = 14.dp, vertical = 9.dp),
@@ -321,15 +330,15 @@ fun ListItemSurface(
 
 @Composable
 fun FavoriteBadge(modifier: Modifier = Modifier) {
-    Box(modifier.size(28.dp).background(Accent, RoundedCornerShape(14.dp)), contentAlignment = Alignment.Center) {
-        Text("♥︎", color = MaterialTheme.colorScheme.onPrimary, style = MaterialTheme.typography.labelLarge)
+    Box(modifier.size(28.dp).background(Heart, RoundedCornerShape(14.dp)), contentAlignment = Alignment.Center) {
+        Text("♥︎", color = TextPrimary, style = MaterialTheme.typography.labelLarge)
     }
 }
 
 @Composable
 fun ProgressBar(fraction: Float, modifier: Modifier = Modifier, thickness: Dp = 5.dp) {
     Box(modifier.fillMaxWidth().height(thickness).background(SurfaceRaised)) {
-        Box(Modifier.fillMaxWidth(fraction.coerceIn(0f, 1f)).height(thickness).background(Accent))
+        Box(Modifier.fillMaxWidth(fraction.coerceIn(0f, 1f)).height(thickness).background(Live))
     }
 }
 
