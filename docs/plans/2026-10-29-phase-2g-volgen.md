@@ -159,3 +159,4 @@ so the focus-follow after pinning scrolls to it.
 - Not built from the plan: "Terugkijken" on past programmes in a guide (BUIS has no guide grid yet) and
   "Vanaf begin" on the reminder banner (part 4). Not known yet: whether Jordy's panel allows seeking
   inside a timeshift stream; the real-tv test will show it.
+- Installed on the tv (release, 2026-10-29 10:44): install succeeded and the app process started; the screen was not checked because the tv sat in its idle screensaver with the auto-standby countdown. First open re-syncs the catalog.
