@@ -41,6 +41,8 @@ import nl.jordy.iptv.data.profile.ProfileRepository
 import nl.jordy.iptv.data.repo.EpgRepository
 import nl.jordy.iptv.data.repo.MovieEnricher
 import nl.jordy.iptv.data.repo.LibraryRepository
+import nl.jordy.iptv.data.repo.ChannelHealthRepository
+import nl.jordy.iptv.data.repo.StallDetector
 import nl.jordy.iptv.data.repo.WatchCounter
 import nl.jordy.iptv.data.repo.WatchItem
 import nl.jordy.iptv.data.repo.WatchLog
@@ -108,6 +110,7 @@ class PlayerViewModel @Inject constructor(
     private val profiles: ProfileRepository,
     private val xtream: XtreamClient,
     private val watchLog: WatchLog,
+    private val channelHealth: ChannelHealthRepository,
 ) : ViewModel() {
 
     val route = savedState.toRoute<PlayerRoute>()
@@ -197,6 +200,7 @@ class PlayerViewModel @Inject constructor(
         when (route.kind) {
             PlayerRoute.Kind.LIVE -> {
                 liveSources = LiveSources(base, c)
+                swaps = runCatching { channelHealth.swapMap() }.getOrDefault(emptyMap())
                 channels = loadZapList()
                 channelIndex = channels.indexOfFirst { it.streamId == route.id }
                 val channel = channels.getOrNull(channelIndex)
@@ -252,8 +256,12 @@ class PlayerViewModel @Inject constructor(
     }
 
     private fun playLive(streamId: Int, name: String) {
-        val source = liveSources?.first(streamId) ?: return
+        // Zenderstatus: a channel the household replaced plays its steadier version; guide and catch-up stay the channel's own.
+        val played = swaps[streamId] ?: streamId
+        val source = liveSources?.first(played) ?: return
         liveStreamId = streamId
+        playedStreamId = played
+        healthStart(played)
         history.watched(ChannelHistory.Entry(streamId, name, zapCategory))
         watching(WatchItem(ContentType.LIVE, streamId, name, categoryId = zapCategory))
         _state.update {
@@ -283,6 +291,9 @@ class PlayerViewModel @Inject constructor(
 
     /** The live channel playing (or last played before going back in time). */
     private var liveStreamId = route.id
+    /** The stream that actually plays: [liveStreamId], or its replacement from Zenderstatus. */
+    private var playedStreamId = route.id
+    private var swaps: Map<Int, Int> = emptyMap()
     /** The panel's time zone, asked once: timeshift URLs need the start time in it. */
     private var panelZone: ZoneId? = null
 
@@ -298,6 +309,7 @@ class PlayerViewModel @Inject constructor(
                 ?: ZoneId.systemDefault()
             currentSource = null
             epgJob?.cancel()
+            healthEnd()
             _state.update { it.copy(catchup = programme, buffering = true, error = null) }
             val url = StreamUrls.timeshift(base, c, streamId, programme.start, Catchup.minutes(programme), zone)
             player.setMediaItem(MediaItem.Builder().setUri(url).setMimeType(MimeTypes.VIDEO_MP2T).build())
@@ -329,10 +341,10 @@ class PlayerViewModel @Inject constructor(
             return showError("Terugkijken lukt niet voor dit programma. Druk op Terug voor live.")
         }
         if (isLive) {
-            val streamId = liveStreamId
             val failed = currentSource
-            val next = failed?.let { liveSources?.fallback(streamId, it) }
+            val next = failed?.let { liveSources?.fallback(playedStreamId, it) }
             if (next != null) return setSource(next)
+            healthFailed = true
         }
         showError(
             when (error.errorCode) {
@@ -449,6 +461,10 @@ class PlayerViewModel @Inject constructor(
         }
         breakTimer?.tick(now, player.isPlaying)
         watchCounter.tick(now, player.isPlaying)
+        if (isLive && _state.value.catchup == null) {
+            healthCounter.tick(now, player.isPlaying)
+            stall.tick(now, player.isPlaying, player.playbackState == Player.STATE_BUFFERING)
+        }
         if (breakTick(now)) return
         if (route.kind == PlayerRoute.Kind.EPISODE) nextUpTick(now)
     }
@@ -566,6 +582,27 @@ class PlayerViewModel @Inject constructor(
         watchStartedAt = System.currentTimeMillis()
     }
 
+    // Zenderstatus
+
+    private var healthId: Int? = null
+    private var healthCounter = WatchCounter()
+    private var stall = StallDetector()
+    private var healthFailed = false
+
+    private fun healthStart(streamId: Int) {
+        healthEnd()
+        healthId = streamId
+    }
+
+    /** One live session ends (zap, catch-up, leaving): how it went goes into the channel's record. */
+    private fun healthEnd() {
+        healthId?.let { channelHealth.record(it, healthCounter.take(), stall.stalls, healthFailed) }
+        healthId = null
+        healthCounter = WatchCounter()
+        stall = StallDetector()
+        healthFailed = false
+    }
+
     // Audio, subtitles and the clock
 
     private var profilePrefs = UserPrefs()
@@ -645,6 +682,7 @@ class PlayerViewModel @Inject constructor(
     }
 
     override fun onCleared() {
+        healthEnd()
         saveNow()
         player.release()
         enricher.playing.update { it - 1 }

@@ -121,6 +121,8 @@ private fun route(ex: HttpExchange, cfg: Config, catalog: Catalog) {
             if (parts.size != 5 || parts[2] != USER || parts[3] != PASS) return send(ex, 403, "text/plain", ByteArray(0))
             val id = parts[4].substringBefore('.').toIntOrNull() ?: return send(ex, 404, "text/plain", ByteArray(0))
             val variant = id % 4
+            // Every channel ending in 99 is broken altogether, for Zenderstatus ("NPO 1 SD" next to "NPO 1 HD").
+            if (id % 100 == 99) return send(ex, 404, "text/plain", ByteArray(0))
             when (parts[4].substringAfter('.')) {
                 // Every channel ending in 7 has no HLS, to exercise the .m3u8 -> .ts fallback.
                 "m3u8" -> if (id % 10 == 7) {

@@ -42,8 +42,8 @@ class XtreamParserTest {
     @Test
     fun `live streams survive missing, null and mistyped fields`() {
         val streams = array("live_streams.json").mapNotNull(XtreamParser::liveStream)
-        // 14 entries: no stream_id, "abc" id, a number and null are dropped.
-        assertEquals(10, streams.size)
+        // 15 entries: no stream_id, "abc" id, a number and null are dropped.
+        assertEquals(11, streams.size)
         assertEquals(102, streams.first { it.name == "NPO 2 HD" }.streamId)
         assertEquals("Zender 106", streams.first { it.streamId == 106 }.name)
         assertNull("empty icon", streams.first { it.streamId == 102 }.logoUrl)

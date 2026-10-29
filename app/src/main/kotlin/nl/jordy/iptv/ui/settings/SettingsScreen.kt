@@ -248,7 +248,7 @@ class SettingsViewModel @Inject constructor(
  */
 @OptIn(ExperimentalComposeUiApi::class)
 @Composable
-fun SettingsScreen(onRefreshCatalog: () -> Unit, onLoggedOut: () -> Unit, onEditProfile: (Long) -> Unit, onOpenHistory: () -> Unit, vm: SettingsViewModel = hiltViewModel()) {
+fun SettingsScreen(onRefreshCatalog: () -> Unit, onLoggedOut: () -> Unit, onEditProfile: (Long) -> Unit, onOpenHistory: () -> Unit, onOpenChannelHealth: () -> Unit, vm: SettingsViewModel = hiltViewModel()) {
     val scope = rememberCoroutineScope()
     // PIN checks still to pass before "Profiel bewerken" opens, as in "Wie kijkt er?".
     var gates by remember { mutableStateOf<Pair<Long, List<List<String>>>?>(null) }
@@ -368,6 +368,7 @@ fun SettingsScreen(onRefreshCatalog: () -> Unit, onLoggedOut: () -> Unit, onEdit
         )
         SettingRow("Gids vernieuwen", guideStatus, onClick = vm::refreshGuide)
         SettingRow("Filmgegevens", "Genres per film, voor het filter bij Films.", value = filmInfo)
+        SettingRow("Zenderstatus", "Welke zenders haperen, en een voorstel om het op te lossen.", onClick = onOpenChannelHealth)
 
         SettingRow("Server", value = state.server)
         SettingRow("Gebruiker", value = state.username)

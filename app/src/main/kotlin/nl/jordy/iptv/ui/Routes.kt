@@ -17,6 +17,8 @@ import kotlinx.serialization.Serializable
 @Serializable data class MovieDetailRoute(val streamId: Int)
 /** Kijkgeschiedenis and the weekoverzicht of the active profile. */
 @Serializable data object HistoryRoute
+/** Zenderstatus: channels that hiccup and their replacements. */
+@Serializable data object ChannelHealthRoute
 @Serializable data class SeriesDetailRoute(val seriesId: Int)
 
 /** What to play. Live carries its category so up/down can zap through the same list. */

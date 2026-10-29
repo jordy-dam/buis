@@ -272,6 +272,19 @@ class MigrationTest {
         }
     }
 
+    @Test
+    fun `17 to 18 adds empty Zenderstatus tables and keeps the watch log`() {
+        helper.createDatabase(DB, 17).use { db ->
+            db.execSQL("INSERT INTO profile (id, name, avatar, face, pinHash, preferredCountries, onlyPreferred, kids, lastUsedAt, createdAt, pinnedCategories) VALUES (1, 'Anna', 3, 2, NULL, 'NL', 1, 0, 5, 1, '')")
+            db.execSQL("INSERT INTO watch_log (profileId, type, itemId, title, detail, containerExtension, categoryId, startedAt, seconds) VALUES (1, 'LIVE', 101, 'NPO 1', NULL, '', '1', 5, 600)")
+        }
+        helper.runMigrationsAndValidate(DB, 18, true).use { db ->
+            assertEquals(0, db.count("channel_check"))
+            assertEquals(0, db.count("channel_swap"))
+            assertEquals(1, db.count("watch_log"))
+        }
+    }
+
     private fun SupportSQLiteDatabase.insertPhase1Data() {
         execSQL("INSERT INTO favorite (type, itemId, name, imageUrl, addedAt) VALUES ('LIVE', 101, '┃NL┃ NPO 1 HD', NULL, 1)")
         execSQL("INSERT INTO playback_position (type, itemId, positionMs, durationMs, updatedAt) VALUES ('MOVIE', 5001, 62000, 180000, 2)")

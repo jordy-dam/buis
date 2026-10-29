@@ -20,6 +20,7 @@ import androidx.navigation.compose.rememberNavController
 import androidx.navigation.toRoute
 import nl.jordy.iptv.ui.detail.MovieDetailScreen
 import nl.jordy.iptv.ui.history.HistoryScreen
+import nl.jordy.iptv.ui.settings.ChannelHealthScreen
 import nl.jordy.iptv.ui.detail.SeriesDetailScreen
 import nl.jordy.iptv.ui.login.LoginScreen
 import nl.jordy.iptv.ui.player.PlayerScreen
@@ -85,6 +86,7 @@ fun AppNavHost(start: Any) {
                 onRefreshCatalog = { nav.navigate(SyncRoute) { popUpTo(ShellRoute) { inclusive = true } } },
                 onEditProfile = { nav.navigate(ProfileEditRoute(it)) },
                 onOpenHistory = { nav.navigate(HistoryRoute) },
+                onOpenChannelHealth = { nav.navigate(ChannelHealthRoute) },
                 onLoggedOut = { nav.navigate(LoginRoute) { popUpTo(ShellRoute) { inclusive = true } } },
             )
         }
@@ -92,5 +94,6 @@ fun AppNavHost(start: Any) {
         composable<SeriesDetailRoute> { SeriesDetailScreen(onPlay = { nav.navigate(it) }) }
         composable<PlayerRoute> { PlayerScreen(onExit = { nav.popBackStack() }) }
         composable<HistoryRoute> { HistoryScreen(onPlay = { nav.navigate(it) }) }
+        composable<ChannelHealthRoute> { ChannelHealthScreen() }
     }
 }

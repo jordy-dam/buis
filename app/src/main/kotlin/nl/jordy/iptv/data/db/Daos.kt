@@ -332,3 +332,18 @@ interface WatchLogDao {
     @Query("DELETE FROM watch_log WHERE startedAt < :before")
     suspend fun prune(before: Long)
 }
+
+/** Zenderstatus: live sessions and chosen replacements. */
+@Dao
+interface ChannelHealthDao {
+    @Insert suspend fun insert(item: ChannelCheckEntity)
+    @Query("DELETE FROM channel_check WHERE at < :before") suspend fun prune(before: Long)
+    @Query("SELECT * FROM channel_check") suspend fun checks(): List<ChannelCheckEntity>
+    /** Other versions of a channel: the same cleaned name, any quality or category. */
+    @Query("SELECT * FROM live_channel WHERE name = :name COLLATE NOCASE GROUP BY streamId")
+    suspend fun liveNamed(name: String): List<LiveChannelEntity>
+    @Upsert suspend fun upsertSwap(item: ChannelSwapEntity)
+    @Query("DELETE FROM channel_swap WHERE fromStreamId = :from") suspend fun deleteSwap(from: Int)
+    @Query("SELECT * FROM channel_swap") suspend fun swaps(): List<ChannelSwapEntity>
+    @Query("SELECT * FROM channel_swap ORDER BY at DESC") fun observeSwaps(): Flow<List<ChannelSwapEntity>>
+}

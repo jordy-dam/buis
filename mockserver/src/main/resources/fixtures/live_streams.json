@@ -9,6 +9,7 @@
   {"name": "stream_id als tekst", "stream_id": "abc", "category_id": "2"},
   {"name": "Ziggo Sport", "stream_id": 107, "stream_icon": "{base}/img/logo1.png", "category_id": "2", "epg_channel_id": "ziggosport.nl"},
   {"name": "Zonder categorie", "stream_id": 108, "category_id": null},
+  {"name": "NPO 1 SD", "stream_id": 199, "stream_icon": "{base}/img/logo0.png", "epg_channel_id": "npo1.nl", "category_id": "1"},
   {"name": "Alleen TS (geen m3u8)", "stream_id": 117, "stream_icon": "{base}/img/logo2.png", "category_id": "1"},
   {"name": "Dubbel id", "stream_id": 101, "category_id": "5"},
   42,

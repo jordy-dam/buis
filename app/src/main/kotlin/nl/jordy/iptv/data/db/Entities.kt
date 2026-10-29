@@ -301,3 +301,22 @@ data class WatchLogEntity(
     val startedAt: Long,
     val seconds: Int,
 )
+
+/** One live session for Zenderstatus: how long it played, how often it stalled, whether it failed. Household-wide. */
+@Entity(tableName = "channel_check", indices = [Index("streamId")])
+data class ChannelCheckEntity(
+    @PrimaryKey(autoGenerate = true) val id: Long = 0,
+    val streamId: Int,
+    val at: Long,
+    val playedSeconds: Int,
+    val stalls: Int,
+    val failed: Boolean,
+)
+
+/** A channel the household chose to replace with a steadier version of it; the player plays [toStreamId]. */
+@Entity(tableName = "channel_swap")
+data class ChannelSwapEntity(
+    @PrimaryKey val fromStreamId: Int,
+    val toStreamId: Int,
+    val at: Long,
+)
