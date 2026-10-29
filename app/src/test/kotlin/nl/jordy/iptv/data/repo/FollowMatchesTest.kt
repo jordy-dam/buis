@@ -11,7 +11,7 @@ class FollowMatchesTest {
 
     private val now = 1_800_000_000L
     private fun row(stream: Int, title: String = "Formule 1: Race", start: Long = now + 240, archive: Int = 0, name: String = "Kanaal $stream") =
-        FollowMatchRow("Formule 1", start, start + 7200, title, stream, name, "sport", archive, false)
+        FollowMatchRow("Formule 1", start, start + 7200, title, stream, name, "sport", archive, false, null)
 
     @Test
     fun `the same race on several channels is one reminder, on the channel with an archive`() {
@@ -24,6 +24,35 @@ class FollowMatchesTest {
     fun `different sessions stay apart, in time order`() {
         val m = FollowMatches.fold(listOf(row(1, "Formule 1: Race", start = now + 9000), row(1, "Formule 1: Kwalificatie", start = now + 100)))
         assertEquals(listOf("Formule 1: Kwalificatie", "Formule 1: Race"), m.map { it.title })
+    }
+
+    @Test
+    fun `a block of back-to-back programmes is one item, from the first start to the last stop`() {
+        fun z(t: String, from: Long, to: Long) = FollowMatchRow("Zappelin", from, to, t, 3, "NPO 3", "nl", 0, false, null)
+        val m = FollowMatches.fold(
+            listOf(
+                z("Zappelin: Nijntje", now, now + 600),
+                z("Zappelin: Dikkie Dik", now + 600, now + 1200),
+                z("Zappelin: Bing", now + 1200, now + 1800),
+                z("Zappelin: Nijntje", now + 36_000, now + 36_600), // the evening block
+            ),
+        )
+        assertEquals(2, m.size)
+        assertEquals(now to now + 1800, m[0].start to m[0].stop)
+        assertEquals(3, m[0].parts)
+        assertEquals(now + 36_000, m[1].start)
+    }
+
+    @Test
+    fun `Home shows the first item per term only`() {
+        val m = FollowMatches.fold(
+            listOf(
+                row(1, "Formule 1: Kwalificatie", start = now + 100),
+                row(1, "Formule 1: Race", start = now + 90_000),
+                FollowMatchRow("FC Utrecht", now + 5000, now + 11000, "KNVB Beker", 12, "ESPN 1", "sport", 0, false, null),
+            ),
+        )
+        assertEquals(listOf("Formule 1: Kwalificatie", "KNVB Beker"), FollowMatches.nextPerTerm(m).map { it.title })
     }
 
     @Test

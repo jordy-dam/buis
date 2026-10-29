@@ -64,6 +64,15 @@ class FollowRepositoryTest {
     }
 
     @Test
+    fun `a cup match is found by the club in the description`() = runTest {
+        profiles.ensureOne()
+        guide()
+        db.epg().insertProgrammes(listOf(EpgProgrammeEntity("viaplay.nl", now + 7200, now + 14400, "Voetbal: KNVB Beker", "Live: FC Utrecht - Ajax")))
+        follows.add("fc utrecht")
+        assertEquals(listOf("Voetbal: KNVB Beker"), follows.upcoming(now).map { it.title })
+    }
+
+    @Test
     fun `a kids profile is never sent to an adult channel`() = runTest {
         profiles.ensureOne()
         db.catalog().upsertCategories(listOf(CategoryEntity(ContentType.LIVE, "xxx", "ADULT", 0, 1, adult = true)))

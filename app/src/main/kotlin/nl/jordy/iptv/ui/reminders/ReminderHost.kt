@@ -36,7 +36,24 @@ import nl.jordy.iptv.ui.components.ignoreHeldKey
 import nl.jordy.iptv.ui.theme.Live
 import nl.jordy.iptv.ui.theme.SurfaceColor
 import nl.jordy.iptv.ui.theme.TextSecondary
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.aspectRatio
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalView
+import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.window.DialogProperties
+import androidx.compose.ui.window.DialogWindowProvider
+import coil3.compose.AsyncImage
+import nl.jordy.iptv.ui.theme.SafeArea
+import nl.jordy.iptv.ui.theme.SurfaceRaised
+import java.time.Instant
+import java.time.ZoneId
+import java.time.format.DateTimeFormatter
 import javax.inject.Inject
+
+private val clock = DateTimeFormatter.ofPattern("HH:mm").withZone(ZoneId.systemDefault())
 
 /** Looks in the guide every 20 seconds for something the profile follows that's about to start. */
 @HiltViewModel
@@ -81,16 +98,29 @@ fun ReminderHost(active: Boolean, onWatch: (PlayerRoute) -> Unit, vm: ReminderVi
     val started = d.moment == FollowMatches.Moment.STARTED
     val live = PlayerRoute(PlayerRoute.Kind.LIVE, m.streamId, m.channelName, categoryId = m.categoryId)
     val watch = remember { FocusRequester() }
-    Dialog(onDismissRequest = { vm.dismiss(watched = false) }) {
+    // A card in the corner over a lightly dimmed screen, like a tv notification, not a dialog in the middle.
+    Dialog(onDismissRequest = { vm.dismiss(watched = false) }, properties = DialogProperties(usePlatformDefaultWidth = false)) {
+        (LocalView.current.parent as? DialogWindowProvider)?.window?.setDimAmount(0.25f)
+        Box(Modifier.fillMaxSize().padding(SafeArea), contentAlignment = Alignment.BottomEnd) {
         Column(
-            Modifier.ignoreHeldKey().background(SurfaceColor, RoundedCornerShape(16.dp)).padding(28.dp).width(520.dp),
-            verticalArrangement = Arrangement.spacedBy(10.dp),
+            Modifier.ignoreHeldKey().width(560.dp).background(SurfaceRaised, RoundedCornerShape(16.dp)).padding(20.dp),
+            verticalArrangement = Arrangement.spacedBy(14.dp),
         ) {
-            val minutes = ((m.start - System.currentTimeMillis() / 1000 + 59) / 60).coerceAtLeast(1)
-            Text(if (started) "Nu begonnen" else "Over $minutes min", style = MaterialTheme.typography.labelLarge, color = Live)
-            Text(m.title, style = MaterialTheme.typography.headlineMedium)
-            Text(m.channelName, style = MaterialTheme.typography.bodyLarge, color = TextSecondary)
-            Row(horizontalArrangement = Arrangement.spacedBy(16.dp), modifier = Modifier.padding(top = 10.dp)) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                // Logo plate like the channel rows: logos are often transparent PNGs.
+                Box(Modifier.width(112.dp).aspectRatio(16f / 9f).background(SurfaceColor, RoundedCornerShape(8.dp)), contentAlignment = Alignment.Center) {
+                    Text(m.channelName.take(2).uppercase(), style = MaterialTheme.typography.titleMedium, color = TextSecondary)
+                    if (m.logoUrl != null) AsyncImage(model = m.logoUrl, contentDescription = null, contentScale = ContentScale.Fit, modifier = Modifier.fillMaxSize().padding(6.dp))
+                }
+                Column(Modifier.padding(start = 16.dp)) {
+                    val minutes = ((m.start - System.currentTimeMillis() / 1000 + 59) / 60).coerceAtLeast(1)
+                    val at = clock.format(Instant.ofEpochSecond(m.start))
+                    Text(if (started) "Nu begonnen · $at" else "Over $minutes min · $at", style = MaterialTheme.typography.labelLarge, color = Live)
+                    Text(m.title, style = MaterialTheme.typography.titleLarge, maxLines = 2, overflow = TextOverflow.Ellipsis)
+                    Text(m.channelName, style = MaterialTheme.typography.bodyMedium, color = TextSecondary, maxLines = 1)
+                }
+            }
+            Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                 PrimaryButton("Kijken", {
                     vm.dismiss(watched = true)
                     onWatch(live)
@@ -103,6 +133,7 @@ fun ReminderHost(active: Boolean, onWatch: (PlayerRoute) -> Unit, vm: ReminderVi
                 }
                 SecondaryButton("Later", { vm.dismiss(watched = false) })
             }
+        }
         }
     }
     LaunchedEffect(m.key, d.moment) { runCatching { watch.requestFocus() } }

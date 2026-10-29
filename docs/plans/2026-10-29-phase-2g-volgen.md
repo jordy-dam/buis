@@ -192,3 +192,16 @@ only tile, row disappears and focus lands on the rail. Moving focus to a neighbo
 - Not done: following a programme straight from the guide/player (terms are typed in Instellingen), and
   tying a term to one channel. Whether F1 shows up depends on how the Ziggo guide titles it.
 - Installed on the tv (release, 2026-10-29 11:23): install succeeded, app process started, no crash in the log; the screen was in the Google TV screensaver, so not seen.
+
+## Volgen after Jordy's first use (2026-10-29)
+- "Zappelin" filled "Straks voor jou" with every short NPO 3 programme. Back-to-back matches on one channel
+  now fold into one block (first start → last stop), and Home shows the first block per term only; reminders
+  come once per block.
+- "FC Utrecht" found nothing for tonight's cup match: matching now also searches the programme description
+  (cup matches are often titled "KNVB Beker" with the clubs in the description). Whether that's enough for
+  Jordy's guide shows in the Volgen dialog, which now lists per term what it finds next (or "Nog niets in de gids").
+- How far ahead: as far as the guide reaches, 36 hours from its last refresh (refreshed when older than 20 h).
+- The reminder is a card in the bottom-right corner with the channel logo and the start time, over a lightly
+  dimmed screen, instead of a dialog in the middle.
+- Tested: unit 137 green (blocks, one per term, description match). Emulator: the card, one Home tile per
+  term, the Volgen dialog's "11:30 · NPO 1 · Sport 101".

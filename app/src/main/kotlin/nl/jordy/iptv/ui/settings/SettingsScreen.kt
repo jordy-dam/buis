@@ -26,6 +26,11 @@ import nl.jordy.iptv.ui.components.Focus
 import nl.jordy.iptv.ui.components.ListItemSurface
 import nl.jordy.iptv.ui.components.TvTextField
 import nl.jordy.iptv.data.repo.FollowRepository
+import nl.jordy.iptv.data.repo.FollowMatch
+import nl.jordy.iptv.ui.home.whenLabel
+import kotlinx.coroutines.flow.mapLatest
+import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.layout.Arrangement
@@ -112,6 +117,12 @@ class SettingsViewModel @Inject constructor(
     private val follows: FollowRepository,
 ) : ViewModel() {
     val followTerms = follows.terms.stateIn(viewModelScope, SharingStarted.Eagerly, emptyList())
+    /** Per term what the guide has next, so a term that finds nothing shows it right away. */
+    @OptIn(kotlinx.coroutines.ExperimentalCoroutinesApi::class)
+    val followNext = follows.terms.mapLatest { terms ->
+        val found = runCatching { follows.upcoming() }.getOrDefault(emptyList())
+        terms.associateWith { t -> found.firstOrNull { it.term == t } }
+    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyMap())
     fun follow(term: String) = viewModelScope.launch { follows.add(term) }
     fun unfollow(term: String) = viewModelScope.launch { follows.remove(term) }
 
@@ -230,6 +241,7 @@ fun SettingsScreen(onRefreshCatalog: () -> Unit, onLoggedOut: () -> Unit, onEdit
     var pickCountries by remember { mutableStateOf(false) }
     var editFollows by remember { mutableStateOf(false) }
     val followTerms by vm.followTerms.collectAsStateWithLifecycle()
+    val followNext by vm.followNext.collectAsStateWithLifecycle()
 
     // Entering from the rail (whose Instellingen item sits at the bottom) must land on the first
     // setting, not on whatever row is nearest: that would be Uitloggen.
@@ -313,7 +325,7 @@ fun SettingsScreen(onRefreshCatalog: () -> Unit, onLoggedOut: () -> Unit, onEdit
         )
     }
     if (editFollows) {
-        FollowDialog(followTerms, vm::follow, vm::unfollow, onDismiss = { editFollows = false })
+        FollowDialog(followTerms, followNext, vm::follow, vm::unfollow, onDismiss = { editFollows = false })
     }
     if (pickCountries) {
         CountryDialog(countries, prefs.preferredCountries, vm::toggleCountry, onDismiss = { pickCountries = false })
@@ -420,9 +432,15 @@ private fun LogoutDialog(onConfirm: () -> Unit, onDismiss: () -> Unit) {
     LaunchedEffect(Unit) { cancel.requestFocus() }
 }
 
-/** The profile's search terms: OK on one removes it, the field below adds one. */
+/** The profile's search terms with what each finds next: OK on one removes it, the field below adds one. */
 @Composable
-private fun FollowDialog(terms: List<String>, onAdd: (String) -> Unit, onRemove: (String) -> Unit, onDismiss: () -> Unit) {
+private fun FollowDialog(
+    terms: List<String>,
+    next: Map<String, FollowMatch?>,
+    onAdd: (String) -> Unit,
+    onRemove: (String) -> Unit,
+    onDismiss: () -> Unit,
+) {
     var draft by remember { mutableStateOf("") }
     Dialog(onDismissRequest = onDismiss) {
         Column(
@@ -431,13 +449,31 @@ private fun FollowDialog(terms: List<String>, onAdd: (String) -> Unit, onRemove:
         ) {
             Text("Volgen", style = MaterialTheme.typography.headlineMedium)
             Text(
-                "Bijvoorbeeld \"Formule 1\" of \"FC Utrecht\". BUIS zoekt in de gids en meldt het als het bijna begint.",
+                "Bijvoorbeeld \"Formule 1\" of \"FC Utrecht\". BUIS zoekt in titels en omschrijvingen van de gids (zo'n anderhalve dag vooruit) en meldt het als het bijna begint. OK op een zoekterm haalt hem weg.",
                 style = MaterialTheme.typography.bodyMedium,
                 color = TextSecondary,
             )
             LazyColumn(Modifier.weight(1f, fill = false), verticalArrangement = Arrangement.spacedBy(4.dp)) {
                 items(terms, key = { it }) { term ->
-                    ListItemSurface(text = "$term   ·   OK om te verwijderen", selected = false, onClick = { onRemove(term) })
+                    Surface(
+                        onClick = { onRemove(term) },
+                        modifier = Modifier.fillMaxWidth(),
+                        shape = ClickableSurfaceDefaults.shape(RoundedCornerShape(8.dp)),
+                        scale = ClickableSurfaceDefaults.scale(focusedScale = 1.02f),
+                        colors = Focus.bar(container = androidx.compose.ui.graphics.Color.Transparent),
+                    ) {
+                        Column(Modifier.padding(horizontal = 14.dp, vertical = 8.dp)) {
+                            Text(term, style = MaterialTheme.typography.titleMedium)
+                            val m = next[term]
+                            Text(
+                                m?.let { "${whenLabel(it.start)} · ${it.channelName} · ${it.title}" } ?: "Nog niets in de gids",
+                                style = MaterialTheme.typography.bodyMedium,
+                                color = TextSecondary,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis,
+                            )
+                        }
+                    }
                 }
             }
             TvTextField(

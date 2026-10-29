@@ -69,6 +69,7 @@ import androidx.tv.material3.Surface
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.flow
 import nl.jordy.iptv.data.repo.FollowMatch
+import nl.jordy.iptv.data.repo.FollowMatches
 import nl.jordy.iptv.data.repo.FollowRepository
 import nl.jordy.iptv.ui.components.Focus
 import nl.jordy.iptv.ui.theme.Live
@@ -115,7 +116,7 @@ class HomeViewModel @Inject constructor(
     val upcoming = follows.terms.flatMapLatest {
         flow {
             while (true) {
-                emit(follows.upcoming().take(ROW_SIZE))
+                emit(FollowMatches.nextPerTerm(follows.upcoming()).take(ROW_SIZE))
                 delay(60_000)
             }
         }
@@ -321,7 +322,7 @@ private fun UpcomingCard(m: FollowMatch, onClick: () -> Unit, modifier: Modifier
 }
 
 /** "15:00" today, "Morgen 15:00", else "Za 15:00". */
-private fun whenLabel(startSec: Long): String {
+internal fun whenLabel(startSec: Long): String {
     val zone = ZoneId.systemDefault()
     val at = Instant.ofEpochSecond(startSec).atZone(zone)
     val today = LocalDate.now(zone)

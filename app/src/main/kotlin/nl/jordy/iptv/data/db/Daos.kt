@@ -272,6 +272,7 @@ data class FollowMatchRow(
     val categoryId: String,
     val archiveDays: Int,
     val catchup: Boolean,
+    val logoUrl: String?,
 )
 
 /** Per profile, like favourites. */
@@ -282,14 +283,15 @@ interface FollowDao {
     @Query("SELECT * FROM follow WHERE profileId = :profileId ORDER BY addedAt") fun observe(profileId: Long): Flow<List<FollowEntity>>
 
     /**
-     * Programmes between [from] and [until] whose title contains one of the profile's terms (SQLite's
-     * LIKE ignores case), on every live channel that uses that guide channel. Duplicates (the same
+     * Programmes between [from] and [until] whose title or description contains one of the profile's
+     * terms (SQLite's LIKE ignores case; a cup match is often "KNVB Beker" with the clubs only in the
+     * description), on every live channel that uses that guide channel. Duplicates (the same
      * programme on an HD and an FHD channel) are folded by [nl.jordy.iptv.data.repo.FollowMatches].
      */
     @Query(
         "SELECT f.term AS term, p.start AS start, p.stop AS stop, p.title AS title, l.streamId AS streamId, " +
-            "l.name AS channelName, l.categoryId AS categoryId, l.archiveDays AS archiveDays, l.catchup AS catchup " +
-            "FROM follow f JOIN epg_programme p ON p.title LIKE '%' || f.term || '%' " +
+            "l.name AS channelName, l.categoryId AS categoryId, l.archiveDays AS archiveDays, l.catchup AS catchup, l.logoUrl AS logoUrl " +
+            "FROM follow f JOIN epg_programme p ON (p.title LIKE '%' || f.term || '%' OR IFNULL(p.description, '') LIKE '%' || f.term || '%') " +
             "JOIN epg_channel c ON c.channelId = p.channelId JOIN live_channel l ON l.streamId = c.streamId " +
             "LEFT JOIN category k ON k.type = 'LIVE' AND k.id = l.categoryId " +
             "WHERE f.profileId = :profileId AND p.stop > :from AND p.start < :until AND (:hideAdult = 0 OR IFNULL(k.adult, 0) = 0) " +
