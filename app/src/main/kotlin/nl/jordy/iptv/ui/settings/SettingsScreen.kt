@@ -206,6 +206,17 @@ class SettingsViewModel @Inject constructor(
      * only make sense for its ids, and viewing history shouldn't outlive the login it belongs to.
      * The next sync creates a fresh first profile.
      */
+    /** Grown-up PINs that guard "Alles wissen" once a kids profile exists (same rule as managing profiles). */
+    suspend fun wipeLock(): List<String> = ProfileRepository.managementLock(profiles.all())
+
+    fun wipeAll(then: () -> Unit) = viewModelScope.launch {
+        subscription.wipeAll()
+        library.clearCache()
+        epg.clearCache()
+        credentials.clear()
+        then()
+    }
+
     /** Forgets the subscription and the provider's catalog; profiles, history and film details stay (see [SubscriptionData]). */
     fun logout(then: () -> Unit) = viewModelScope.launch {
         subscription.onLogout(credentials.current())
@@ -239,6 +250,8 @@ fun SettingsScreen(onRefreshCatalog: () -> Unit, onLoggedOut: () -> Unit, onEdit
     val guideStatus by vm.guideStatus.collectAsStateWithLifecycle()
     val filmInfo by vm.filmInfo.collectAsStateWithLifecycle()
     var confirmLogout by remember { mutableStateOf(false) }
+    var confirmWipe by remember { mutableStateOf(false) }
+    var wipePin by remember { mutableStateOf<List<String>?>(null) }
     var pickCountries by remember { mutableStateOf(false) }
     var editFollows by remember { mutableStateOf(false) }
     val followTerms by vm.followTerms.collectAsStateWithLifecycle()
@@ -304,6 +317,17 @@ fun SettingsScreen(onRefreshCatalog: () -> Unit, onLoggedOut: () -> Unit, onEdit
             onClick = { confirmLogout = true },
             destructive = true,
         )
+        SettingRow(
+            "Alles wissen",
+            "Haalt alles van BUIS van deze tv, ook de profielen. Voor als de tv weggaat.",
+            onClick = {
+                scope.launch {
+                    val lock = vm.wipeLock()
+                    if (lock.isEmpty()) confirmWipe = true else wipePin = lock
+                }
+            },
+            destructive = true,
+        )
 
         if (BuildConfig.DEBUG) {
             Header("Ontwikkeling")
@@ -332,7 +356,41 @@ fun SettingsScreen(onRefreshCatalog: () -> Unit, onLoggedOut: () -> Unit, onEdit
         CountryDialog(countries, prefs.preferredCountries, vm::toggleCountry, onDismiss = { pickCountries = false })
     }
     if (confirmLogout) {
-        LogoutDialog(onConfirm = { vm.logout(onLoggedOut) }, onDismiss = { confirmLogout = false })
+        ConsequenceDialog(
+            title = "Uitloggen?",
+            keeps = listOf("Profielen en pincodes", "Favorieten en Verder kijken", "Zoektermen en herinneringen", "Filmgegevens en genres"),
+            loses = listOf("Inloggegevens van dit abonnement", "Catalogus en gids (komen terug bij het inloggen)"),
+            note = "Log je daarna in bij een andere provider, dan beginnen favorieten en Verder kijken opnieuw.",
+            confirm = "Uitloggen",
+            onConfirm = { vm.logout(onLoggedOut) },
+            onDismiss = { confirmLogout = false },
+        )
+    }
+    wipePin?.let { hashes ->
+        PinDialog(
+            title = "Pincode van een volwassene",
+            onPin = { pin ->
+                if (hashes.any { Pin.verify(pin, it) }) { wipePin = null; confirmWipe = true; null } else "Onjuiste pincode"
+            },
+            onDismiss = { wipePin = null },
+        )
+    }
+    if (confirmWipe) {
+        ConsequenceDialog(
+            title = "Alles wissen?",
+            keeps = emptyList(),
+            loses = listOf(
+                "Alle profielen en pincodes",
+                "Favorieten en Verder kijken",
+                "Zoektermen en herinneringen",
+                "Filmgegevens en genres (uren om opnieuw op te halen)",
+                "Inloggegevens, catalogus en gids",
+            ),
+            note = "Dit kan niet ongedaan worden gemaakt.",
+            confirm = "Alles wissen",
+            onConfirm = { vm.wipeAll(onLoggedOut) },
+            onDismiss = { confirmWipe = false },
+        )
     }
 }
 
@@ -409,29 +467,45 @@ private val SwitchOff = androidx.compose.ui.graphics.Color(0xFF4A4D55)
 @Composable
 private fun danger() = androidx.compose.ui.graphics.Color(if (onLight()) 0xFFB42318 else 0xFFFF8A80)
 
+/**
+ * What a step costs, before taking it: ✓ what stays, ✕ what goes. Focus starts on Annuleren, since
+ * both uses throw something away.
+ */
 @Composable
-private fun LogoutDialog(onConfirm: () -> Unit, onDismiss: () -> Unit) {
+private fun ConsequenceDialog(
+    title: String,
+    keeps: List<String>,
+    loses: List<String>,
+    note: String?,
+    confirm: String,
+    onConfirm: () -> Unit,
+    onDismiss: () -> Unit,
+) {
     val cancel = remember { FocusRequester() }
     Dialog(onDismissRequest = onDismiss) {
         Column(
             Modifier.background(SurfaceColor, RoundedCornerShape(16.dp)).padding(32.dp).width(520.dp),
-            verticalArrangement = Arrangement.spacedBy(20.dp),
+            verticalArrangement = Arrangement.spacedBy(8.dp),
         ) {
-            Text("Uitloggen?", style = MaterialTheme.typography.headlineMedium)
-            Text(
-                "Je profielen, favorieten, kijkgeschiedenis, zoektermen en filmgegevens blijven bewaard; alleen de inloggegevens en de catalogus gaan weg. " +
-                    "Log je daarna in bij een andere provider, dan beginnen favorieten en kijkgeschiedenis opnieuw: die horen bij de zenders en films van deze provider.",
-                style = MaterialTheme.typography.bodyLarge,
-                color = TextSecondary,
-            )
-            Row(horizontalArrangement = Arrangement.spacedBy(16.dp)) {
-                // Default focus on cancelling: this wipes data.
+            Text(title, style = MaterialTheme.typography.headlineMedium, modifier = Modifier.padding(bottom = 8.dp))
+            keeps.forEach { ConsequenceLine("✓", BrandText, it) }
+            loses.forEach { ConsequenceLine("✕", danger(), it) }
+            note?.let { Text(it, style = MaterialTheme.typography.bodyMedium, color = TextSecondary, modifier = Modifier.padding(top = 8.dp)) }
+            Row(horizontalArrangement = Arrangement.spacedBy(16.dp), modifier = Modifier.padding(top = 12.dp)) {
                 SecondaryButton("Annuleren", onDismiss, Modifier.focusRequester(cancel))
-                PrimaryButton("Uitloggen", onConfirm)
+                PrimaryButton(confirm, onConfirm)
             }
         }
     }
     LaunchedEffect(Unit) { cancel.requestFocus() }
+}
+
+@Composable
+private fun ConsequenceLine(mark: String, color: androidx.compose.ui.graphics.Color, text: String) {
+    Row(verticalAlignment = Alignment.CenterVertically) {
+        Text(mark, style = MaterialTheme.typography.titleMedium, color = color, modifier = Modifier.width(28.dp))
+        Text(text, style = MaterialTheme.typography.bodyLarge)
+    }
 }
 
 @Composable

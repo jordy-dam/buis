@@ -243,3 +243,8 @@ remembered at logout/login) also clears favourites, positions, one-off reminders
 Tested: unit 145 (logout keeps profile/favourites/position/genres; same panel new account keeps all; other
 provider clears id data, keeps profiles and terms). Emulator: Uitloggen dialog with the new text, log out,
 log in again with the mock account → Bas, Verder kijken, Straks voor jou and favourites all still there.
+- Follow-up: the logout confirmation is a ✓ (stays) / ✕ (goes) list instead of a paragraph. New row
+  "Alles wissen" under Uitloggen: the same kind of list, all ✕, focus on Annuleren, guarded by a grown-up
+  PIN once a kids profile exists (the profile-management rule); wipes everything incl. the remembered server.
+  Tested: unit 146; emulator: the logout list, the PIN gate in front of Alles wissen (the wipe list itself
+  not opened there: it needs the test profile's PIN; same composable as the logout list).

@@ -125,3 +125,4 @@
 **Why:** Jordy: an accidental logout or a new subscription would throw away profiles, history and hours of fetched film genres for nothing.
 **Alternatives rejected:** A backup/export (a second mechanism to trust and restore; keeping the data is simpler); keeping provider-id data across providers (favourites would open the wrong channel); a separate "Alles wissen" option (not needed now; Android's "clear data" remains for giving the tv away).
 **Revisit if:** the tv changes hands (then a deliberate wipe option), or a provider renumbers its streams on the same server.
+Follow-up (same day): the confirmation lists ✓ what stays and ✕ what goes. A separate "Alles wissen" (everything, as a fresh install; grown-up PIN when a kids profile exists) sits under Uitloggen for when the tv changes hands — this replaces "a separate Alles wissen option rejected" above, at Jordy's request.

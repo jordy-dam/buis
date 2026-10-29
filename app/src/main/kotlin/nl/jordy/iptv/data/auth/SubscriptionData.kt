@@ -40,6 +40,12 @@ class SubscriptionData @Inject constructor(@ApplicationContext context: Context,
         prefs.edit().putString(SERVER, server).apply()
     }
 
+    /** Alles wissen: the whole household and the subscription, as on a fresh install. */
+    suspend fun wipeAll() {
+        withContext(Dispatchers.IO) { db.clearAllTables() }
+        prefs.edit().clear().apply()
+    }
+
     private suspend fun clear(tables: List<String>) = withContext(Dispatchers.IO) {
         db.withTransaction { tables.forEach { db.openHelper.writableDatabase.execSQL("DELETE FROM `$it`") } }
     }

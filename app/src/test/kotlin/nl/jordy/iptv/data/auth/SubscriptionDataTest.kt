@@ -92,4 +92,18 @@ class SubscriptionDataTest {
         assertEquals("profiles and follow terms stay", 1, profiles.all().size)
         assertEquals(listOf("Formule 1"), db.follows().observe(id).first().map { it.term })
     }
+
+    @Test
+    fun `Alles wissen leaves nothing, and a later login starts clean without clearing again`() = runTest {
+        household()
+        subscription.onLogout(panel)
+        subscription.wipeAll()
+        assertTrue(profiles.all().isEmpty())
+        assertEquals(null, db.movieInfo().get(5001))
+        // The remembered server is gone too: logging in elsewhere is a first login, not a provider switch.
+        profiles.ensureOne()
+        db.movieInfo().upsert(MovieInfoEntity(7, "Actie", null, null, null, null, 1))
+        subscription.onLogin(XtreamCredentials("http://other-provider.example", "a", "b"))
+        assertEquals("Actie", db.movieInfo().get(7)?.genre)
+    }
 }
