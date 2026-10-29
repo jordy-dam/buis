@@ -138,3 +138,4 @@ channels are in the Ziggo cable list, which has a guide.
   blue values, switch, headers), pinning Drama and Thriller incl. after a restart.
 - Not done: a "Jouw diensten" row on Home and suggesting a service (that needs viewing history → phase 3);
   six or more profiles not walked on screen (layout rule unit-free, by reading).
+- On the tv (release, 2026-10-29): starts without errors, schema 7 → 9 migrated; profile, "Verder kijken" and favourite channels intact; the grey focus shows on Home.
