@@ -248,3 +248,4 @@ log in again with the mock account → Bas, Verder kijken, Straks voor jou and f
   PIN once a kids profile exists (the profile-management rule); wipes everything incl. the remembered server.
   Tested: unit 146; emulator: the logout list, the PIN gate in front of Alles wissen (the wipe list itself
   not opened there: it needs the test profile's PIN; same composable as the logout list).
+- On the tv (release, 2026-10-29 12:21): installed, app process started without errors; screen not seen (Google TV screensaver).
