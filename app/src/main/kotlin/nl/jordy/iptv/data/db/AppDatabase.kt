@@ -26,7 +26,7 @@ import androidx.sqlite.db.SupportSQLiteDatabase
         FollowEntity::class,
         ReminderEntity::class,
     ],
-    version = 13,
+    version = 14,
     exportSchema = true,
     autoMigrations = [
         AutoMigration(from = 1, to = 2, spec = AppDatabase.CatalogResync::class),
@@ -50,6 +50,8 @@ import androidx.sqlite.db.SupportSQLiteDatabase
         AutoMigration(from = 11, to = 12),
         // Pauzemoment per profile, off for everyone at first.
         AutoMigration(from = 12, to = 13),
+        // How long the Pauzemoment lasts; one minute for everyone at first.
+        AutoMigration(from = 13, to = 14),
     ],
 )
 abstract class AppDatabase : RoomDatabase() {

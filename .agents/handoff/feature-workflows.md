@@ -12,7 +12,7 @@ Everything through phase 2g is on the tv and Jordy is happy with it. The code is
 `git@github-personal:jordy-dam/buis.git` (private, personal account), `main` = current state (776e166).
 Plan and per-part notes: `docs/plans/2026-10-29-phase-2g-volgen.md`. Decisions: `.agents/decisions/product.md`.
 New since: `docs/brainstorm.md` (open idea list) and **Pauzemoment** on branch `feat/pauzemoment`
-(plan `docs/plans/2026-10-29-pauzemoment.md`): built, emulator-tested and **on the tv since 13:24 (release, 6acd0b4); not merged, not pushed**.
+(plan `docs/plans/2026-10-29-pauzemoment.md`): built, emulator-tested and on the tv since 13:24 (release, 6acd0b4). Since then: **Pauzeduur** setting (schema 14), emulator-tested, **not on the tv yet**; branch not merged, not pushed.
 
 ## State
 **Where we are:**
@@ -45,6 +45,9 @@ New since: `docs/brainstorm.md` (open idea list) and **Pauzemoment** on branch `
 ## Open questions
 - Does Jordy's panel allow seeking inside a timeshift stream?
 - Old guide-OK title follows (e.g. "De Bondgenoten") are Volgen terms Jordy may want to remove.
+- BUIS icon not showing on the Google TV home (2026-10-29): the release APK has icon + banner and the tv
+  lists BUIS as a leanback app, so likely a stale launcher image (BUIS was first installed before the logo).
+  Need Jordy's description (blank tile, old icon, or missing) before changing anything.
 
 ## Don't forget
 - Every `adb install` stops the running app on the tv: only install when Jordy says so; always `install -r`

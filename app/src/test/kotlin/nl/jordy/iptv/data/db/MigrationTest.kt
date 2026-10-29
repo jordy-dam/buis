@@ -214,6 +214,20 @@ class MigrationTest {
         }
     }
 
+    @Test
+    fun `13 to 14 adds a Pauzeduur of one minute and keeps the Pauzemoment`() {
+        helper.createDatabase(DB, 13).use { db ->
+            db.execSQL("INSERT INTO profile (id, name, avatar, face, pinHash, preferredCountries, onlyPreferred, kids, lastUsedAt, createdAt, sleepMinutes, breakMinutes, pinnedCategories) VALUES (1, 'Anna', 3, 2, NULL, 'NL', 1, 0, 5, 1, 0, 60, '')")
+        }
+        helper.runMigrationsAndValidate(DB, 14, true).use { db ->
+            db.query("SELECT breakLength, breakMinutes FROM profile").use {
+                it.moveToFirst()
+                assertEquals(1, it.getInt(0))
+                assertEquals(60, it.getInt(1))
+            }
+        }
+    }
+
     private fun SupportSQLiteDatabase.insertPhase1Data() {
         execSQL("INSERT INTO favorite (type, itemId, name, imageUrl, addedAt) VALUES ('LIVE', 101, '┃NL┃ NPO 1 HD', NULL, 1)")
         execSQL("INSERT INTO playback_position (type, itemId, positionMs, durationMs, updatedAt) VALUES ('MOVIE', 5001, 62000, 180000, 2)")

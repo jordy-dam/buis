@@ -187,6 +187,9 @@ class SettingsViewModel @Inject constructor(
         val choices = if (BuildConfig.DEBUG) BreakTimer.DEBUG_CHOICES else BreakTimer.CHOICES
         profiles.setBreakMinutes(BreakTimer.nextChoice(prefs.value.breakMinutes, choices))
     }
+    fun cycleBreakLength() = viewModelScope.launch {
+        profiles.setBreakLength(BreakTimer.nextChoice(prefs.value.breakLength, BreakTimer.LENGTHS))
+    }
 
     init {
         viewModelScope.launch {
@@ -299,10 +302,18 @@ fun SettingsScreen(onRefreshCatalog: () -> Unit, onLoggedOut: () -> Unit, onEdit
         )
         SettingRow(
             "Pauzemoment",
-            "Na zo lang kijken pauzeert BUIS een minuut, zodat iedereen even kan plassen, drinken of iets pakken. Alleen bij films en series.",
+            "Na zo lang kijken pauzeert BUIS even, zodat iedereen kan plassen, drinken of iets pakken. Alleen bij films en series.",
             value = if (prefs.breakMinutes == 0) "Uit" else "${prefs.breakMinutes} min",
             onClick = vm::cycleBreak,
         )
+        if (prefs.breakMinutes > 0) {
+            SettingRow(
+                "Pauzeduur",
+                "Zo lang wacht BUIS voordat het vanzelf verder speelt. OK op de pauzekaart gaat altijd meteen verder.",
+                value = "${prefs.breakLength} min",
+                onClick = vm::cycleBreakLength,
+            )
+        }
         SettingRow(
             "Volgen",
             "Vijf minuten voordat een programma met deze woorden begint, laat BUIS het weten.",

@@ -170,7 +170,7 @@ class PlayerViewModel @Inject constructor(
         credentials = c
         val prefs = profiles.currentPrefs()
         sleepTimer = SleepTimer(prefs.sleepMinutes, SystemClock.elapsedRealtime())
-        if (!isLive) breakTimer = BreakTimer(prefs.breakMinutes)
+        if (!isLive) breakTimer = BreakTimer(prefs.breakMinutes, prefs.breakLength)
         when (route.kind) {
             PlayerRoute.Kind.LIVE -> {
                 liveSources = LiveSources(base, c)
@@ -423,7 +423,7 @@ class PlayerViewModel @Inject constructor(
     /** True while the break card shows, so the next-episode card waits. */
     private fun breakTick(now: Long): Boolean {
         breakStartedAt?.let { startedAt ->
-            val left = BreakTimer.BREAK_SECS - ((now - startedAt) / 1000).toInt()
+            val left = (breakTimer?.lengthSecs ?: 60) - ((now - startedAt) / 1000).toInt()
             if (left > 0) _state.update { it.copy(breakSecondsLeft = left) } else endBreak()
             return true
         }
@@ -445,7 +445,7 @@ class PlayerViewModel @Inject constructor(
         breakStartedAt = now
         breakThenNext = thenNext
         player.pause()
-        _state.update { it.copy(nextUp = null, breakSecondsLeft = BreakTimer.BREAK_SECS) }
+        _state.update { it.copy(nextUp = null, breakSecondsLeft = breakTimer?.lengthSecs ?: 60) }
     }
 
     /** OK or Back on the break card, or the minute is over. */

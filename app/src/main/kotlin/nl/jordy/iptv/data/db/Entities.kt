@@ -118,6 +118,8 @@ data class ProfileEntity(
     @ColumnInfo(defaultValue = "0") val sleepMinutes: Int = 0,
     /** Pauzemoment: a one-minute break after this many minutes of films/episodes, 0 = off. */
     @ColumnInfo(defaultValue = "0") val breakMinutes: Int = 0,
+    /** How long that break lasts, in minutes. */
+    @ColumnInfo(defaultValue = "1") val breakLength: Int = 1,
     /** Categories pinned to the top of Films/Series, as [nl.jordy.iptv.data.settings.CategoryGroups.pinKey]s, comma-separated. */
     @ColumnInfo(defaultValue = "") val pinnedCategories: String = "",
     /** The profile with the highest value is the active one; picking a profile bumps it. */

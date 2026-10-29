@@ -103,4 +103,14 @@ class BreakTimerTest {
         assertEquals(45, BreakTimer.nextChoice(1)) // the debug choice in a release build: restart the cycle
         assertEquals(1, BreakTimer.nextChoice(0, BreakTimer.DEBUG_CHOICES))
     }
+
+    @Test
+    fun `Pauzeduur is one minute by default and stays between 1 and 15`() {
+        assertEquals(60, BreakTimer(60).lengthSecs)
+        assertEquals(5 * 60, BreakTimer(60, 5).lengthSecs)
+        assertEquals("a broken value never means no break or an endless one", 60, BreakTimer(60, 0).lengthSecs)
+        assertEquals(15 * 60, BreakTimer(60, 99).lengthSecs)
+        assertEquals(2, BreakTimer.nextChoice(1, BreakTimer.LENGTHS))
+        assertEquals(1, BreakTimer.nextChoice(15, BreakTimer.LENGTHS))
+    }
 }

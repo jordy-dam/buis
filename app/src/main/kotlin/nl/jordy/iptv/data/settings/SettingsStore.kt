@@ -21,6 +21,8 @@ data class UserPrefs(
     val sleepMinutes: Int = 0,
     /** Pauzemoment in minutes of watching, 0 = off. */
     val breakMinutes: Int = 0,
+    /** How long the break lasts, in minutes. */
+    val breakLength: Int = 1,
 )
 
 private val Context.settings by preferencesDataStore("settings")

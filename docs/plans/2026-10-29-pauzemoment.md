@@ -86,3 +86,11 @@ you set it, only for films and series, and with next-episode autoplay it counts 
   30 min without keys), a reminder appearing on top of a player card.
 - Seen in passing, not from this change: after autoplay from a "Verder kijken" episode, the player title
   reads "Serie 33 · S1 A3 – Serie 20032 - S01E04" (the series name is cut on " – ", but the Home route uses " · ").
+
+## Pauzeduur (2026-10-29, after Jordy's first look)
+- Jordy: make the length adjustable, 1–15 minutes, default 1. Instellingen → "Pauzeduur", right under
+  Pauzemoment and only while it's on: `1 · 2 · 3 · 5 · 10 · 15 min` (OK cycles, like the other rows;
+  15 single steps would mean up to 14 presses). Schema 14 (`profile.breakLength`, default 1).
+- Tests: length default/clamping and the cycle in `BreakTimerTest`, migration 13 → 14; 157 green.
+- Emulator: the row shows "1 min" after the migration, OK made it "2 min", and the break card counted
+  down from 2:00 between episodes.

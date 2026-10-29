@@ -27,6 +27,7 @@ val ProfileEntity.prefs
         hideAdult = kids,
         sleepMinutes = sleepMinutes,
         breakMinutes = breakMinutes,
+        breakLength = breakLength,
     )
 
 /**
@@ -118,6 +119,7 @@ class ProfileRepository @Inject constructor(
     suspend fun setOnlyPreferred(only: Boolean) = updateCurrent { it.copy(onlyPreferred = only) }
     suspend fun setSleepMinutes(minutes: Int) = updateCurrent { it.copy(sleepMinutes = minutes) }
     suspend fun setBreakMinutes(minutes: Int) = updateCurrent { it.copy(breakMinutes = minutes) }
+    suspend fun setBreakLength(minutes: Int) = updateCurrent { it.copy(breakLength = minutes) }
 
     /** What the active profile pinned in Films and Series. */
     val pinned: Flow<Set<String>> = current.filterNotNull().map { it.pinnedSet() }.distinctUntilChanged()
