@@ -75,8 +75,15 @@ import nl.jordy.iptv.ui.components.filterToggle
 import nl.jordy.iptv.data.settings.FilteredCategories
 import nl.jordy.iptv.ui.theme.TextSecondary
 import java.time.Instant
+import java.time.LocalDate
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
+import java.util.Locale
+import androidx.tv.material3.LocalContentColor
+import nl.jordy.iptv.ui.components.progress
+import nl.jordy.iptv.ui.theme.BrandText
+import nl.jordy.iptv.ui.theme.FocusFill
+import nl.jordy.iptv.ui.theme.SurfaceRaised
 import javax.inject.Inject
 import nl.jordy.iptv.data.db.ReminderEntity
 import nl.jordy.iptv.data.epg.EpgGuide
@@ -380,46 +387,21 @@ private fun GuidePanel(
                 when {
                     list == null -> Unit
                     list.isEmpty() -> Text("Geen gids voor deze zender.", style = MaterialTheme.typography.bodyLarge, color = TextSecondary)
-                    else -> LazyColumn(verticalArrangement = Arrangement.spacedBy(4.dp), contentPadding = PaddingValues(vertical = 8.dp)) {
-                        itemsIndexed(list, key = { _, p -> p.start }) { i, p ->
-                            val nowSec = System.currentTimeMillis() / 1000
-                            val running = p.start <= nowSec
-                            val reminded = "${channel.streamId}:${p.start}" in reminders
-                            val follows = followed.any { p.title.contains(it, ignoreCase = true) }
-                            var focused by remember { mutableStateOf(false) }
-                            Surface(
-                                onClick = { if (running) onWatch() else onToggleReminder(p) },
-                                onLongClick = { onToggleFollow(p.title) },
-                                modifier = Modifier.fillMaxWidth().onFocusChanged { focused = it.isFocused }
-                                    .then(if (i == 0) Modifier.focusRequester(first) else Modifier),
-                                shape = ClickableSurfaceDefaults.shape(RoundedCornerShape(8.dp)),
-                                scale = ClickableSurfaceDefaults.scale(focusedScale = 1.02f),
-                                colors = Focus.bar(container = Color.Transparent),
-                            ) {
-                                Column(Modifier.padding(horizontal = 12.dp, vertical = 8.dp)) {
-                                    val live = Live
-                                    Text(
-                                        buildAnnotatedString {
-                                            if (running) withStyle(SpanStyle(color = live, fontWeight = FontWeight.Medium)) { append("NU  ") }
-                                            else append(whenLabel(p.start) + "  ")
-                                            append(p.title)
-                                        },
-                                        style = MaterialTheme.typography.titleMedium,
-                                        maxLines = 1,
-                                        overflow = TextOverflow.Ellipsis,
-                                    )
-                                    // A bell for a reminder on this programme, an eye when its title is followed.
-                                    when {
-                                        reminded -> androidx.tv.material3.Icon(Icons.Filled.NotificationsActive, contentDescription = "Herinnering", tint = live, modifier = Modifier.size(18.dp))
-                                        follows -> androidx.tv.material3.Icon(Icons.Filled.Visibility, contentDescription = "Je volgt dit", tint = live, modifier = Modifier.size(18.dp))
-                                    }
-                                    if (focused && !p.description.isNullOrBlank()) {
-                                        Text(p.description!!, style = MaterialTheme.typography.bodyMedium, color = TextSecondary, maxLines = 3, overflow = TextOverflow.Ellipsis)
-                                    }
-                                    if (focused) {
-                                        Text("${fmt.format(Instant.ofEpochSecond(p.start))}–${fmt.format(Instant.ofEpochSecond(p.stop))}", style = MaterialTheme.typography.bodyMedium, color = TextSecondary)
-                                    }
-                                }
+                    else -> LazyColumn(verticalArrangement = Arrangement.spacedBy(2.dp), contentPadding = PaddingValues(vertical = 8.dp)) {
+                        val zone = ZoneId.systemDefault()
+                        // A header where the day changes, so the time column only ever holds a time.
+                        list.withIndex().groupBy { Instant.ofEpochSecond(it.value.start).atZone(zone).toLocalDate() }.forEach { (day, rows) ->
+                            if (rows.first().index > 0) item(key = "day/$day") { GuideDay(day) }
+                            items(rows, key = { it.value.start }) { (i, p) ->
+                                GuideRow(
+                                    p = p,
+                                    time = fmt,
+                                    reminded = "${channel.streamId}:${p.start}" in reminders,
+                                    follows = followed.any { p.title.contains(it, ignoreCase = true) },
+                                    onClick = { if (p.start <= System.currentTimeMillis() / 1000) onWatch() else onToggleReminder(p) },
+                                    onLongClick = { onToggleFollow(p.title) },
+                                    modifier = if (i == 0) Modifier.focusRequester(first) else Modifier,
+                                )
                             }
                         }
                     }
@@ -428,5 +410,76 @@ private fun GuidePanel(
         }
     }
     LaunchedEffect(programmes) { if (!programmes.isNullOrEmpty()) runCatching { first.requestFocus() } }
+}
+
+private val guideDate = DateTimeFormatter.ofPattern("EEEE d MMMM", Locale.forLanguageTag("nl"))
+
+/** Where the guide crosses midnight: "Morgen · vrijdag 30 oktober" over a line, so the next day reads as a new block. */
+@Composable
+private fun GuideDay(day: LocalDate) {
+    val label = guideDate.format(day).let { if (day == LocalDate.now().plusDays(1)) "Morgen · $it" else it.replaceFirstChar(Char::uppercase) }
+    Column(Modifier.fillMaxWidth().padding(top = 20.dp, bottom = 6.dp)) {
+        Box(Modifier.fillMaxWidth().height(1.dp).background(FocusFill))
+        Text(label, style = MaterialTheme.typography.titleSmall, color = BrandText, modifier = Modifier.padding(start = 12.dp, top = 10.dp))
+    }
+}
+
+/**
+ * One programme: the start time in its own column ("NU" while it runs, with how far it is), the
+ * title, and a bell or eye at the end. The focused row adds its times, length and description.
+ */
+@Composable
+private fun GuideRow(
+    p: EpgEntry,
+    time: DateTimeFormatter,
+    reminded: Boolean,
+    follows: Boolean,
+    onClick: () -> Unit,
+    onLongClick: () -> Unit,
+    modifier: Modifier,
+) {
+    val nowSec = System.currentTimeMillis() / 1000
+    val running = p.start <= nowSec
+    var focused by remember { mutableStateOf(false) }
+    Surface(
+        onClick = onClick,
+        onLongClick = onLongClick,
+        modifier = modifier.fillMaxWidth().onFocusChanged { focused = it.isFocused },
+        shape = ClickableSurfaceDefaults.shape(RoundedCornerShape(8.dp)),
+        scale = ClickableSurfaceDefaults.scale(focusedScale = 1.02f),
+        colors = Focus.bar(container = if (running) SurfaceRaised else Color.Transparent),
+    ) {
+        Column(Modifier.padding(horizontal = 12.dp, vertical = 10.dp)) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text(
+                    if (running) "NU" else time.format(Instant.ofEpochSecond(p.start)),
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = if (running) FontWeight.Bold else null,
+                    color = if (running) Live else LocalContentColor.current.copy(alpha = 0.7f),
+                    modifier = Modifier.width(64.dp),
+                )
+                Text(p.title, style = MaterialTheme.typography.titleMedium, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f))
+                // A bell for a reminder on this programme, an eye when its title is followed.
+                when {
+                    reminded -> androidx.tv.material3.Icon(Icons.Filled.NotificationsActive, contentDescription = "Herinnering", tint = Live, modifier = Modifier.padding(start = 8.dp).size(18.dp))
+                    follows -> androidx.tv.material3.Icon(Icons.Filled.Visibility, contentDescription = "Je volgt dit", tint = Live, modifier = Modifier.padding(start = 8.dp).size(18.dp))
+                }
+            }
+            if (running) {
+                Box(Modifier.padding(start = 64.dp, top = 6.dp).fillMaxWidth().height(3.dp).background(FocusFill, RoundedCornerShape(2.dp))) {
+                    Box(Modifier.fillMaxWidth(p.progress(nowSec)).fillMaxHeight().background(Live, RoundedCornerShape(2.dp)))
+                }
+            }
+            if (focused) {
+                Column(Modifier.padding(start = 64.dp, top = 6.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                    val minutes = (p.stop - p.start) / 60
+                    Text("${time.format(Instant.ofEpochSecond(p.start))}–${time.format(Instant.ofEpochSecond(p.stop))} · $minutes min", style = MaterialTheme.typography.bodyMedium, color = LocalContentColor.current.copy(alpha = 0.7f))
+                    p.description?.takeIf { it.isNotBlank() }?.let {
+                        Text(it, style = MaterialTheme.typography.bodyMedium, color = LocalContentColor.current.copy(alpha = 0.7f), maxLines = 3, overflow = TextOverflow.Ellipsis)
+                    }
+                }
+            }
+        }
+    }
 }
 
