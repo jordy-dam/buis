@@ -73,6 +73,7 @@ import java.time.Instant
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
 import javax.inject.Inject
+import nl.jordy.iptv.data.db.ReminderEntity
 import nl.jordy.iptv.data.epg.EpgGuide
 import kotlinx.coroutines.flow.first
 import android.view.KeyEvent
@@ -103,7 +104,6 @@ import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.runtime.produceState
 import nl.jordy.iptv.ui.home.whenLabel
 import nl.jordy.iptv.data.settings.CategoryGroups
-import nl.jordy.iptv.data.db.EpgProgrammeEntity
 import nl.jordy.iptv.data.repo.FollowRepository
 import androidx.compose.ui.Alignment
 
@@ -147,8 +147,17 @@ class LiveViewModel @Inject constructor(
 
     val followTerms = follows.terms.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
 
-    /** OK on a coming programme in the guide: a reminder for exactly that title, or off again. */
-    fun toggleReminder(title: String) = viewModelScope.launch {
+    val reminderKeys = follows.reminderKeys.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptySet())
+
+    /** OK on a coming programme in the guide: a reminder for just that one, or off again. */
+    fun toggleReminder(channel: LiveChannelEntity, p: EpgEntry) = viewModelScope.launch {
+        follows.toggleReminder(
+            ReminderEntity(0, channel.streamId, p.start, p.stop, p.title, channel.name, channel.categoryId, channel.logoUrl, channel.hasArchive),
+        )
+    }
+
+    /** Long-press in the guide: follow every programme with this title (a [FollowEntity] term), or stop. */
+    fun toggleFollow(title: String) = viewModelScope.launch {
         if (followTerms.value.any { it.equals(title, ignoreCase = true) }) follows.remove(followTerms.value.first { it.equals(title, ignoreCase = true) })
         else follows.add(title)
     }
@@ -274,16 +283,19 @@ fun LiveScreen(onPlay: (PlayerRoute) -> Unit, vm: LiveViewModel = hiltViewModel(
     }
     guideFor?.let { ch ->
         val terms by vm.followTerms.collectAsStateWithLifecycle()
+        val reminders by vm.reminderKeys.collectAsStateWithLifecycle()
         GuidePanel(
             channel = ch,
             load = vm::guide,
             followed = terms,
+            reminders = reminders,
             onWatch = {
                 guideFor = null
                 vm.lastChannel = ch.streamId
                 onPlay(PlayerRoute(PlayerRoute.Kind.LIVE, ch.streamId, ch.name, categoryId = ch.categoryId))
             },
-            onToggleReminder = vm::toggleReminder,
+            onToggleReminder = { vm.toggleReminder(ch, it) },
+            onToggleFollow = vm::toggleFollow,
             onDismiss = { guideFor = null },
         )
     }
@@ -322,16 +334,19 @@ private fun NowNextStrip(channel: LiveChannelEntity?, load: suspend (Int) -> Pai
 
 /**
  * One channel's guide on the right, from now on. The focused programme shows its description, so you
- * can see how the guide names things (handy for a "Volgen" term). OK on what's on now tunes in; OK on
- * something later sets a reminder for exactly that title (OK again removes it). Back or Left closes.
+ * can see how the guide names things. OK on what's on now tunes in; OK on something later sets a
+ * reminder for just that programme (OK again removes it). Long-press follows every programme with
+ * that title, like a "Volgen" term. Back or Left closes.
  */
 @Composable
 private fun GuidePanel(
     channel: LiveChannelEntity,
     load: suspend (Int) -> List<EpgEntry>,
     followed: List<String>,
+    reminders: Set<String>,
     onWatch: () -> Unit,
-    onToggleReminder: (String) -> Unit,
+    onToggleReminder: (EpgEntry) -> Unit,
+    onToggleFollow: (String) -> Unit,
     onDismiss: () -> Unit,
 ) {
     val programmes by produceState<List<EpgEntry>?>(null, channel.streamId) { value = load(channel.streamId) }
@@ -348,7 +363,7 @@ private fun GuidePanel(
                 verticalArrangement = Arrangement.spacedBy(8.dp),
             ) {
                 Text(channel.name, style = MaterialTheme.typography.headlineMedium, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                Text("OK: nu kijken, of een herinnering voor later", style = MaterialTheme.typography.bodyMedium, color = TextSecondary)
+                Text("OK: kijken, of een herinnering voor dit programma · lang indrukken: alles met deze titel volgen", style = MaterialTheme.typography.bodyMedium, color = TextSecondary)
                 val list = programmes
                 when {
                     list == null -> Unit
@@ -357,10 +372,12 @@ private fun GuidePanel(
                         itemsIndexed(list, key = { _, p -> p.start }) { i, p ->
                             val nowSec = System.currentTimeMillis() / 1000
                             val running = p.start <= nowSec
-                            val reminded = !running && followed.any { p.title.contains(it, ignoreCase = true) }
+                            val reminded = "${channel.streamId}:${p.start}" in reminders
+                            val follows = followed.any { p.title.contains(it, ignoreCase = true) }
                             var focused by remember { mutableStateOf(false) }
                             Surface(
-                                onClick = { if (running) onWatch() else onToggleReminder(p.title) },
+                                onClick = { if (running) onWatch() else onToggleReminder(p) },
+                                onLongClick = { onToggleFollow(p.title) },
                                 modifier = Modifier.fillMaxWidth().onFocusChanged { focused = it.isFocused }
                                     .then(if (i == 0) Modifier.focusRequester(first) else Modifier),
                                 shape = ClickableSurfaceDefaults.shape(RoundedCornerShape(8.dp)),
@@ -379,7 +396,10 @@ private fun GuidePanel(
                                         maxLines = 1,
                                         overflow = TextOverflow.Ellipsis,
                                     )
-                                    if (reminded) Text("Herinnering staat aan", style = MaterialTheme.typography.labelLarge, color = live)
+                                    when {
+                                        reminded -> Text("Herinnering staat aan", style = MaterialTheme.typography.labelLarge, color = live)
+                                        follows -> Text("Je volgt dit", style = MaterialTheme.typography.labelLarge, color = live)
+                                    }
                                     if (focused && !p.description.isNullOrBlank()) {
                                         Text(p.description!!, style = MaterialTheme.typography.bodyMedium, color = TextSecondary, maxLines = 3, overflow = TextOverflow.Ellipsis)
                                     }

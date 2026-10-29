@@ -70,18 +70,20 @@ class ReminderViewModel @Inject constructor(private val follows: FollowRepositor
     val due = MutableStateFlow<FollowMatches.Due?>(null)
 
     /** For "Volgen aanpassen" straight from a reminder. */
-    val terms = follows.terms.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
+    // Kept up to date all along, so the dialog opens with its terms already there.
+    val terms = follows.terms.stateIn(viewModelScope, SharingStarted.Eagerly, emptyList())
     @OptIn(ExperimentalCoroutinesApi::class)
     val next = follows.terms.mapLatest { terms ->
         val found = runCatching { follows.upcoming() }.getOrDefault(emptyList())
         terms.associateWith { t -> found.firstOrNull { it.term == t } }
-    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyMap())
+    }.stateIn(viewModelScope, SharingStarted.Eagerly, emptyMap())
     fun follow(term: String) = viewModelScope.launch { follows.add(term) }
     fun unfollow(term: String) = viewModelScope.launch { follows.remove(term) }
 
     init {
         viewModelScope.launch {
             while (isActive) {
+                runCatching { follows.clearOverReminders() }
                 if (due.value == null) {
                     val now = System.currentTimeMillis() / 1000
                     val matches = runCatching { follows.upcoming(now, hours = 1) }.getOrDefault(emptyList())

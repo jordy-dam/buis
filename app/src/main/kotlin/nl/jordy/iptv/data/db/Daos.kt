@@ -308,3 +308,17 @@ interface FollowDao {
     suspend fun matches(profileId: Long, from: Long, until: Long, hideAdult: Boolean): List<FollowMatchRow>
 }
 
+/** One-off reminders, per profile. */
+@Dao
+interface ReminderDao {
+    @Upsert suspend fun upsert(item: ReminderEntity)
+    @Query("DELETE FROM reminder WHERE profileId = :profileId AND streamId = :streamId AND start = :start")
+    suspend fun delete(profileId: Long, streamId: Int, start: Long)
+    @Query("SELECT * FROM reminder WHERE profileId = :profileId AND stop > :now ORDER BY start")
+    fun observe(profileId: Long, now: Long): Flow<List<ReminderEntity>>
+    @Query("SELECT * FROM reminder WHERE profileId = :profileId AND stop > :now ORDER BY start")
+    suspend fun upcoming(profileId: Long, now: Long): List<ReminderEntity>
+    /** Programmes that are over: their reminders have done their job. */
+    @Query("DELETE FROM reminder WHERE stop <= :now") suspend fun deleteOver(now: Long)
+}
+

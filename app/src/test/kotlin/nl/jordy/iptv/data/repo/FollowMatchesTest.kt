@@ -56,6 +56,16 @@ class FollowMatchesTest {
     }
 
     @Test
+    fun `every one-off reminder shows on Home, and a followed programme that is also reminded shows once`() {
+        val followed = FollowMatches.fold(listOf(row(1, "Formule 1: Race", start = now + 100)))
+        val race = followed.single().copy(oneOff = true)
+        val other = race.copy(title = "Darts", streamId = 9, start = now + 50)
+        val merged = FollowMatches.merge(followed, listOf(race, other))
+        assertEquals(listOf("Darts", "Formule 1: Race"), merged.map { it.title })
+        assertEquals(2, FollowMatches.nextPerTerm(merged).size)
+    }
+
+    @Test
     fun `five minutes before, then at the start if ignored, then never again`() {
         val m = FollowMatches.fold(listOf(row(1, start = now + 240)))
         val key = m.single().key

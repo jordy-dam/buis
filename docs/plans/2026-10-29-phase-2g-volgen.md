@@ -225,3 +225,13 @@ All type styles one step down (bodyMedium/labelLarge 12sp, titleMedium 14sp, hea
 at Jordy's request; 12sp is the new floor. One place: `typography` in `Theme.kt`.
 On the tv right after installing, Home showed "Straks voor jou" with real matches: "15:00 · ZIGGO SPORT 3 ·
 The Inside Line" and "17:30 · ESPN 2 · Eurojackpot KNVB Beker" (FC Utrecht found through the description).
+
+## One-off reminders (2026-10-29)
+OK on a later programme in a channel's guide set a Volgen term for its whole title, so every airing of
+e.g. "ESPN Vandaag" lit up. Now OK sets a reminder for that one programme (table `reminder`, schema 12:
+profile, channel, start), OK again removes it; long-press follows the title as before ("Je volgt dit").
+One-off reminders join "Straks voor jou" (each one shows) and the same corner card, and are deleted once the
+programme is over. The reminder's "Volgen aanpassen" dialog now has its terms loaded before it opens.
+Tested: unit 142 (one programme only, toggle off, cleanup, merge, migration 11→12). Emulator: OK on
+12:30 Sport 1035 marks only that one, long-press on Journaal 1035 marks every Journaal 1035.
+Text size: Jordy keeps the smaller step ("perfect zo").

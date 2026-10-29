@@ -24,8 +24,9 @@ import androidx.sqlite.db.SupportSQLiteDatabase
         EpgInfoEntity::class,
         MovieInfoEntity::class,
         FollowEntity::class,
+        ReminderEntity::class,
     ],
-    version = 11,
+    version = 12,
     exportSchema = true,
     autoMigrations = [
         AutoMigration(from = 1, to = 2, spec = AppDatabase.CatalogResync::class),
@@ -45,6 +46,8 @@ import androidx.sqlite.db.SupportSQLiteDatabase
         AutoMigration(from = 9, to = 10, spec = AppDatabase.CatalogResync::class),
         // What each profile follows ("Formule 1"); a new, empty table.
         AutoMigration(from = 10, to = 11),
+        // One-off reminders for a single programme, set from a channel's guide; a new, empty table.
+        AutoMigration(from = 11, to = 12),
     ],
 )
 abstract class AppDatabase : RoomDatabase() {
@@ -58,6 +61,7 @@ abstract class AppDatabase : RoomDatabase() {
     abstract fun epg(): EpgDao
     abstract fun movieInfo(): MovieInfoDao
     abstract fun follows(): FollowDao
+    abstract fun reminders(): ReminderDao
 
     /**
      * The catalog is a cache of the provider: after a schema change it's emptied and the next

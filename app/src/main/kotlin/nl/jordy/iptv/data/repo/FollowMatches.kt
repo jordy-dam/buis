@@ -16,6 +16,8 @@ data class FollowMatch(
     val logoUrl: String? = null,
     /** Back-to-back matching programmes on this channel folded into this one ("Zappelin" all morning). */
     val parts: Int = 1,
+    /** A reminder for this one programme only, set from the guide, not a followed term. */
+    val oneOff: Boolean = false,
 ) {
     /** One programme on one channel, for remembering which reminders were shown. */
     val key get() = "$streamId:$start"
@@ -62,8 +64,12 @@ object FollowMatches {
         return blocks
     }
 
-    /** "Straks voor jou": per term only what comes first, so one busy term can't fill the row. */
-    fun nextPerTerm(matches: List<FollowMatch>): List<FollowMatch> = matches.distinctBy { it.term.lowercase() }
+    /** "Straks voor jou": per term only what comes first, so one busy term can't fill the row; every one-off reminder shows. */
+    fun nextPerTerm(matches: List<FollowMatch>): List<FollowMatch> = matches.distinctBy { if (it.oneOff) it.key else it.term.lowercase() }
+
+    /** Followed matches and one-off reminders in one list; a programme both followed and reminded shows once. */
+    fun merge(followed: List<FollowMatch>, oneOffs: List<FollowMatch>): List<FollowMatch> =
+        (oneOffs + followed).distinctBy { it.key }.sortedBy { it.start }
 
     /** The banner to show now, if any; [shown] holds "<key>:soon" and "<key>:now" for what was dealt with. */
     fun due(matches: List<FollowMatch>, nowSec: Long, shown: Set<String>): Due? {

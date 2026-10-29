@@ -72,7 +72,7 @@ private val colors = darkColorScheme(
 )
 
 // 10-foot type, below the spec's 16sp body at Jordy's request (2e, 2f, and one more step in 2g as a
-// tv test). 12sp is now the floor: below that is unreadable from the couch.
+// tv test, kept). 12sp is the floor: below that is unreadable from the couch.
 private val typography = Typography(
     displaySmall = TextStyle(fontSize = 28.sp, fontWeight = FontWeight.SemiBold),
     headlineMedium = TextStyle(fontSize = 20.sp, fontWeight = FontWeight.SemiBold),

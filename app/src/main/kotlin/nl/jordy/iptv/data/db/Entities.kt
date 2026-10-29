@@ -238,3 +238,24 @@ data class FollowEntity(
     val addedAt: Long,
 )
 
+/**
+ * A reminder for one programme on one channel ("this match, tonight"), set from the channel's guide.
+ * Unlike a [FollowEntity] term it never matches anything else; it's removed once the programme is over.
+ */
+@Entity(
+    tableName = "reminder",
+    primaryKeys = ["profileId", "streamId", "start"],
+    foreignKeys = [ForeignKey(ProfileEntity::class, ["id"], ["profileId"], onDelete = ForeignKey.CASCADE)],
+)
+data class ReminderEntity(
+    val profileId: Long,
+    val streamId: Int,
+    val start: Long,
+    val stop: Long,
+    val title: String,
+    val channelName: String,
+    val categoryId: String,
+    val logoUrl: String?,
+    val hasArchive: Boolean,
+)
+

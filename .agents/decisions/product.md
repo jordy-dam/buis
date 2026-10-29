@@ -107,3 +107,15 @@
 **Why:** Jordy couldn't see how the guide names things (to pick a Volgen term), wants to pin providers like "Ziggo Kabel", and "FC Utrecht" found nothing — sports channels in country-less categories weren't in the guide at all.
 **Alternatives rejected:** A full EPG grid now (more work; the per-channel panel answers the question); downloading the guide for every channel (thousands of channels, slow on the tv for little gain).
 **Revisit if:** a full grid is wanted, or the guide gets slow with many pinned categories.
+
+## 2026-10-29 — Text size settled
+**Decision:** The 2g test step stays: bodyMedium/labelLarge 12sp, titleMedium 14sp, titleLarge 17sp, headline 20sp, display 28sp. No smaller.
+**Why:** Jordy on the tv: "perfect zo, we gaan niet kleiner".
+**Alternatives rejected:** Another step down (12sp is the floor for reading from the couch).
+**Revisit if:** someone in the household finds it hard to read.
+
+## 2026-10-29 — One-off reminders from the guide
+**Decision:** In a channel's guide OK on a later programme sets a reminder for that programme only (channel + start, schema 12); long-press follows its title. One-off reminders behave like followed matches (card, "Straks voor jou") and disappear when the programme is over.
+**Why:** Jordy: OK set a reminder on every airing with that title; he wants just the selected one.
+**Alternatives rejected:** Following the exact title (matches repeats); a dialog asking "dit programma of alles?" (one more step for the common case).
+**Revisit if:** people want reminders for a whole series from the Home row too.

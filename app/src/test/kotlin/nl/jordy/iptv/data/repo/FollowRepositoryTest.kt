@@ -10,6 +10,7 @@ import nl.jordy.iptv.data.xtream.ContentType
 import nl.jordy.iptv.data.db.EpgChannelEntity
 import nl.jordy.iptv.data.db.EpgProgrammeEntity
 import nl.jordy.iptv.data.db.LiveChannelEntity
+import nl.jordy.iptv.data.db.ReminderEntity
 import nl.jordy.iptv.data.profile.ProfileRepository
 import nl.jordy.iptv.data.settings.SettingsStore
 import org.junit.After
@@ -91,6 +92,34 @@ class FollowRepositoryTest {
         )
         val rows = db.catalog().liveForGuide(listOf("NL"), categoryIds = listOf("ziggo"), streamIds = listOf(4))
         assertEquals(setOf(1, 2, 4), rows.map { it.streamId }.toSet())
+    }
+
+    @Test
+    fun `a reminder from the guide is for that one programme, not every one with its title`() = runTest {
+        profiles.ensureOne()
+        db.epg().insertChannels(listOf(EpgChannelEntity(12, "espn1")))
+        db.epg().insertProgrammes(
+            listOf(
+                EpgProgrammeEntity("espn1", now + 3600, now + 5400, "ESPN Vandaag", null),
+                EpgProgrammeEntity("espn1", now + 90_000, now + 91_800, "ESPN Vandaag", null),
+            ),
+        )
+        val tonight = ReminderEntity(0, 12, now + 3600, now + 5400, "ESPN Vandaag", "ESPN 1", "sport", null, false)
+        follows.toggleReminder(tonight)
+        val m = follows.upcoming(now)
+        assertEquals(listOf(now + 3600), m.map { it.start })
+        assertTrue(m.single().oneOff)
+
+        follows.toggleReminder(tonight)
+        assertTrue("OK again turns it off", follows.upcoming(now).isEmpty())
+    }
+
+    @Test
+    fun `a reminder is gone once its programme is over`() = runTest {
+        profiles.ensureOne()
+        follows.toggleReminder(ReminderEntity(0, 12, now - 7200, now - 3600, "Voorbij", "ESPN 1", "sport", null, false))
+        follows.clearOverReminders(now)
+        assertEquals(0, db.reminders().upcoming(profiles.currentId(), 0).size)
     }
 
     @Test
