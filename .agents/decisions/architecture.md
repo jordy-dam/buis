@@ -71,3 +71,9 @@
 **Why:** The provider's film list has no genre; only `get_vod_info` has it. About 20k NL films means about 1.5 h the first time, then only new films. It stays between the tv and the provider, needs no key, and gives genre, cast and director for phase 3.
 **Alternatives rejected:** TMDB now (external service, an API key, matching titles; kept as an option for phase 3 if the provider's genres prove thin); fetching on demand per category (slow chips, many bursts).
 **Revisit if:** the provider rate-limits or blocks the requests (lower the pace), or the genres turn out mostly empty.
+
+## 2026-10-29 — Code on Jordy's personal GitHub account
+**Decision:** The repo lives at `git@github-personal:jordy-dam/buis.git` (private, personal account), pushed through the `github-personal` SSH alias (`~/.ssh/id_ed25519_personal`). `main` holds the current state; new work branches from `main`. Commits use Jordy's personal e-mail.
+**Why:** BUIS is a personal project; it doesn't belong under the employer's GitHub account, which is what `gh` and the default `github.com` SSH host on this Mac are logged into.
+**Alternatives rejected:** A private repo under the work account (mixes a personal project with work, and the work account owns it); keeping it local only (no off-machine copy of the code).
+**Revisit if:** the project is shared with others or the work/personal setup on this Mac changes.
