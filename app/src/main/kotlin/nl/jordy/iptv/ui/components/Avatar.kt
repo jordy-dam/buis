@@ -24,7 +24,20 @@ import androidx.tv.material3.ClickableSurfaceDefaults
 import androidx.tv.material3.MaterialTheme
 import androidx.tv.material3.Surface
 import androidx.tv.material3.Text
+import nl.jordy.iptv.ui.theme.Background
+import nl.jordy.iptv.ui.theme.SurfaceRaised
 import nl.jordy.iptv.ui.theme.TextPrimary
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.foundation.layout.offset
+import androidx.compose.foundation.layout.padding
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.focus.onFocusChanged
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.tv.material3.Icon
 import nl.jordy.iptv.ui.theme.TextSecondary
 
 /**
@@ -59,28 +72,59 @@ fun AvatarCircle(name: String, avatar: Int, size: Dp, modifier: Modifier = Modif
     }
 }
 
-/** Focusable avatar with the name underneath, for the profile picker. */
+/**
+ * Focusable avatar with the name underneath, for the profile picker. [badge] marks the profile on
+ * the circle itself (kids, PIN) instead of a line of text, so every tile has the same height.
+ */
 @Composable
 fun AvatarTile(
     name: String,
     avatar: Int,
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
-    caption: String? = null,
     size: Dp = 88.dp,
     symbol: String? = null,
     face: Int = 0,
+    badge: ImageVector? = null,
+    badgeDescription: String? = null,
 ) {
+    var focused by remember { mutableStateOf(false) }
+    // Scaled as a whole, so the badge stays on the circle's edge when it grows with focus.
+    val scale by animateFloatAsState(if (focused) Focus.SCALE else 1f, label = "avatar")
     Column(Modifier.width(size + 40.dp), horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(10.dp)) {
-        Surface(
-            onClick = onClick,
-            modifier = modifier.size(size),
-            shape = ClickableSurfaceDefaults.shape(CircleShape),
-            scale = ClickableSurfaceDefaults.scale(focusedScale = Focus.SCALE),
-            border = ClickableSurfaceDefaults.border(focusedBorder = Border(BorderStroke(4.dp, TextPrimary), shape = CircleShape)),
-            colors = ClickableSurfaceDefaults.colors(containerColor = Color.Transparent, focusedContainerColor = Color.Transparent),
-        ) { AvatarCircle(name, avatar, size, symbol = symbol, face = face) }
+        Box(Modifier.size(size).graphicsLayer { scaleX = scale; scaleY = scale }) {
+            Surface(
+                onClick = onClick,
+                modifier = modifier.size(size).onFocusChanged { focused = it.isFocused },
+                shape = ClickableSurfaceDefaults.shape(CircleShape),
+                scale = ClickableSurfaceDefaults.scale(focusedScale = 1f),
+                border = ClickableSurfaceDefaults.border(focusedBorder = Border(BorderStroke(4.dp, TextPrimary), shape = CircleShape)),
+                colors = ClickableSurfaceDefaults.colors(containerColor = Color.Transparent, focusedContainerColor = Color.Transparent),
+            ) { AvatarCircle(name, avatar, size, symbol = symbol, face = face) }
+            badge?.let { AvatarBadge(it, badgeDescription, size) }
+        }
         Text(name, style = MaterialTheme.typography.titleMedium, maxLines = 1, overflow = TextOverflow.Ellipsis, textAlign = TextAlign.Center)
-        caption?.let { Text(it, style = MaterialTheme.typography.bodyMedium, color = TextSecondary, textAlign = TextAlign.Center) }
+    }
+}
+
+/**
+ * A small dark disc on the circle's lower right edge (at 45°, where a corner badge would fall off
+ * the round avatar), ringed in the page colour so it reads on every avatar colour.
+ */
+@Composable
+private fun AvatarBadge(icon: ImageVector, description: String?, avatar: Dp) {
+    val badge = avatar * 0.34f
+    // The point on the circle at 45°: r + r·cos 45° from the top left, minus half the badge.
+    val at = avatar * 0.854f - badge / 2
+    Box(
+        Modifier
+            .offset(at, at)
+            .size(badge)
+            .background(Background, CircleShape)
+            .padding(2.dp)
+            .background(SurfaceRaised, CircleShape),
+        contentAlignment = Alignment.Center,
+    ) {
+        Icon(icon, contentDescription = description, tint = TextPrimary, modifier = Modifier.size(badge * 0.6f))
     }
 }

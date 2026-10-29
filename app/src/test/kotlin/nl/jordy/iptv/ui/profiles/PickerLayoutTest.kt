@@ -4,7 +4,9 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.test.assertCountEquals
 import androidx.compose.ui.test.assertIsDisplayed
+import androidx.compose.ui.test.onAllNodesWithContentDescription
 import androidx.compose.ui.test.getUnclippedBoundsInRoot
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithText
@@ -34,7 +36,7 @@ class PickerLayoutTest {
     private val names = listOf("Profiel 1", "Bas", "Anna", "Daan", "Eva", "Fleur", "Gijs", "Hanna")
 
     private fun household(n: Int) = List(n) { i ->
-        // Captions make a tile taller: give every profile one, the worst case.
+        // Every other profile is a kids profile, the rest have a PIN: both show as a badge.
         ProfileEntity(id = i + 1L, name = names[i], avatar = i, face = i % 6, kids = i % 2 == 1, pinHash = if (i % 2 == 0) "x" else null)
     }
 
@@ -65,6 +67,8 @@ class PickerLayoutTest {
                 val b = node.getUnclippedBoundsInRoot()
                 assertTrue("$text is cut off with $n profiles", b.top >= 0.dp && b.bottom <= root.bottom && b.left >= 0.dp && b.right <= root.right)
             }
+            compose.onAllNodesWithContentDescription("Pincode").assertCountEquals((n + 1) / 2)
+            compose.onAllNodesWithContentDescription("Kinderprofiel").assertCountEquals(n / 2)
         }
     }
 }

@@ -47,6 +47,9 @@ import androidx.compose.foundation.Image
 import androidx.compose.foundation.layout.size
 import androidx.compose.ui.res.painterResource
 import nl.jordy.iptv.R
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.ChildCare
+import androidx.compose.material.icons.filled.Lock
 import nl.jordy.iptv.ui.theme.SafeArea
 import javax.inject.Inject
 
@@ -167,8 +170,9 @@ fun ProfilePickerScreen(
 }
 
 /**
- * Logo, title, the profile tiles and the manage button. Up to five tiles sit in one row; more go
- * into two even rows (6 → 3 + 3, 9 → 5 + 4) with smaller avatars and no logo, so eight profiles
+ * Logo, title, the profile tiles and the manage button. Kids and PIN show as a badge on the avatar
+ * (no caption lines, so all tiles line up, also in "Profielen beheren"). Up to five tiles sit in one
+ * row; more go into two even rows (6 → 3 + 3, 9 → 5 + 4) with smaller avatars and no logo, so eight profiles
  * and "+" still fit a 540 dp tall screen. Plain rows on purpose: a FlowRow that runs out of height
  * silently leaves out the rows that don't fit, which made the fifth profile "delete" two others.
  */
@@ -186,36 +190,39 @@ internal fun PickerLayout(
     val tiles: List<ProfileEntity?> = profiles + if (canAdd) listOf(null) else emptyList()
     val twoRows = tiles.size > 5
     val perRow = if (twoRows) (tiles.size + 1) / 2 else tiles.size
+    val size = if (twoRows) 80.dp else 88.dp
     Column(
         modifier.fillMaxSize().padding(SafeArea),
         horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.spacedBy(if (twoRows) 20.dp else 32.dp, Alignment.CenterVertically),
+        verticalArrangement = Arrangement.spacedBy(if (twoRows) 24.dp else 32.dp, Alignment.CenterVertically),
     ) {
         if (!twoRows) Image(painterResource(R.drawable.ic_buis), contentDescription = "BUIS", modifier = Modifier.size(96.dp))
         Text(if (managing) "Profielen beheren" else "Wie kijkt er?", style = MaterialTheme.typography.displaySmall)
         Column(
-            Modifier.focusRestorer().focusGroup(),
+            // A little air between the question and the faces.
+            Modifier.padding(top = 16.dp).focusRestorer().focusGroup(),
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.spacedBy(16.dp),
         ) {
             tiles.chunked(perRow).forEach { row ->
                 Row(horizontalArrangement = Arrangement.spacedBy(24.dp)) {
                     row.forEach { p ->
-                        val size = if (twoRows) 72.dp else 88.dp
                         if (p == null) {
                             AvatarTile(name = "Toevoegen", avatar = AvatarAdd, symbol = "+", size = size, onClick = onAdd)
                         } else {
+                            // Kids wins over a PIN: a kids profile with a PIN is still a kids profile first.
+                            val (badge, what) = when {
+                                p.kids -> Icons.Filled.ChildCare to "Kinderprofiel"
+                                p.pinHash != null -> Icons.Filled.Lock to "Pincode"
+                                else -> null to null
+                            }
                             AvatarTile(
                                 name = p.name,
                                 avatar = p.avatar,
                                 face = p.face,
                                 size = size,
-                                caption = when {
-                                    managing -> "Bewerken"
-                                    p.kids -> "Kinderprofiel"
-                                    p.pinHash != null -> "Pincode"
-                                    else -> null
-                                },
+                                badge = badge,
+                                badgeDescription = what,
                                 modifier = Modifier.focusRequester(focus[profiles.indexOf(p)]),
                                 onClick = { onProfile(p) },
                             )
