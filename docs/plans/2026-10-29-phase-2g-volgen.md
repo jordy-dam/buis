@@ -167,3 +167,27 @@ it forgets that profile's position, so a later play starts at the beginning. Foc
 tile (or the previous one). Tested: unit 124 (removal is per profile); emulator: dialog, removal of the
 only tile, row disappears and focus lands on the rail. Moving focus to a neighbour tile not walked.
 - On the tv (release, 2026-10-29): starts, catalog re-synced, Verder kijken and favourite channels shown. "RTL 7 8K+" no longer appears among the favourite channels on Home (it did this morning); Jordy removed it himself; not a bug.
+
+## Fixes after Jordy's tv test (2026-10-29)
+- **Long-press opened and confirmed the remove dialog at once**: the held OK's repeats and release landed
+  on the focused Verwijderen. `Modifier.ignoreHeldKey()` swallows them until a fresh key press; also used
+  on the reminder dialog. Emulator: `input keyevent --longpress DPAD_CENTER` leaves the dialog open.
+- **Version choice** is now one button next to Afspelen ("Nederlands gesproken · 3 versies ▾") opening a
+  list, two lines per version: the language in plain Dutch, then title (only when titles differ) and quality.
+- **"(NL Subs)" and friends** leave film titles: NL SUBS / SUBBED / SUBTITLED / GESUBD / ONDERTITELD /
+  DUTCH SUBS → badge "NL sub"; NL DUB / DUBBED → "NL gesproken". Titles change at the next catalog sync.
+
+## Part 4 — volgen, built (2026-10-29)
+- Schema 11: `follow` (profile, term). Instellingen → "Voor <naam>" → Volgen: type a term, OK on a term removes it.
+- `FollowDao.matches` searches the guide titles (case-insensitive LIKE) through `epg_channel` to every live
+  channel; `FollowMatches.fold` keeps one channel per programme (the one with an archive first); a kids
+  profile never gets adult channels.
+- Home "Straks voor jou": the next matches (NU in amber when running), OK tunes in.
+- Reminder dialog over everything (also a playing film), checked every 20 s: "Over 4 min" five minutes
+  before; Later → again at the start ("Nu begonnen", with Vanaf begin when the channel has an archive);
+  Kijken replaces a playing player with that channel. Not over login, sync or the profile picker.
+- Tested: unit 134 green, run twice (matching, fold, timing, kids filter, migration 10→11; plus a fix so
+  a closed test database no longer leaks an error into the next test class). Emulator with the clock set
+  to 11:26 and 11:30: "Over 4 min · Sport 101 · NPO 1", Later, "Nu begonnen", Kijken plays NPO 1.
+- Not done: following a programme straight from the guide/player (terms are typed in Instellingen), and
+  tying a term to one channel. Whether F1 shows up depends on how the Ziggo guide titles it.

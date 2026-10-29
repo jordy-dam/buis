@@ -34,7 +34,7 @@ fun GenreChips(genres: List<String>, selected: String?, onSelect: (String?) -> U
     }
 }
 
-/** A pill-shaped choice: genres above a grid, versions on a detail screen. */
+/** A pill-shaped choice: genres above a grid. */
 @Composable
 fun Chip(text: String, selected: Boolean, modifier: Modifier = Modifier, onClick: () -> Unit) {
     Surface(

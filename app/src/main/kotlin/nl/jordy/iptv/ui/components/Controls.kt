@@ -35,6 +35,9 @@ import androidx.tv.material3.ClickableSurfaceDefaults
 import androidx.tv.material3.MaterialTheme
 import androidx.tv.material3.Surface
 import androidx.tv.material3.Text
+import androidx.compose.ui.input.key.KeyEventType
+import androidx.compose.ui.input.key.onPreviewKeyEvent
+import androidx.compose.ui.input.key.type
 import nl.jordy.iptv.ui.theme.Brand
 import nl.jordy.iptv.ui.theme.FocusBar
 import nl.jordy.iptv.ui.theme.FocusFill
@@ -158,4 +161,25 @@ fun SecondaryButton(text: String, onClick: () -> Unit, modifier: Modifier = Modi
             focusedContentColor = TextPrimary,
         ),
     ) { Text(text) }
+}
+
+/**
+ * For a dialog opened by a long-press: the OK that opened it is still held, and its repeats and
+ * release would land on the dialog's focused button and confirm it at once. Those are swallowed;
+ * the dialog reacts from the first fresh key press on.
+ */
+@Composable
+fun Modifier.ignoreHeldKey(): Modifier {
+    var armed by remember { mutableStateOf(false) }
+    return onPreviewKeyEvent { e ->
+        if (armed) return@onPreviewKeyEvent false
+        val fresh = e.type == KeyEventType.KeyDown && e.nativeKeyEvent.repeatCount == 0
+        if (fresh) {
+            armed = true
+            false
+        } else {
+            if (e.type == KeyEventType.KeyUp) armed = true
+            true
+        }
+    }
 }

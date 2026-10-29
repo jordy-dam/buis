@@ -51,6 +51,12 @@ class NameParserTest {
         assertEquals("CA" to listOf("FR"), p("┃CA FR┃ TVA").let { it.country to it.badges })
         assertEquals("NL" to listOf("NL sub"), p("┃NL-SUB┃ Film").let { it.country to it.badges })
         assertEquals("NL" to listOf("NL audio"), p("┃NL-AUDIO┃ Film").let { it.country to it.badges })
+        // The spellings seen in film titles all leave a clean title and one badge.
+        assertEquals("Inception" to listOf("NL sub"), p("Inception (NL Subs)").let { it.title to it.badges })
+        assertEquals("Inception" to listOf("NL sub"), p("Inception [NL SUBBED]").let { it.title to it.badges })
+        assertEquals("Inception" to listOf("NL sub"), p("Inception (Ondertiteld)").let { it.title to it.badges })
+        assertEquals("Frozen" to listOf("NL gesproken"), p("Frozen (NL Dubbed)").let { it.title to it.badges })
+        assertEquals("a title that merely ends in a word stays whole", "Subs and Dubs", p("Subs and Dubs").title)
     }
 
     @Test

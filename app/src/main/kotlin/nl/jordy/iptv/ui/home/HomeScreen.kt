@@ -58,6 +58,25 @@ import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.window.Dialog
 import kotlinx.coroutines.launch
 import nl.jordy.iptv.ui.components.PrimaryButton
+import nl.jordy.iptv.ui.components.ignoreHeldKey
+import androidx.compose.foundation.layout.height
+import androidx.compose.ui.text.SpanStyle
+import androidx.compose.ui.text.buildAnnotatedString
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.withStyle
+import androidx.tv.material3.ClickableSurfaceDefaults
+import androidx.tv.material3.Surface
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.flow
+import nl.jordy.iptv.data.repo.FollowMatch
+import nl.jordy.iptv.data.repo.FollowRepository
+import nl.jordy.iptv.ui.components.Focus
+import nl.jordy.iptv.ui.theme.Live
+import java.time.Instant
+import java.time.LocalDate
+import java.time.ZoneId
+import java.time.format.TextStyle
+import java.util.Locale
 import nl.jordy.iptv.ui.components.SecondaryButton
 import nl.jordy.iptv.ui.theme.SurfaceColor
 import javax.inject.Inject
@@ -89,7 +108,19 @@ class HomeViewModel @Inject constructor(
     private val library: LibraryRepository,
     profiles: ProfileRepository,
     private val epg: EpgRepository,
+    follows: FollowRepository,
 ) : ViewModel() {
+    /** "Straks voor jou": what the profile follows, refreshed every minute and whenever a term changes. */
+    @OptIn(ExperimentalCoroutinesApi::class)
+    val upcoming = follows.terms.flatMapLatest {
+        flow {
+            while (true) {
+                emit(follows.upcoming().take(ROW_SIZE))
+                delay(60_000)
+            }
+        }
+    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
+
     suspend fun nowAndNext(streamId: Int) = epg.nowAndNext(streamId)
 
     fun removeFromContinue(c: ContinueItem) = viewModelScope.launch { library.forgetPosition(c.type, c.itemId) }
@@ -134,6 +165,7 @@ class HomeViewModel @Inject constructor(
 fun HomeScreen(onPlay: (PlayerRoute) -> Unit, onOpenMovie: (Int) -> Unit, vm: HomeViewModel = hiltViewModel()) {
     val loaded by vm.state.collectAsStateWithLifecycle()
     val s = loaded ?: return
+    val upcoming by vm.upcoming.collectAsStateWithLifecycle()
     var focusedContinue by remember { mutableStateOf<ContinueItem?>(null) }
     var confirmRemove by remember { mutableStateOf<ContinueItem?>(null) }
     // After a removal the tile is gone: focus moves to its neighbour, or it would be lost.
@@ -200,6 +232,22 @@ fun HomeScreen(onPlay: (PlayerRoute) -> Unit, onOpenMovie: (Int) -> Unit, vm: Ho
                 )
             }
         }
+        if (upcoming.isNotEmpty()) {
+            item(key = "upcoming") {
+                Text("Straks voor jou", style = MaterialTheme.typography.titleLarge)
+                LazyRow(
+                    contentPadding = Rows.tilePadding,
+                    horizontalArrangement = Arrangement.spacedBy(16.dp),
+                    modifier = Modifier.focusRestorer(),
+                ) {
+                    items(upcoming, key = { it.key }) { m ->
+                        UpcomingCard(m, onClick = {
+                            onPlay(PlayerRoute(PlayerRoute.Kind.LIVE, m.streamId, m.channelName, categoryId = m.categoryId))
+                        }, modifier = Modifier.lastInRow(m == upcoming.last()))
+                    }
+                }
+            }
+        }
         if (s.channels.isNotEmpty()) {
             item(key = "channels") {
                 Text("Favoriete zenders", style = MaterialTheme.typography.titleLarge)
@@ -244,13 +292,54 @@ fun HomeScreen(onPlay: (PlayerRoute) -> Unit, onOpenMovie: (Int) -> Unit, vm: Ho
     }
 }
 
+/** A followed programme: when and where on top, the title below. OK tunes in. */
+@Composable
+private fun UpcomingCard(m: FollowMatch, onClick: () -> Unit, modifier: Modifier = Modifier) {
+    Surface(
+        onClick = onClick,
+        modifier = modifier.width(260.dp).height(64.dp),
+        shape = ClickableSurfaceDefaults.shape(RoundedCornerShape(8.dp)),
+        scale = ClickableSurfaceDefaults.scale(focusedScale = 1.04f),
+        colors = Focus.bar(),
+    ) {
+        Column(Modifier.padding(horizontal = 12.dp, vertical = 8.dp)) {
+            val live = Live
+            Text(
+                buildAnnotatedString {
+                    val started = m.start <= System.currentTimeMillis() / 1000
+                    if (started) withStyle(SpanStyle(color = live, fontWeight = FontWeight.Medium)) { append("NU") } else append(whenLabel(m.start))
+                    append(" · ${m.channelName}")
+                },
+                style = MaterialTheme.typography.bodyMedium,
+                color = TextSecondary,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+            )
+            Text(m.title, style = MaterialTheme.typography.titleMedium, maxLines = 1, overflow = TextOverflow.Ellipsis)
+        }
+    }
+}
+
+/** "15:00" today, "Morgen 15:00", else "Za 15:00". */
+private fun whenLabel(startSec: Long): String {
+    val zone = ZoneId.systemDefault()
+    val at = Instant.ofEpochSecond(startSec).atZone(zone)
+    val today = LocalDate.now(zone)
+    val time = "%02d:%02d".format(at.hour, at.minute)
+    return when (at.toLocalDate()) {
+        today -> time
+        today.plusDays(1) -> "Morgen $time"
+        else -> at.dayOfWeek.getDisplayName(TextStyle.SHORT, Locale.forLanguageTag("nl-NL")).replaceFirstChar { it.uppercase() } + " $time"
+    }
+}
+
 /** Long-press on a "Verder kijken" tile. Focus starts on Verwijderen: it's what the long-press was for. */
 @Composable
 private fun RemoveDialog(title: String, onConfirm: () -> Unit, onDismiss: () -> Unit) {
     val remove = remember { FocusRequester() }
     Dialog(onDismissRequest = onDismiss) {
         Column(
-            Modifier.background(SurfaceColor, RoundedCornerShape(16.dp)).padding(32.dp).width(520.dp),
+            Modifier.ignoreHeldKey().background(SurfaceColor, RoundedCornerShape(16.dp)).padding(32.dp).width(520.dp),
             verticalArrangement = Arrangement.spacedBy(20.dp),
         ) {
             Text("Uit Verder kijken halen?", style = MaterialTheme.typography.headlineMedium)

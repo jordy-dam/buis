@@ -24,6 +24,10 @@ import nl.jordy.iptv.data.settings.UserPrefs
 import nl.jordy.iptv.data.xtream.NameParser
 import nl.jordy.iptv.ui.components.Focus
 import nl.jordy.iptv.ui.components.ListItemSurface
+import nl.jordy.iptv.ui.components.TvTextField
+import nl.jordy.iptv.data.repo.FollowRepository
+import androidx.compose.ui.text.input.ImeAction
+import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -105,7 +109,12 @@ class SettingsViewModel @Inject constructor(
     private val epg: EpgRepository,
     private val guide: EpgGuide,
     enricher: MovieEnricher,
+    private val follows: FollowRepository,
 ) : ViewModel() {
+    val followTerms = follows.terms.stateIn(viewModelScope, SharingStarted.Eagerly, emptyList())
+    fun follow(term: String) = viewModelScope.launch { follows.add(term) }
+    fun unfollow(term: String) = viewModelScope.launch { follows.remove(term) }
+
     /** "1.234 van 19.826 films": how far the background fetch of film details is. */
     val filmInfo = enricher.progress.map { (done, total) ->
         val n = NumberFormat.getIntegerInstance(Locale.forLanguageTag("nl-NL"))
@@ -219,6 +228,8 @@ fun SettingsScreen(onRefreshCatalog: () -> Unit, onLoggedOut: () -> Unit, onEdit
     val filmInfo by vm.filmInfo.collectAsStateWithLifecycle()
     var confirmLogout by remember { mutableStateOf(false) }
     var pickCountries by remember { mutableStateOf(false) }
+    var editFollows by remember { mutableStateOf(false) }
+    val followTerms by vm.followTerms.collectAsStateWithLifecycle()
 
     // Entering from the rail (whose Instellingen item sits at the bottom) must land on the first
     // setting, not on whatever row is nearest: that would be Uitloggen.
@@ -253,6 +264,12 @@ fun SettingsScreen(onRefreshCatalog: () -> Unit, onLoggedOut: () -> Unit, onEdit
             "Stopt het afspelen als er zo lang geen knop is ingedrukt. Een minuut ervoor vraagt BUIS of je nog kijkt.",
             value = if (prefs.sleepMinutes == 0) "Uit" else "${prefs.sleepMinutes} min",
             onClick = vm::cycleSleepTimer,
+        )
+        SettingRow(
+            "Volgen",
+            "Vijf minuten voordat een programma met deze woorden begint, laat BUIS het weten.",
+            value = followTerms.joinToString(", ").ifEmpty { "Niets" },
+            onClick = { editFollows = true },
         )
 
         Header("Voor iedereen", "Het abonnement, de catalogus en de gids delen alle profielen.") {
@@ -294,6 +311,9 @@ fun SettingsScreen(onRefreshCatalog: () -> Unit, onLoggedOut: () -> Unit, onEdit
             },
             onDismiss = { gates = null },
         )
+    }
+    if (editFollows) {
+        FollowDialog(followTerms, vm::follow, vm::unfollow, onDismiss = { editFollows = false })
     }
     if (pickCountries) {
         CountryDialog(countries, prefs.preferredCountries, vm::toggleCountry, onDismiss = { pickCountries = false })
@@ -398,6 +418,44 @@ private fun LogoutDialog(onConfirm: () -> Unit, onDismiss: () -> Unit) {
         }
     }
     LaunchedEffect(Unit) { cancel.requestFocus() }
+}
+
+/** The profile's search terms: OK on one removes it, the field below adds one. */
+@Composable
+private fun FollowDialog(terms: List<String>, onAdd: (String) -> Unit, onRemove: (String) -> Unit, onDismiss: () -> Unit) {
+    var draft by remember { mutableStateOf("") }
+    Dialog(onDismissRequest = onDismiss) {
+        Column(
+            Modifier.background(SurfaceColor, RoundedCornerShape(16.dp)).padding(24.dp).width(520.dp).heightIn(max = 520.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp),
+        ) {
+            Text("Volgen", style = MaterialTheme.typography.headlineMedium)
+            Text(
+                "Bijvoorbeeld \"Formule 1\" of \"FC Utrecht\". BUIS zoekt in de gids en meldt het als het bijna begint.",
+                style = MaterialTheme.typography.bodyMedium,
+                color = TextSecondary,
+            )
+            LazyColumn(Modifier.weight(1f, fill = false), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                items(terms, key = { it }) { term ->
+                    ListItemSurface(text = "$term   ·   OK om te verwijderen", selected = false, onClick = { onRemove(term) })
+                }
+            }
+            TvTextField(
+                label = "Toevoegen",
+                value = draft,
+                onValueChange = { draft = it },
+                imeAction = ImeAction.Done,
+                onImeAction = {
+                    onAdd(draft)
+                    draft = ""
+                },
+            )
+            PrimaryButton("Klaar", {
+                if (draft.isNotBlank()) onAdd(draft)
+                onDismiss()
+            })
+        }
+    }
 }
 
 @Composable

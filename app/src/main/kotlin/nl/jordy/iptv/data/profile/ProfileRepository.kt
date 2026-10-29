@@ -7,6 +7,7 @@ import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.catch
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.filterNotNull
 import kotlinx.coroutines.flow.first
@@ -47,6 +48,8 @@ class ProfileRepository @Inject constructor(
     /** Null only between a logout wipe and [ensureOne]. */
     val current: StateFlow<ProfileEntity?> = profiles
         .map { all -> all.maxByOrNull { it.lastUsedAt } }
+        // A closed database (a test's teardown) ends the stream quietly instead of crashing the next test.
+        .catch { }
         .stateIn(scope, SharingStarted.Eagerly, null)
 
     val currentId: Flow<Long> = current.filterNotNull().map { it.id }.distinctUntilChanged()

@@ -36,6 +36,10 @@ object NameParser {
     private val trailingTags = mapOf(
         "NL GESPROKEN" to ("NL gesproken" to "NL"),
         "NL GESUB" to ("NL sub" to "NL"),
+        "NL ONDERTITELD" to ("NL sub" to "NL"),
+        "ONDERTITELD" to ("NL sub" to "NL"),
+        "DUTCH SUBS" to ("NL sub" to "NL"),
+        "DUTCH SUBBED" to ("NL sub" to "NL"),
         "DOLBY" to ("Dolby" to null),
         "DOLBY VISION" to ("Dolby Vision" to null),
         "ATMOS" to ("Atmos" to null),
@@ -112,9 +116,15 @@ object NameParser {
     private fun classify(rawTag: String, allowNonCountry: Boolean): Pair<String?, String?>? {
         val tag = spaces.replace(rawTag.trim().uppercase(), " ")
         if (tag.contains("MULTI") || tag.contains("LINGO")) return (null as String?) to "Multi"
-        // NL-SUB / NL-AUDIO: Dutch content with subtitles or dubbing.
-        Regex("""^([A-Z]{2})[- ](SUB|AUDIO)$""").matchEntire(tag)?.let { m ->
-            return country(m.groupValues[1]) to (m.groupValues[1] + if (m.groupValues[2] == "SUB") " sub" else " audio")
+        // NL-SUB / NL SUBS / NL-AUDIO / NL DUBBED: subtitles or dubbing, in all the spellings panels use.
+        Regex("""^([A-Z]{2})[- ]?(SUBS?|SUBBED|SUBTITLED|GESUBD?|AUDIO|DUB|DUBBED|GESPROKEN)$""").matchEntire(tag)?.let { m ->
+            val cc = m.groupValues[1]
+            val badge = when (m.groupValues[2]) {
+                "AUDIO" -> "$cc audio"
+                "DUB", "DUBBED", "GESPROKEN" -> if (cc == "NL") "NL gesproken" else "$cc audio"
+                else -> "$cc sub"
+            }
+            return country(cc) to badge
         }
         // "CA EN" / "CA FR": a country with a language.
         Regex("""^([A-Z]{2}) ([A-Z]{2})$""").matchEntire(tag)?.let { m ->

@@ -11,7 +11,20 @@ import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.flatMapLatest
 import nl.jordy.iptv.data.db.MovieVersionRow
 import nl.jordy.iptv.data.repo.MovieVersions
-import nl.jordy.iptv.ui.components.Chip
+import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.window.Dialog
+import androidx.tv.material3.ClickableSurfaceDefaults
+import androidx.tv.material3.Surface
+import nl.jordy.iptv.ui.components.Focus
+import nl.jordy.iptv.ui.theme.Brand
+import nl.jordy.iptv.ui.theme.SurfaceColor
 import nl.jordy.iptv.ui.theme.TextSecondary
 import androidx.compose.foundation.layout.Row
 import androidx.compose.runtime.Composable
@@ -46,8 +59,8 @@ import nl.jordy.iptv.ui.components.SecondaryButton
 import nl.jordy.iptv.ui.player.formatTime
 import javax.inject.Inject
 
-/** A version the detail screen offers: the stream and its button text. */
-data class Version(val streamId: Int, val label: String, val containerExtension: String)
+/** A version the detail screen offers: the stream and how it reads in the version list. */
+data class Version(val streamId: Int, val label: MovieVersions.Label, val containerExtension: String)
 
 @OptIn(ExperimentalCoroutinesApi::class)
 @HiltViewModel
@@ -103,6 +116,7 @@ fun MovieDetailScreen(onPlay: (PlayerRoute) -> Unit, vm: MovieDetailViewModel = 
     val m = movie ?: return
     val primary = remember { FocusRequester() }
     LaunchedEffect(Unit) { runCatching { primary.requestFocus() } }
+    var pickVersion by remember { mutableStateOf(false) }
 
     val resumeAt = position?.let { ResumePolicy.startPosition(it.positionMs, it.durationMs) } ?: 0
     val version = versions.firstOrNull { it.streamId == selected }
@@ -124,16 +138,48 @@ fun MovieDetailScreen(onPlay: (PlayerRoute) -> Unit, vm: MovieDetailViewModel = 
                     } else {
                         PrimaryButton("Afspelen", { play(true) }, Modifier.focusRequester(primary))
                     }
-                    SecondaryButton(if (favorite) "♥︎ In favorieten" else "♡︎ Favoriet", { vm.toggleFavorite() })
-                }
-                // Language versions of the same film: picking one changes what Play starts.
-                if (versions.size > 1) {
-                    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                        Text("Versie", style = MaterialTheme.typography.labelLarge, color = TextSecondary, modifier = Modifier.padding(end = 4.dp))
-                        versions.forEach { v -> Chip(v.label, v.streamId == selected) { vm.select(v.streamId) } }
+                    // Language versions of the same film: one button next to Play, the choices in a list.
+                    if (versions.size > 1 && version != null) {
+                        SecondaryButton("${version.label.language} · ${versions.size} versies ▾", { pickVersion = true })
                     }
+                    SecondaryButton(if (favorite) "♥︎ In favorieten" else "♡︎ Favoriet", { vm.toggleFavorite() })
                 }
             }
         },
     )
+    if (pickVersion) {
+        VersionDialog(versions, selected, onPick = { vm.select(it); pickVersion = false }, onDismiss = { pickVersion = false })
+    }
+}
+
+/** The versions of a film, two lines each: the language, then title and quality. Focus starts on the current one. */
+@Composable
+private fun VersionDialog(versions: List<Version>, selected: Int, onPick: (Int) -> Unit, onDismiss: () -> Unit) {
+    val current = remember { FocusRequester() }
+    Dialog(onDismissRequest = onDismiss) {
+        Column(
+            Modifier.background(SurfaceColor, RoundedCornerShape(16.dp)).padding(24.dp).width(520.dp),
+            verticalArrangement = Arrangement.spacedBy(6.dp),
+        ) {
+            Text("Versie kiezen", style = MaterialTheme.typography.headlineMedium, modifier = Modifier.padding(start = 12.dp, bottom = 10.dp))
+            versions.forEach { v ->
+                val isCurrent = v.streamId == selected
+                Surface(
+                    onClick = { onPick(v.streamId) },
+                    modifier = Modifier.fillMaxWidth().then(if (isCurrent) Modifier.focusRequester(current) else Modifier),
+                    shape = ClickableSurfaceDefaults.shape(RoundedCornerShape(10.dp)),
+                    scale = ClickableSurfaceDefaults.scale(focusedScale = 1.02f),
+                    colors = Focus.bar(container = if (isCurrent) Brand.copy(alpha = 0.35f) else Color.Transparent),
+                ) {
+                    Column(Modifier.padding(horizontal = 14.dp, vertical = 10.dp)) {
+                        Text(v.label.language, style = MaterialTheme.typography.titleMedium)
+                        if (v.label.detail.isNotEmpty()) {
+                            Text(v.label.detail, style = MaterialTheme.typography.bodyMedium, color = TextSecondary, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                        }
+                    }
+                }
+            }
+        }
+    }
+    LaunchedEffect(Unit) { runCatching { current.requestFocus() } }
 }

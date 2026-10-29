@@ -225,3 +225,16 @@ data class MovieInfoEntity(
     /** TMDB id from `get_vod_info`: groups language versions whose titles differ. */
     val tmdbId: Int? = null,
 )
+
+/** A search term a profile follows ("Formule 1", "FC Utrecht"): matching programmes get a reminder. */
+@Entity(
+    tableName = "follow",
+    primaryKeys = ["profileId", "term"],
+    foreignKeys = [ForeignKey(ProfileEntity::class, ["id"], ["profileId"], onDelete = ForeignKey.CASCADE)],
+)
+data class FollowEntity(
+    val profileId: Long,
+    val term: String,
+    val addedAt: Long,
+)
+

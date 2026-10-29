@@ -95,3 +95,9 @@
 **Why:** Jordy wants films he won't finish out of the row. The same gesture already means "do something with this item" (favourite, pin).
 **Alternatives rejected:** Hiding while keeping the position (a second state to explain for a rare case); removing without asking (too easy to hit by accident on a remote).
 **Revisit if:** people want to hide but still resume later.
+
+## 2026-10-29 — 2g part 4: volgen with an in-app reminder; version list; held-key guard
+**Decision:** Each profile follows search terms (Instellingen → Volgen). Guide programmes whose title contains a term show in "Straks voor jou" on Home and trigger a reminder dialog five minutes before the start and, if put off, again at the start (with Vanaf begin on archive channels). The dialog takes focus on purpose, over whatever plays, and only while someone is in the app (no system notifications). The same programme on several channels becomes one reminder on the channel with an archive. Film versions are chosen from a list behind one button next to Afspelen, named by language in plain Dutch. Dialogs opened by a long-press ignore the still-held OK.
+**Why:** Jordy wants to not miss F1 and FC Utrecht while using the app; the version chips were long and read like provider tags; a long-press confirmed the remove dialog by itself.
+**Alternatives rejected:** A non-focused toast (no way to act on it with a remote without stealing focus anyway); system notifications (Google TV hardly shows them, and Jordy only needs it in the app); a term tied to one channel (Viaplay F1's own channel has no guide data, the Ziggo copy does).
+**Revisit if:** reminders nag (many followed programmes at once), or the Ziggo guide titles F1 too vaguely for a term.

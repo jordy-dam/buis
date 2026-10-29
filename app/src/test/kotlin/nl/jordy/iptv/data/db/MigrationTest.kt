@@ -176,6 +176,18 @@ class MigrationTest {
         }
     }
 
+    @Test
+    fun `10 to 11 adds an empty follow list and keeps the catalog`() {
+        helper.createDatabase(DB, 10).use { db ->
+            db.execSQL("INSERT INTO profile (id, name, avatar, face, pinHash, preferredCountries, onlyPreferred, kids, lastUsedAt, createdAt, sleepMinutes, pinnedCategories) VALUES (1, 'Anna', 3, 2, NULL, 'NL', 1, 0, 5, 1, 0, '')")
+            db.execSQL("INSERT INTO sync_info (id, lastSyncAt, generation) VALUES (0, 3, 1)")
+        }
+        helper.runMigrationsAndValidate(DB, 11, true).use { db ->
+            assertEquals(0, db.count("follow"))
+            assertEquals("no catalog re-sync for this one", 1, db.count("sync_info"))
+        }
+    }
+
     private fun SupportSQLiteDatabase.insertPhase1Data() {
         execSQL("INSERT INTO favorite (type, itemId, name, imageUrl, addedAt) VALUES ('LIVE', 101, '┃NL┃ NPO 1 HD', NULL, 1)")
         execSQL("INSERT INTO playback_position (type, itemId, positionMs, durationMs, updatedAt) VALUES ('MOVIE', 5001, 62000, 180000, 2)")

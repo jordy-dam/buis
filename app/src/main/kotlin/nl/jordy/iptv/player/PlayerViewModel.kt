@@ -235,8 +235,15 @@ class PlayerViewModel @Inject constructor(
             val (now, next) = epg.nowAndNext(streamId)
             val channel = channels.firstOrNull { it.streamId == streamId } ?: db.catalog().liveByIds(listOf(streamId)).firstOrNull()
             _state.update { it.copy(now = now, next = next, canRestart = Catchup.canRestart(channel, now, System.currentTimeMillis() / 1000)) }
+            // "Vanaf begin" from a reminder: once, for the channel the player opened on.
+            if (startFromBeginning && streamId == route.id) {
+                startFromBeginning = false
+                watchFromStart()
+            }
         }
     }
+
+    private var startFromBeginning = isLive && route.fromStart
 
     // Vanaf begin
 

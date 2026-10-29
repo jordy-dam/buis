@@ -34,7 +34,9 @@ class MovieVersionsTest {
             MovieVersionRow(movie("c", 4, "Film", 2020), null),
             MovieVersionRow(movie("d", 5, "Film", 2020), null),
         )
-        assertEquals(listOf("Origineel 1", "NL sub", "Multi · 4K", "Origineel 2", "Origineel 3"), MovieVersions.labels(rows))
+        val labels = MovieVersions.labels(rows)
+        assertEquals(listOf("Origineel 1", "Nederlands ondertiteld", "Meerdere talen", "Origineel 2", "Origineel 3"), labels.map { it.language })
+        assertEquals("quality goes on the second line", listOf("", "", "4K", "", ""), labels.map { it.detail })
     }
 
     @Test
@@ -44,7 +46,22 @@ class MovieVersionsTest {
             MovieVersionRow(movie("a", 2, "The Croods: A New Age", 2020), "NL"),
         )
         assertEquals(
-            listOf("NL gesproken · The Croods 2: Een Nieuw Begin", "Origineel · The Croods: A New Age"),
+            listOf(
+                MovieVersions.Label("Nederlands gesproken", "The Croods 2: Een Nieuw Begin"),
+                MovieVersions.Label("Origineel", "The Croods: A New Age"),
+            ),
+            MovieVersions.labels(rows),
+        )
+    }
+
+    @Test
+    fun `provider tags read as plain Dutch, UK audio is English`() {
+        val rows = listOf(
+            MovieVersionRow(movie("a", 1, "Film", 2020, "UK audio,HDR"), null),
+            MovieVersionRow(movie("a", 2, "Film", 2020, "NL audio"), "NL"),
+        )
+        assertEquals(
+            listOf(MovieVersions.Label("Engels gesproken", "HDR"), MovieVersions.Label("Nederlands gesproken", "")),
             MovieVersions.labels(rows),
         )
     }

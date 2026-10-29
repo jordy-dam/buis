@@ -23,8 +23,9 @@ import androidx.sqlite.db.SupportSQLiteDatabase
         EpgChannelEntity::class,
         EpgInfoEntity::class,
         MovieInfoEntity::class,
+        FollowEntity::class,
     ],
-    version = 10,
+    version = 11,
     exportSchema = true,
     autoMigrations = [
         AutoMigration(from = 1, to = 2, spec = AppDatabase.CatalogResync::class),
@@ -42,6 +43,8 @@ import androidx.sqlite.db.SupportSQLiteDatabase
         AutoMigration(from = 8, to = 9),
         // Catch-up days per channel: catalog re-syncs to fill them.
         AutoMigration(from = 9, to = 10, spec = AppDatabase.CatalogResync::class),
+        // What each profile follows ("Formule 1"); a new, empty table.
+        AutoMigration(from = 10, to = 11),
     ],
 )
 abstract class AppDatabase : RoomDatabase() {
@@ -54,6 +57,7 @@ abstract class AppDatabase : RoomDatabase() {
     abstract fun search(): SearchDao
     abstract fun epg(): EpgDao
     abstract fun movieInfo(): MovieInfoDao
+    abstract fun follows(): FollowDao
 
     /**
      * The catalog is a cache of the provider: after a schema change it's emptied and the next

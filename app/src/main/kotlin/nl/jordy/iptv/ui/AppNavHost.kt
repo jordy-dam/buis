@@ -1,5 +1,10 @@
 package nl.jordy.iptv.ui
 
+import androidx.compose.runtime.getValue
+import androidx.navigation.NavDestination.Companion.hasRoute
+import androidx.navigation.compose.currentBackStackEntryAsState
+import nl.jordy.iptv.ui.reminders.ReminderHost
+
 import androidx.compose.runtime.Composable
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
@@ -21,6 +26,15 @@ import nl.jordy.iptv.ui.sync.SyncScreen
 @Composable
 fun AppNavHost(start: Any) {
     val nav = rememberNavController()
+    val entry by nav.currentBackStackEntryAsState()
+    // Reminders only where someone is watching: not over login, the catalog sync or "Wie kijkt er?".
+    val dest = entry?.destination
+    val watching = dest != null && (dest.hasRoute<ShellRoute>() || dest.hasRoute<PlayerRoute>() || dest.hasRoute<MovieDetailRoute>() || dest.hasRoute<SeriesDetailRoute>())
+    ReminderHost(watching, onWatch = { route ->
+        // From another channel or a film: the reminder's channel replaces it, Back still leads home.
+        if (nav.currentDestination?.hasRoute<PlayerRoute>() == true) nav.popBackStack()
+        nav.navigate(route)
+    })
     NavHost(navController = nav, startDestination = start) {
         composable<LoginRoute> {
             LoginScreen(onLoggedIn = { nav.navigate(SyncRoute) { popUpTo(LoginRoute) { inclusive = true } } })

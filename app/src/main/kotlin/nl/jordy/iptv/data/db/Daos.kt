@@ -260,3 +260,41 @@ const val FILM_KEY = "COALESCE(CAST(m.tmdbId AS TEXT), CAST(i.tmdbId AS TEXT), l
 data class MovieTile(@Embedded val movie: MovieEntity, val versions: Int, val firstSort: Int)
 
 data class MovieVersionRow(@Embedded val movie: MovieEntity, val country: String?)
+
+/** A guide programme that matches a followed term, with the channel it's on. */
+data class FollowMatchRow(
+    val term: String,
+    val start: Long,
+    val stop: Long,
+    val title: String,
+    val streamId: Int,
+    val channelName: String,
+    val categoryId: String,
+    val archiveDays: Int,
+    val catchup: Boolean,
+)
+
+/** Per profile, like favourites. */
+@Dao
+interface FollowDao {
+    @Upsert suspend fun upsert(item: FollowEntity)
+    @Query("DELETE FROM follow WHERE profileId = :profileId AND term = :term") suspend fun delete(profileId: Long, term: String)
+    @Query("SELECT * FROM follow WHERE profileId = :profileId ORDER BY addedAt") fun observe(profileId: Long): Flow<List<FollowEntity>>
+
+    /**
+     * Programmes between [from] and [until] whose title contains one of the profile's terms (SQLite's
+     * LIKE ignores case), on every live channel that uses that guide channel. Duplicates (the same
+     * programme on an HD and an FHD channel) are folded by [nl.jordy.iptv.data.repo.FollowMatches].
+     */
+    @Query(
+        "SELECT f.term AS term, p.start AS start, p.stop AS stop, p.title AS title, l.streamId AS streamId, " +
+            "l.name AS channelName, l.categoryId AS categoryId, l.archiveDays AS archiveDays, l.catchup AS catchup " +
+            "FROM follow f JOIN epg_programme p ON p.title LIKE '%' || f.term || '%' " +
+            "JOIN epg_channel c ON c.channelId = p.channelId JOIN live_channel l ON l.streamId = c.streamId " +
+            "LEFT JOIN category k ON k.type = 'LIVE' AND k.id = l.categoryId " +
+            "WHERE f.profileId = :profileId AND p.stop > :from AND p.start < :until AND (:hideAdult = 0 OR IFNULL(k.adult, 0) = 0) " +
+            "ORDER BY p.start, l.sortIndex",
+    )
+    suspend fun matches(profileId: Long, from: Long, until: Long, hideAdult: Boolean): List<FollowMatchRow>
+}
+
