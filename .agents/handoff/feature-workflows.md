@@ -33,14 +33,14 @@ New since: `docs/brainstorm.md` (open idea list) and **Pauzemoment** on branch `
 
 - Phase 2h on the same branch (schema 20): Opties in the player, Bedtijd, Kijkgeschiedenis + weekoverzicht,
   Zenderstatus, Intro overslaan, Stemming/lengte, instant replay, Testbeeld easter egg, round PIN keys,
-  screensaver. Plan: `docs/plans/2026-10-29-phase-2h-brainstorm.md`. Emulator-tested; **not on the tv**.
+  screensaver. Plan: `docs/plans/2026-10-29-phase-2h-brainstorm.md`. Emulator-tested; on the tv since 15:47 (release, 779bdd9); screensaver not switched on there.
 
-**Last completed step:** phase 2h built and committed (f90b431); release build ready, not installed.
+**Last completed step:** phase 2h installed on the tv (release 779bdd9, schema 14 → 20); started fine.
 
 **Mid-flight:** nothing — clean break. Jordy still has to set `main` as default branch on github.com.
 
 ## Next up
-1. Install 2h on the tv when Jordy says so; screensaver needs his OK for `settings put secure screensaver_components`. Then his tv test, then merge `feat/pauzemoment` to `main` and push. Ask Jordy: does a mid-film pause annoy, is the corner card style right for all four cards?
+1. Jordy tests 2h on the tv. The screensaver needs his OK for `adb shell settings put secure screensaver_components nl.jordy.iptv/.ui.dream.BuisDream`. Then, then merge `feat/pauzemoment` to `main` and push. Ask Jordy: does a mid-film pause annoy, is the corner card style right for all four cards?
 2. Start other new work from `main` on a fresh branch. Ideas: `docs/brainstorm.md` (next pick: Home Assistant).
 3. Wait for Jordy's report on vanaf begin on real channels (↺ on Viaplay F1/ESPN? seeking in timeshift?) — fix only if needed.
 4. Candidates when he asks: number-key zapping (parked), auto-play into a Home "Jouw diensten" row,

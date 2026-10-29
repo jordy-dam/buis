@@ -1,6 +1,6 @@
 # 2026-10-29 — Phase 2h: the ✓ ideas from the brainstorm
 
-Status: **built and emulator-tested (2026-10-29); not on the tv.** Branch `feat/pauzemoment`, on top of
+Status: **built, emulator-tested, on the tv since 2026-10-29 15:47 (release 779bdd9); Jordy's tv test pending. Screensaver not switched on on the tv.** Branch `feat/pauzemoment`, on top of
 Pauzemoment. Jordy picked these in `docs/brainstorm.md` and said "bouw het allemaal maar". Each part is
 its own commit, so each can be tested or reverted on its own. Schema 15 → 20.
 
