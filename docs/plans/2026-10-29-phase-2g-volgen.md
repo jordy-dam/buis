@@ -235,3 +235,4 @@ programme is over. The reminder's "Volgen aanpassen" dialog now has its terms lo
 Tested: unit 142 (one programme only, toggle off, cleanup, merge, migration 11→12). Emulator: OK on
 12:30 Sport 1035 marks only that one, long-press on Journaal 1035 marks every Journaal 1035.
 Text size: Jordy keeps the smaller step ("perfect zo").
+- On the tv (release, 2026-10-29 ~12:20): starts, schema 12 migrated, terms and Home intact ("Straks voor jou" shows SBS 6, Ziggo Sport 3, ESPN 2). Titles followed with the old guide OK (e.g. "De Bondgenoten") stay as Volgen terms until removed in the Volgen dialog.
