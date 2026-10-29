@@ -35,7 +35,9 @@ New since: `docs/brainstorm.md` (open idea list) and **Pauzemoment** on branch `
   Zenderstatus, Intro overslaan, Stemming/lengte, instant replay, Testbeeld easter egg, round PIN keys,
   screensaver. Plan: `docs/plans/2026-10-29-phase-2h-brainstorm.md`. Emulator-tested; on the tv since 16:11 (release fee9212, incl. icons, shorter Instellingen, Opties fix, Versie row); screensaver not switched on there.
 
-**Last completed step:** icons + Instellingen round installed on the tv (release fee9212); started fine.
+**Last completed step:** consistency round built (f8f255f): HD/SD badges (schema 21: the first launch re-syncs
+the catalog), icon buttons on cards and detail, no text glyphs left, and the icon/word + card-layout rule in the
+spec's design principles. Release built, **not on the tv yet** (the tv has fee9212).
 
 **Mid-flight:** nothing — clean break. Jordy still has to set `main` as default branch on github.com.
 
