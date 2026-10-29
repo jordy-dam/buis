@@ -292,77 +292,77 @@ fun SettingsScreen(onRefreshCatalog: () -> Unit, onLoggedOut: () -> Unit, onEdit
         Header("Voor $profileName") { profile?.let { AvatarCircle(it.name, it.avatar, 28.dp, face = it.face) } }
         SettingRow(
             "Profiel bewerken",
-            "Naam, kleur, pincode en kinderprofiel.",
+            "Naam, kleur, pincode, kinderprofiel",
             onClick = { openEdit() },
             modifier = Modifier.focusRequester(first),
         )
         SettingRow(
             "Voorkeurslanden",
-            "Staan bovenaan in Live TV, Films, Series en Zoeken.",
+            "Staan overal bovenaan",
             value = prefs.preferredCountries.sorted().joinToString(", ") { NameParser.countryName(it) },
             onClick = { pickCountries = true },
         )
         SettingRow(
             "Alleen voorkeurslanden tonen",
-            "Andere landen blijven bereikbaar via \"Alle landen tonen\" onderaan elke lijst.",
+            "Andere landen via \"Alle landen tonen\"",
             toggle = prefs.onlyPreferred,
             onClick = vm::toggleOnlyPreferred,
         )
         SettingRow(
             "Geluid",
-            "Taal die de speler kiest als de film of serie hem heeft; Standaard volgt de taal van de tv. In de speler kies je per titel (▼ opties).",
+            "Voorkeurstaal; per titel via ▼ in de speler",
             value = TrackLabels.name(prefs.audioLang, TrackLabels.AUDIO_CHOICES),
             onClick = vm::cycleAudioLang,
         )
         SettingRow(
             "Ondertitels",
-            "Gaan aan in deze taal als de film of serie ze heeft.",
+            "Gaan aan als de titel ze heeft",
             value = TrackLabels.name(prefs.subtitleLang, TrackLabels.SUBTITLE_CHOICES),
             onClick = vm::cycleSubtitleLang,
         )
         SettingRow(
             "Slaaptimer",
-            "Stopt het afspelen als er zo lang geen knop is ingedrukt. Een minuut ervoor vraagt BUIS of je nog kijkt.",
+            "Stopt na zo lang zonder knop",
             value = if (prefs.sleepMinutes == 0) "Uit" else "${prefs.sleepMinutes} min",
             onClick = vm::cycleSleepTimer,
         )
         SettingRow(
             "Bedtijd",
-            "Op dit tijdstip vraagt BUIS één keer: doorkijken of lekker naar bed?",
+            "Eén keer: doorkijken of naar bed?",
             value = Bedtime.timeName(prefs.bedtime),
             onClick = vm::cycleBedtime,
         )
         if (prefs.bedtime >= 0) {
             SettingRow(
                 "Bedtijd op",
-                "Zo–do: de avonden voor een werk- of schooldag.",
+                "Zo–do = avonden voor een werkdag",
                 value = Bedtime.daysName(prefs.bedtimeDays),
                 onClick = vm::cycleBedtimeDays,
             )
         }
         SettingRow(
             "Pauzemoment",
-            "Na zo lang kijken pauzeert BUIS even, zodat iedereen kan plassen, drinken of iets pakken. Alleen bij films en series.",
+            "Even pauze na zo lang kijken",
             value = if (prefs.breakMinutes == 0) "Uit" else "${prefs.breakMinutes} min",
             onClick = vm::cycleBreak,
         )
         if (prefs.breakMinutes > 0) {
             SettingRow(
                 "Pauzeduur",
-                "Zo lang wacht BUIS voordat het vanzelf verder speelt. OK op de pauzekaart gaat altijd meteen verder.",
+                "Daarna speelt het vanzelf verder",
                 value = "${prefs.breakLength} min",
                 onClick = vm::cycleBreakLength,
             )
         }
         SettingRow(
             "Volgen",
-            "Vijf minuten voordat een programma met deze woorden begint, laat BUIS het weten.",
+            "Seintje 5 minuten voor de start",
             value = followTerms.joinToString(", ").ifEmpty { "Niets" },
             onClick = { editFollows = true },
         )
         SettingRow(
             "Kijkgeschiedenis",
-            "Wat je keek, met je weekoverzicht: uren, zenders, je langste binge.",
+            "Wat je keek, en je weekoverzicht",
             onClick = onOpenHistory,
         )
 
@@ -375,20 +375,21 @@ fun SettingsScreen(onRefreshCatalog: () -> Unit, onLoggedOut: () -> Unit, onEdit
             onClick = onRefreshCatalog,
         )
         SettingRow("Gids vernieuwen", guideStatus, onClick = vm::refreshGuide)
-        SettingRow("Filmgegevens", "Genres per film, voor het filter bij Films.", value = filmInfo)
-        SettingRow("Zenderstatus", "Welke zenders haperen, en een voorstel om het op te lossen.", onClick = onOpenChannelHealth)
+        SettingRow("Filmgegevens", "Voor genres en lengte bij Films", value = filmInfo)
+        SettingRow("Zenderstatus", "Haperende zenders en een oplossing", onClick = onOpenChannelHealth)
 
+        SettingRow("Versie", value = "${BuildConfig.VERSION_NAME} · ${BuildConfig.GIT_SHA} · ${BuildConfig.BUILD_DATE}")
         SettingRow("Server", value = state.server)
         SettingRow("Gebruiker", value = state.username)
         SettingRow(
             "Uitloggen",
-            "Vergeet dit abonnement. Profielen, favorieten, kijkgeschiedenis en filmgegevens blijven op deze tv.",
+            "Profielen en geschiedenis blijven",
             onClick = { confirmLogout = true },
             destructive = true,
         )
         SettingRow(
             "Alles wissen",
-            "Haalt alles van BUIS van deze tv, ook de profielen. Voor als de tv weggaat.",
+            "Alles weg, ook profielen",
             onClick = {
                 scope.launch {
                     val lock = vm.wipeLock()
@@ -400,8 +401,8 @@ fun SettingsScreen(onRefreshCatalog: () -> Unit, onLoggedOut: () -> Unit, onEdit
 
         if (BuildConfig.DEBUG) {
             Header("Ontwikkeling")
-            SettingRow("EPG controleren", epgCheck ?: "Hoeveel van je voorkeurszenders een programmagids hebben.", onClick = vm::checkEpg)
-            SettingRow("Screensaver bekijken", "Zoals de tv hem toont. Terug sluit hem.", onClick = { dreamPreview = true })
+            SettingRow("EPG controleren", epgCheck ?: "Gidsdekking van je voorkeurszenders", onClick = vm::checkEpg)
+            SettingRow("Screensaver bekijken", "Voorbeeld; Terug sluit hem", onClick = { dreamPreview = true })
         }
     }
 

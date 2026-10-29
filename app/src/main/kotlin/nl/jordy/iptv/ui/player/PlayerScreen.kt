@@ -382,27 +382,20 @@ private fun OptionsPanel(state: PlayerUiState, vm: PlayerViewModel, modifier: Mo
         verticalArrangement = Arrangement.spacedBy(6.dp),
     ) {
         Text("Opties", style = MaterialTheme.typography.labelLarge, color = Live)
-        val audioClickable = state.audio.size > 1
-        val subsClickable = state.subtitles.isNotEmpty()
+        // Every row takes focus, also with nothing to choose: a panel where only one row reacts feels stuck.
         SettingRow(
             "Geluid",
             value = state.audioSelected?.let { state.audio.getOrNull(it)?.label } ?: "Standaard",
-            onClick = if (audioClickable) vm::nextAudio else null,
-            modifier = if (audioClickable) Modifier.focusRequester(first) else Modifier,
+            onClick = vm::nextAudio,
+            modifier = Modifier.focusRequester(first),
         )
         SettingRow(
             "Ondertitels",
-            value = if (!subsClickable) "Geen" else state.subtitleSelected?.let { state.subtitles.getOrNull(it)?.label } ?: "Uit",
-            onClick = if (subsClickable) vm::nextSubtitle else null,
-            modifier = if (subsClickable && !audioClickable) Modifier.focusRequester(first) else Modifier,
+            value = if (state.subtitles.isEmpty()) "Geen" else state.subtitleSelected?.let { state.subtitles.getOrNull(it)?.label } ?: "Uit",
+            onClick = vm::nextSubtitle,
         )
-        SettingRow(
-            "Klok",
-            toggle = state.showClock,
-            onClick = vm::toggleClock,
-            modifier = if (!audioClickable && !subsClickable) Modifier.focusRequester(first) else Modifier,
-        )
-        Text("Geluid en ondertitels gelden voor deze titel. Vaste talen: Instellingen → Voor jou.", style = MaterialTheme.typography.bodyMedium, color = TextSecondary)
+        SettingRow("Klok", toggle = state.showClock, onClick = vm::toggleClock)
+        Text("Geluid en ondertitels gelden voor deze titel", style = MaterialTheme.typography.bodyMedium, color = TextSecondary)
     }
     LaunchedEffect(Unit) { runCatching { first.requestFocus() } }
 }

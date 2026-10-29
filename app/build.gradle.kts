@@ -1,3 +1,5 @@
+import java.time.LocalDate
+
 plugins {
     alias(libs.plugins.android.application)
     alias(libs.plugins.kotlin.compose)
@@ -16,6 +18,12 @@ android {
         targetSdk = 37
         versionCode = 1
         versionName = "0.1.0"
+        // Instellingen → Versie shows which commit and day this build is, so it's clear what's on the tv.
+        val gitSha = runCatching {
+            providers.exec { commandLine("git", "rev-parse", "--short", "HEAD") }.standardOutput.asText.get().trim()
+        }.getOrDefault("onbekend")
+        buildConfigField("String", "GIT_SHA", "\"$gitSha\"")
+        buildConfigField("String", "BUILD_DATE", "\"${LocalDate.now()}\"")
         // Google TV devices are ARM; many (e.g. Chromecast with Google TV) run a 32-bit userspace.
         // x86_64 is only for the emulator on Intel hosts, so it is left out.
         ndk { abiFilters += listOf("arm64-v8a", "armeabi-v7a") }
