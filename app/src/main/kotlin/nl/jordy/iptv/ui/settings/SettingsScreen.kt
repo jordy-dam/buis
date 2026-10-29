@@ -27,7 +27,7 @@ import nl.jordy.iptv.ui.components.ListItemSurface
 import nl.jordy.iptv.ui.components.TvTextField
 import nl.jordy.iptv.data.repo.FollowRepository
 import nl.jordy.iptv.data.repo.FollowMatch
-import nl.jordy.iptv.ui.home.whenLabel
+import nl.jordy.iptv.ui.reminders.FollowDialog
 import kotlinx.coroutines.flow.mapLatest
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -430,68 +430,6 @@ private fun LogoutDialog(onConfirm: () -> Unit, onDismiss: () -> Unit) {
         }
     }
     LaunchedEffect(Unit) { cancel.requestFocus() }
-}
-
-/** The profile's search terms with what each finds next: OK on one removes it, the field below adds one. */
-@Composable
-private fun FollowDialog(
-    terms: List<String>,
-    next: Map<String, FollowMatch?>,
-    onAdd: (String) -> Unit,
-    onRemove: (String) -> Unit,
-    onDismiss: () -> Unit,
-) {
-    var draft by remember { mutableStateOf("") }
-    Dialog(onDismissRequest = onDismiss) {
-        Column(
-            Modifier.background(SurfaceColor, RoundedCornerShape(16.dp)).padding(24.dp).width(520.dp).heightIn(max = 520.dp),
-            verticalArrangement = Arrangement.spacedBy(12.dp),
-        ) {
-            Text("Volgen", style = MaterialTheme.typography.headlineMedium)
-            Text(
-                "Bijvoorbeeld \"Formule 1\" of \"FC Utrecht\". BUIS zoekt in titels en omschrijvingen van de gids (zo'n anderhalve dag vooruit) en meldt het als het bijna begint. OK op een zoekterm haalt hem weg.",
-                style = MaterialTheme.typography.bodyMedium,
-                color = TextSecondary,
-            )
-            LazyColumn(Modifier.weight(1f, fill = false), verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                items(terms, key = { it }) { term ->
-                    Surface(
-                        onClick = { onRemove(term) },
-                        modifier = Modifier.fillMaxWidth(),
-                        shape = ClickableSurfaceDefaults.shape(RoundedCornerShape(8.dp)),
-                        scale = ClickableSurfaceDefaults.scale(focusedScale = 1.02f),
-                        colors = Focus.bar(container = androidx.compose.ui.graphics.Color.Transparent),
-                    ) {
-                        Column(Modifier.padding(horizontal = 14.dp, vertical = 8.dp)) {
-                            Text(term, style = MaterialTheme.typography.titleMedium)
-                            val m = next[term]
-                            Text(
-                                m?.let { "${whenLabel(it.start)} · ${it.channelName} · ${it.title}" } ?: "Nog niets in de gids",
-                                style = MaterialTheme.typography.bodyMedium,
-                                color = TextSecondary,
-                                maxLines = 1,
-                                overflow = TextOverflow.Ellipsis,
-                            )
-                        }
-                    }
-                }
-            }
-            TvTextField(
-                label = "Toevoegen",
-                value = draft,
-                onValueChange = { draft = it },
-                imeAction = ImeAction.Done,
-                onImeAction = {
-                    onAdd(draft)
-                    draft = ""
-                },
-            )
-            PrimaryButton("Klaar", {
-                if (draft.isNotBlank()) onAdd(draft)
-                onDismiss()
-            })
-        }
-    }
 }
 
 @Composable

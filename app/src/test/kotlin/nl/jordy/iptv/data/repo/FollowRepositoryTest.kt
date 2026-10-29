@@ -73,6 +73,27 @@ class FollowRepositoryTest {
     }
 
     @Test
+    fun `the guide covers pinned categories and favourites, not only the preferred countries`() = runTest {
+        db.catalog().upsertCategories(
+            listOf(
+                CategoryEntity(ContentType.LIVE, "nl", "NL Algemeen", 0, 1, country = "NL"),
+                CategoryEntity(ContentType.LIVE, "ziggo", "Ziggo Kabel", 1, 1, country = null),
+                CategoryEntity(ContentType.LIVE, "de", "DE Sport", 2, 1, country = "DE"),
+            ),
+        )
+        db.catalog().upsertLive(
+            listOf(
+                LiveChannelEntity("nl", 1, "NPO 1", null, "npo1", 0, 1),
+                LiveChannelEntity("ziggo", 2, "ESPN 1", null, "espn1", 0, 1),
+                LiveChannelEntity("de", 3, "Sky DE", null, "sky", 0, 1),
+                LiveChannelEntity("de", 4, "Sport1", null, "sport1", 1, 1),
+            ),
+        )
+        val rows = db.catalog().liveForGuide(listOf("NL"), categoryIds = listOf("ziggo"), streamIds = listOf(4))
+        assertEquals(setOf(1, 2, 4), rows.map { it.streamId }.toSet())
+    }
+
+    @Test
     fun `a kids profile is never sent to an adult channel`() = runTest {
         profiles.ensureOne()
         db.catalog().upsertCategories(listOf(CategoryEntity(ContentType.LIVE, "xxx", "ADULT", 0, 1, adult = true)))

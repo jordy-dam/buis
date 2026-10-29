@@ -205,3 +205,17 @@ only tile, row disappears and focus lands on the rail. Moving focus to a neighbo
   dimmed screen, instead of a dialog in the middle.
 - Tested: unit 137 green (blocks, one per term, description match). Emulator: the card, one Home tile per
   term, the Volgen dialog's "11:30 · NPO 1 · Sport 101".
+
+## Guide per channel, pinned live categories, guide coverage (2026-10-29)
+- **Right on a channel** opens its guide on the right: NU, then everything coming (stored guide, else the
+  provider's short EPG). The focused programme shows description and times. OK on NU tunes in; OK on a later
+  programme sets a reminder for exactly that title (OK again removes it); "Herinnering staat aan" marks it.
+- **Live TV categories can be pinned** like services (long-press OK / Menu): "Ziggo Kabel", "Canal+" on the
+  light-blue panel on top.
+- **The stored guide now also covers pinned live categories and favourite channels** of every profile, not
+  only the preferred countries. Likely why "FC Utrecht" found nothing: sports channels in a category without
+  a country tag weren't in the guide, so following couldn't see them. Pinning a live category refreshes the
+  guide at once; a new favourite joins at the next refresh (or Instellingen → Gids vernieuwen).
+- Reminder card: "Volgen aanpassen" opens the terms right there. Volgen dialog: Toevoegen on top, terms below.
+- Tested: unit 138 green (guide coverage query). Emulator: pinning "Events · PPV", the guide panel with
+  descriptions and the reminder mark, OK sets a reminder, the card with Volgen aanpassen and the dialog.

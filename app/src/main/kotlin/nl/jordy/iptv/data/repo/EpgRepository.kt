@@ -38,6 +38,20 @@ class EpgRepository @Inject constructor(
 
     fun clearCache() = cache.evictAll()
 
+    /**
+     * A channel's programmes from now on, for its guide panel: the stored guide, else the provider's
+     * short EPG (up to [limit] entries) for channels the guide doesn't cover.
+     */
+    suspend fun schedule(streamId: Int, nowSec: Long = System.currentTimeMillis() / 1000, limit: Int = 40): List<EpgEntry> {
+        val guide = db.epg().upcoming(streamId, nowSec, limit = 200).map { EpgEntry(it.title, it.description, it.start, it.stop) }
+        if (guide.isNotEmpty()) return guide
+        val c = credentials.current() ?: return emptyList()
+        return limiter.withPermit {
+            runCatching { XtreamParser.shortEpg(client.get(c, "get_short_epg", "stream_id" to "$streamId", "limit" to "$limit")) }
+                .getOrDefault(emptyList())
+        }.filter { it.stop > nowSec }
+    }
+
 
     private suspend fun entries(streamId: Int): List<EpgEntry> {
         cache.get(streamId)?.takeIf { System.currentTimeMillis() - it.fetchedAt < TTL_MS }?.let { return it.entries }

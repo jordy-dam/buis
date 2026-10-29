@@ -101,3 +101,9 @@
 **Why:** Jordy wants to not miss F1 and FC Utrecht while using the app; the version chips were long and read like provider tags; a long-press confirmed the remove dialog by itself.
 **Alternatives rejected:** A non-focused toast (no way to act on it with a remote without stealing focus anyway); system notifications (Google TV hardly shows them, and Jordy only needs it in the app); a term tied to one channel (Viaplay F1's own channel has no guide data, the Ziggo copy does).
 **Revisit if:** reminders nag (many followed programmes at once), or the Ziggo guide titles F1 too vaguely for a term.
+
+## 2026-10-29 — Guide per channel; the guide covers pinned categories and favourites
+**Decision:** Right on a channel row opens that channel's guide (a panel on the right); OK on a later programme sets a reminder for that exact title. Live TV categories can be pinned like services. The stored guide covers the preferred countries plus every profile's pinned live categories and favourite channels; pinning a live category refreshes the guide immediately.
+**Why:** Jordy couldn't see how the guide names things (to pick a Volgen term), wants to pin providers like "Ziggo Kabel", and "FC Utrecht" found nothing — sports channels in country-less categories weren't in the guide at all.
+**Alternatives rejected:** A full EPG grid now (more work; the per-channel panel answers the question); downloading the guide for every channel (thousands of channels, slow on the tv for little gain).
+**Revisit if:** a full grid is wanted, or the guide gets slow with many pinned categories.

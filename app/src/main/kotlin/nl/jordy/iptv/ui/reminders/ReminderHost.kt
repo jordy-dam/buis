@@ -25,6 +25,12 @@ import androidx.tv.material3.Text
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.flow.SharingStarted
+import kotlinx.coroutines.flow.mapLatest
+import kotlinx.coroutines.flow.stateIn
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.setValue
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import nl.jordy.iptv.data.repo.FollowMatches
@@ -63,6 +69,16 @@ class ReminderViewModel @Inject constructor(private val follows: FollowRepositor
     private val shown = mutableSetOf<String>()
     val due = MutableStateFlow<FollowMatches.Due?>(null)
 
+    /** For "Volgen aanpassen" straight from a reminder. */
+    val terms = follows.terms.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
+    @OptIn(ExperimentalCoroutinesApi::class)
+    val next = follows.terms.mapLatest { terms ->
+        val found = runCatching { follows.upcoming() }.getOrDefault(emptyList())
+        terms.associateWith { t -> found.firstOrNull { it.term == t } }
+    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyMap())
+    fun follow(term: String) = viewModelScope.launch { follows.add(term) }
+    fun unfollow(term: String) = viewModelScope.launch { follows.remove(term) }
+
     init {
         viewModelScope.launch {
             while (isActive) {
@@ -92,6 +108,14 @@ class ReminderViewModel @Inject constructor(private val follows: FollowRepositor
 @Composable
 fun ReminderHost(active: Boolean, onWatch: (PlayerRoute) -> Unit, vm: ReminderViewModel = hiltViewModel()) {
     val due by vm.due.collectAsStateWithLifecycle()
+    // Outlives the reminder: "Volgen aanpassen" puts the reminder away and opens the terms in its place.
+    var editFollows by remember { mutableStateOf(false) }
+    if (editFollows) {
+        val terms by vm.terms.collectAsStateWithLifecycle()
+        val next by vm.next.collectAsStateWithLifecycle()
+        FollowDialog(terms, next, vm::follow, vm::unfollow, onDismiss = { editFollows = false })
+        return
+    }
     val d = due ?: return
     if (!active) return
     val m = d.match
@@ -132,6 +156,10 @@ fun ReminderHost(active: Boolean, onWatch: (PlayerRoute) -> Unit, vm: ReminderVi
                     })
                 }
                 SecondaryButton("Later", { vm.dismiss(watched = false) })
+                SecondaryButton("Volgen aanpassen", {
+                    vm.dismiss(watched = true)
+                    editFollows = true
+                })
             }
         }
         }

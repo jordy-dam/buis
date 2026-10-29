@@ -121,8 +121,12 @@ class EpgGuide @Inject constructor(
     private suspend fun download() {
         val c = credentials.current() ?: error("not logged in")
         // Union over profiles: one guide serves the whole household.
-        val countries = profiles.all().flatMap { p -> p.preferredCountries.split(',') }.filter { it.isNotBlank() }.toSet()
-        val channels = XmltvGuide.channels(db.catalog().liveForGuide(countries.toList()))
+        val all = profiles.all()
+        val countries = all.flatMap { p -> p.preferredCountries.split(',') }.filter { it.isNotBlank() }.toSet()
+        // Pinned live categories and favourite channels too, so reminders can find what's on them.
+        val pinned = all.flatMap { p -> p.pinnedCategories.split(',') }.filter { it.startsWith("LIVE:") }.map { it.removePrefix("LIVE:") }.distinct()
+        val favourites = db.favorites().allLiveIds()
+        val channels = XmltvGuide.channels(db.catalog().liveForGuide(countries.toList(), pinned, favourites))
         val wanted = channels.map { it.channelId }.toSet()
 
         val url = c.baseUrl?.newBuilder()?.addPathSegment("xmltv.php")

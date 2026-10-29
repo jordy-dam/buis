@@ -119,12 +119,17 @@ interface CatalogDao {
     @Query("SELECT id FROM category WHERE type = :type AND adult = 1")
     suspend fun adultCategoryIds(type: ContentType): List<String>
 
-    /** Live streams in the given countries with what the guide needs: cleaned name and EPG id. */
+    /**
+     * Live streams the guide covers, with what it needs (cleaned name, EPG id): those in the given
+     * countries, plus pinned categories and favourite channels, whatever their country ("Ziggo Kabel",
+     * "Canal+" and sports packs often carry no country tag).
+     */
     @Query(
         "SELECT l.streamId, l.name, l.epgChannelId, c.country FROM live_channel l " +
-            "JOIN category c ON c.type = 'LIVE' AND c.id = l.categoryId WHERE c.country IN (:countries) GROUP BY l.streamId",
+            "JOIN category c ON c.type = 'LIVE' AND c.id = l.categoryId " +
+            "WHERE c.country IN (:countries) OR l.categoryId IN (:categoryIds) OR l.streamId IN (:streamIds) GROUP BY l.streamId",
     )
-    suspend fun liveForGuide(countries: List<String>): List<LiveGuideRow>
+    suspend fun liveForGuide(countries: List<String>, categoryIds: List<String> = emptyList(), streamIds: List<Int> = emptyList()): List<LiveGuideRow>
 
     @Query("SELECT COUNT(*) FROM live_channel") suspend fun liveCount(): Int
     @Query("SELECT COUNT(*) FROM movie") suspend fun movieCount(): Int
@@ -163,6 +168,9 @@ interface FavoriteDao {
     suspend fun isFavorite(profileId: Long, type: ContentType, itemId: Int): Boolean
     @Query("SELECT EXISTS (SELECT 1 FROM favorite WHERE profileId = :profileId AND type = :type AND itemId = :itemId)")
     fun observeIsFavorite(profileId: Long, type: ContentType, itemId: Int): Flow<Boolean>
+    /** Favourite channels of every profile: the guide covers them for the whole household. */
+    @Query("SELECT DISTINCT itemId FROM favorite WHERE type = 'LIVE'")
+    suspend fun allLiveIds(): List<Int>
     @Query("SELECT * FROM favorite WHERE profileId = :profileId ORDER BY addedAt DESC")
     fun all(profileId: Long): Flow<List<FavoriteEntity>>
     @Query("SELECT itemId FROM favorite WHERE profileId = :profileId AND type = :type")
