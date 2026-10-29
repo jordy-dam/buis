@@ -9,6 +9,8 @@ Tags are optional: effort `S` (an evening) / `M` (a phase part) / `L` (a phase o
 and ⚠️ when the idea breaks a principle from the spec (data leaves the tv, a cloud backend, a
 third-party service). Those aren't forbidden, but they need a decision before they're built.
 
+✓ = Jordy wants it (2026-10-29). "Later" = yes, but not soon.
+
 Already parked elsewhere (don't duplicate, just pick up): number-key zapping, a Home
 "Jouw diensten" row, phase 3 suggestions, the full EPG grid, hiding/reordering categories per
 profile, ratings, voice search, Google TV "Watch Next".
@@ -16,14 +18,28 @@ profile, ratings, voice search, Google TV "Watch Next".
 ---
 
 ## Kijken (playback)
-- **Picture-in-picture for live**: keep the match small in a corner while browsing Films. `M`
-- **Multiview**: two or four live channels at once (F1 onboard + main feed), audio follows focus. `L`
-- **Instant replay**: Left in a live stream rewinds 10 s from the local buffer, without timeshift. `M`
-- **Skip intro / recap** for series: remember per series where the intro ends after you skip it once. `M`
-- **Audio and subtitle language per profile** (already noted as a "revisit" in 2e). `S`
+- ✓ **Instant replay**: in live, rewind from what the player already buffered (ExoPlayer keeps a back
+  buffer, e.g. the last minute), without the provider's timeshift. Needs a key that isn't taken: Left
+  is "vorige zender" in live, so maybe long-press Left or the rewind key. `M`
+- ✓ **Skip intro / recap** for series: the provider has no chapter data, so BUIS learns it. In the first
+  minutes of an episode a quiet "Intro overslaan" hint; when you skip once, BUIS remembers where you
+  landed for that series and offers the same jump on the next episodes. `M`
+- ✓ **Geluid en ondertitels**: during a film or episode pick the audio track and subtitles from what the
+  stream has (a panel in the player). Next to that a default per profile ("Nederlands, ondertitels uit"),
+  which the player picks by itself when the stream has it; a choice in the player only counts for that
+  title. Nothing exists yet: the player takes the stream's default today. `S`–`M`
 - **Night mode**: dynamic range compression on the audio after 22:00 or per profile. `S`
 - **Stream health overlay** (long-press Info): bitrate, resolution, codec, buffer, dropped frames. `S`
-- **Auto-fallback**: when a channel stalls, try the same channel in another category/quality. `M`
+- ✓ **Zenderstatus: log hiccups, suggest a fix**. Today a live channel tries HLS, then raw TS once,
+  and otherwise shows an error. Many providers carry the same channel several times ("NPO 1 HD",
+  "NPO 1 FHD", "NPO 1" in another category). Idea:
+  1. *Log* on the tv, per channel: errors, stalls (buffering longer than a few seconds), which source
+     and quality, when. Stays on the tv like the rest of the history.
+  2. *Suggest*: Instellingen → "Zenderstatus" lists channels that hiccup often, each with a proposal:
+     "NPO 1 HD hapert vaak 's avonds; NPO 1 FHD liep de laatste 5 keer goed — die als standaard?"
+     OK sets the replacement (favourites and zapping then use it), so nothing changes without asking.
+  3. *Later*, if the proposals turn out right: switch to the sibling channel by itself when one stalls.
+  `M`
 - **Sleep timer from anywhere**, not just in the player (revisit from 2g part 2). `S`
 - ~~**Pauzemoment**~~ → built on `feat/pauzemoment`, see `plans/2026-10-29-pauzemoment.md`. Opt-in per profile. After an hour of watching (films and episodes over an hour,
   or the running total when next-episode autoplay chains episodes), BUIS pauses for a minute and
@@ -38,20 +54,27 @@ profile, ratings, voice search, Google TV "Watch Next".
 - **"Wat is er nu op?"**: one screen with only what's live right now on your pinned channels, sorted
   by how far along it is. `S`
 - **Sport hub**: everything matching your Volgen terms over the next week, grouped per sport. `M`
-- **Mood/length filter** for films: "onder 100 minuten", "vanavond iets lichts". Needs per-title
-  data (phase 3). `M`
+- ✓ **Mood/length filter** for films: "onder 100 minuten", "vanavond iets lichts". Length and genre
+  come from the film details BUIS already fetches in the background; mood maps onto genres
+  (licht = komedie/familie/animatie, spannend = thriller/actie/horror). `M`
 - **Recently added per service**: "nieuw op Netflix-categorie deze week". `S`
-- **Search history and suggestions per profile**. `S`
+- ✓ **Kijk- en zoekgeschiedenis per profiel**: what you watched (not only what's unfinished, like
+  Verder kijken) and your recent searches, per profile. `S`
 - **Wachtlijst voor films**: follow a film title that isn't in the catalog yet (just in the
   cinema, announced); after each catalog sync BUIS checks for it and shows "Nu te kijken" on Home.
   Same idea as Volgen, but over VOD instead of the guide. All on the tv. `M`
-- **Collections**: own lists ("Kerstfilms", "Met de kids") next to favourites. `M`
+- Later: **Collections**: own lists ("Kerstfilms", "Met de kids") next to favourites. `M`
 
 ## Huishouden (household)
 - **Kijktijd-limiet** for the kids profile: an hour a day, then a friendly stop screen. `M`
-- **Bedtime per profile** that locks the app, not just stops playback. `S`
+- ✓ **Bedtijd per profiel**: at a time you set (default 23:00) on the days you pick (default Mon–Thu,
+  or Sun–Thu so Friday and Saturday stay free), a corner card: "Het is 23:00 · Doorkijken of lekker naar
+  bed?" with **Doorkijken** (focused, nothing happens) and **Naar bed** (saves the position, stops,
+  BUIS closes). Once per evening; no lock. Uses `CornerCard`, like the other pop-ups. `S`–`M`
 - **Samen kijken** profile switch: watch with two profiles, history goes to both. `M`
-- **Weekoverzicht**: what you watched this week, per profile, on the tv itself. `S`
+- ✓ **Weekoverzicht** per profile, on the tv: hours watched, live vs films vs series, top channels,
+  films finished, longest binge, "je meest gekeken avond". Needs the watch log from the history idea
+  above (time per title and channel). Maybe a Home tile on Monday. `S`–`M`
 - **Guest mode**: no history, no Verder kijken, for visitors. `S`
 
 ## Integraties
@@ -102,21 +125,33 @@ profile, ratings, voice search, Google TV "Watch Next".
 - **Second tv in the house**: share profiles between tvs over the LAN, no cloud. `L`
 
 ## Klein maar fijn
-- **Klok** in the corner of the live overlay. `S`
+- ✓ **Klok** in the live bar, subtle (secondary colour, small, top right of the overlay), on/off per
+  profile. The switch lives in the player panel together with Geluid en ondertitels, so the player
+  gets one menu for "how I watch". `S`
 - **Weather/agenda strip on Home** from HA (it already knows both). `S`
-- **Screensaver of your own**: posters from Verder kijken instead of Google's. `M`
+- ✓ **Screensaver of your own**: posters from Verder kijken and favourites, slowly drifting, with the
+  clock. Android TV lets an app offer a screensaver ("dream") that you pick in the tv's settings. `M`
 - **Seasonal theming**: Sinterklaas/kerst touch on the logo, opt-in. `S`
-- **Easter egg** for the BUIS name. `S`
+- ✓ **Easter egg: Testbeeld**. On "Wie kijkt er?", the classic code on the remote
+  (↑ ↑ ↓ ↓ ← → ← → OK) switches the screen off like an old tube tv (the picture collapses into a white
+  line, then a dot), and on again into a testbeeld: colour bars with a circle, "BUIS" in the middle,
+  the real time underneath and "Beste Unieke IPTV Stream" along the bottom, with a soft 1 kHz tone.
+  Any key and the buis warms up again. Nothing to find in the menus. `S`
 
 ---
 
 ## Niet doen
+- **Picture-in-picture and multiview** (2026-10-29): the subscription allows one stream per login,
+  and both need two at once.
 - **YouTube** (trailers, channels, highlights after a race), 2026-10-29. Jordy wants an in-app
   experience without trips to other apps, and YouTube's terms only allow their own player (a
   WebView, which the spec rules out). Deep-linking to the YouTube app was the only clean option.
 
 ## If I had to pick
-Pauzemoment first: small, all on the tv, and it reuses the sleep timer and the next-episode card.
-Then Home Assistant: you already run it, it stays in the house (no principle to break), and
-Bioscoopmodus plus Volgen-notifications on your phone are small on top of what exists.
-Then the phone companion page, because it fixes the one thing a remote is worst at: typing.
+Pauzemoment is done (on the tv, waiting for an evening's test). Of the ✓ ideas, next:
+1. **Geluid en ondertitels + klok** as one player panel: something you miss every film, and it gives
+   the player one menu that later ideas (replay, intro) can hang off.
+2. **Bedtijd**: small, reuses `CornerCard` and the per-profile settings pattern.
+3. **Kijkgeschiedenis → weekoverzicht**: the log first, the overview is cheap on top of it.
+Then Zenderstatus, intro/recap, mood/length, instant replay; Home Assistant stays a good candidate
+after that.
