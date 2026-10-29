@@ -61,7 +61,7 @@ class SubscriptionData @Inject constructor(@ApplicationContext context: Context,
         )
 
         /** The household's data that refers to the provider's ids. */
-        val PROVIDER_IDS = listOf("favorite", "playback_position", "reminder", "movie_info", "watch_log", "channel_check", "channel_swap")
+        val PROVIDER_IDS = listOf("favorite", "playback_position", "reminder", "movie_info", "watch_log", "channel_check", "channel_swap", "series_intro")
 
         /** Same panel = same host and port; the username may change with a new subscription. */
         fun serverKey(c: XtreamCredentials): String? = c.baseUrl?.let { "${it.host}:${it.port}" }

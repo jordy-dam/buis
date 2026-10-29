@@ -149,6 +149,7 @@ fun PlayerScreen(onExit: () -> Unit, vm: PlayerViewModel = hiltViewModel()) {
     BackHandler(enabled = state.nextUp != null) { vm.dismissNextUp() }
     // Back on the break card: no break this time, play on.
     BackHandler(enabled = state.breakSecondsLeft != null) { vm.endBreak() }
+    BackHandler(enabled = state.skipIntroTo != null && !optionsOpen) { vm.dismissIntro() }
     BackHandler(enabled = optionsOpen) { optionsOpen = false; focus.requestFocus() }
     LaunchedEffect(state.finished) { if (state.finished) onExit() }
 
@@ -172,6 +173,10 @@ fun PlayerScreen(onExit: () -> Unit, vm: PlayerViewModel = hiltViewModel()) {
                         code == KeyEvent.KEYCODE_MEDIA_PLAY_PAUSE || code == KeyEvent.KEYCODE_MEDIA_PLAY
                     ) vm.endBreak()
                     return@onKeyEvent code != KeyEvent.KEYCODE_BACK
+                }
+                if (state.skipIntroTo != null && (code == KeyEvent.KEYCODE_DPAD_CENTER || code == KeyEvent.KEYCODE_ENTER)) {
+                    vm.skipIntro()
+                    return@onKeyEvent true
                 }
                 if (state.nextUp != null && (code == KeyEvent.KEYCODE_DPAD_CENTER || code == KeyEvent.KEYCODE_ENTER)) {
                     vm.playNextNow()
@@ -259,6 +264,7 @@ fun PlayerScreen(onExit: () -> Unit, vm: PlayerViewModel = hiltViewModel()) {
             state.sleepSecondsLeft != null -> SleepCard(state.sleepSecondsLeft!!, corner)
             state.breakSecondsLeft != null -> BreakCard(state.breakSecondsLeft!!, corner)
             state.nextUp != null -> NextEpisodeCard(state.nextUp!!, corner)
+            state.skipIntroTo != null -> IntroCard(state.skipIntroTo!!, corner)
         }
     }
 }
@@ -401,6 +407,19 @@ private fun Subtitles(player: Player, raised: Boolean, modifier: Modifier) {
         onDispose { player.removeListener(listener) }
     }
     AndroidView({ view }, modifier.padding(bottom = if (raised) 170.dp else 0.dp))
+}
+
+/** Early in an episode of a series whose intro BUIS learned: one OK jumps past it. */
+@Composable
+private fun IntroCard(to: Long, modifier: Modifier) {
+    CornerCard(
+        label = "Intro en terugblik · tot ${formatTime(to)}",
+        title = "Intro overslaan",
+        modifier = modifier,
+    ) {
+        KeyHint("OK", "Overslaan", primary = true)
+        KeyHint("Terug", "Kijken", primary = false)
+    }
 }
 
 @Composable

@@ -285,6 +285,14 @@ class MigrationTest {
         }
     }
 
+    @Test
+    fun `18 to 19 adds an empty intro table`() {
+        helper.createDatabase(DB, 18).close()
+        helper.runMigrationsAndValidate(DB, 19, true).use { db ->
+            assertEquals(0, db.count("series_intro"))
+        }
+    }
+
     private fun SupportSQLiteDatabase.insertPhase1Data() {
         execSQL("INSERT INTO favorite (type, itemId, name, imageUrl, addedAt) VALUES ('LIVE', 101, '┃NL┃ NPO 1 HD', NULL, 1)")
         execSQL("INSERT INTO playback_position (type, itemId, positionMs, durationMs, updatedAt) VALUES ('MOVIE', 5001, 62000, 180000, 2)")

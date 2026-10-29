@@ -28,8 +28,9 @@ import androidx.sqlite.db.SupportSQLiteDatabase
         WatchLogEntity::class,
         ChannelCheckEntity::class,
         ChannelSwapEntity::class,
+        SeriesIntroEntity::class,
     ],
-    version = 18,
+    version = 19,
     exportSchema = true,
     autoMigrations = [
         AutoMigration(from = 1, to = 2, spec = AppDatabase.CatalogResync::class),
@@ -63,6 +64,8 @@ import androidx.sqlite.db.SupportSQLiteDatabase
         AutoMigration(from = 16, to = 17),
         // Zenderstatus: live sessions and replacements; new, empty tables.
         AutoMigration(from = 17, to = 18),
+        // Intro overslaan, learned per series; a new, empty table.
+        AutoMigration(from = 18, to = 19),
     ],
 )
 abstract class AppDatabase : RoomDatabase() {
@@ -79,6 +82,7 @@ abstract class AppDatabase : RoomDatabase() {
     abstract fun reminders(): ReminderDao
     abstract fun watchLog(): WatchLogDao
     abstract fun channelHealth(): ChannelHealthDao
+    abstract fun seriesIntro(): SeriesIntroDao
 
     /**
      * The catalog is a cache of the provider: after a schema change it's emptied and the next

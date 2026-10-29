@@ -320,3 +320,11 @@ data class ChannelSwapEntity(
     val toStreamId: Int,
     val at: Long,
 )
+
+/** Where a series' intro (and recap) ends, learned from how the household skips it; see [nl.jordy.iptv.player.IntroLearner]. */
+@Entity(tableName = "series_intro")
+data class SeriesIntroEntity(
+    @PrimaryKey val seriesId: Int,
+    val endMs: Long,
+    val learnedAt: Long,
+)

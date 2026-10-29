@@ -36,6 +36,7 @@ import nl.jordy.iptv.BuildConfig
 import nl.jordy.iptv.data.auth.CredentialStore
 import nl.jordy.iptv.data.db.AppDatabase
 import nl.jordy.iptv.data.db.EpisodeEntity
+import nl.jordy.iptv.data.db.SeriesIntroEntity
 import nl.jordy.iptv.data.db.LiveChannelEntity
 import nl.jordy.iptv.data.profile.ProfileRepository
 import nl.jordy.iptv.data.repo.EpgRepository
@@ -84,6 +85,8 @@ data class PlayerUiState(
     val subtitles: List<TrackOption> = emptyList(),
     val subtitleSelected: Int? = null,
     val showClock: Boolean = true,
+    /** Episodes: where "Intro overslaan" jumps to, while the card shows. */
+    val skipIntroTo: Long? = null,
 )
 
 /** One audio or subtitle track: its name and where it sits in the player's track groups. */
@@ -428,6 +431,8 @@ class PlayerViewModel @Inject constructor(
         // comes from the catalog: the route's title differs per entry point ("<series> · S1 A3" from Home).
         seriesName = db.catalog().series(ep.seriesId)?.name ?: route.title.substringBefore(" – ").substringBefore(" · ")
         nextEpisode = Autoplay.next(episodes, route.id)
+        seriesId = ep.seriesId
+        introEnd = runCatching { db.seriesIntro().end(ep.seriesId) }.getOrNull()
     }
 
     /** Any key on the remote: someone is watching. */
@@ -466,7 +471,10 @@ class PlayerViewModel @Inject constructor(
             stall.tick(now, player.isPlaying, player.playbackState == Player.STATE_BUFFERING)
         }
         if (breakTick(now)) return
-        if (route.kind == PlayerRoute.Kind.EPISODE) nextUpTick(now)
+        if (route.kind == PlayerRoute.Kind.EPISODE) {
+            introTick(now)
+            nextUpTick(now)
+        }
     }
 
     /** True while the break card shows, so the next-episode card waits. */
@@ -549,6 +557,8 @@ class PlayerViewModel @Inject constructor(
         watching(WatchItem(ContentType.SERIES, e.episodeId, "$seriesName – ${e.title}", containerExtension = e.containerExtension))
         vodId = e.episodeId
         playbackStarted = false
+        introLearner = IntroLearner()
+        introDone = false
         cardShownAt = null
         asking = false
         nextEpisode = Autoplay.next(episodes, e.episodeId)
@@ -559,8 +569,44 @@ class PlayerViewModel @Inject constructor(
     }
 
     fun seekBy(ms: Long) {
-        val target = (player.currentPosition + ms).coerceAtLeast(0)
-        player.seekTo(if (player.duration > 0) target.coerceAtMost(player.duration) else target)
+        val from = player.currentPosition
+        val target = (from + ms).coerceAtLeast(0)
+        val to = if (player.duration > 0) target.coerceAtMost(player.duration) else target
+        if (route.kind == PlayerRoute.Kind.EPISODE) introLearner.seeked(from, to)
+        player.seekTo(to)
+    }
+
+    // Intro overslaan
+
+    private var seriesId: Int? = null
+    private var introEnd: Long? = null
+    private var introLearner = IntroLearner()
+    /** Back on the card, or the jump was made: not offered again in this episode. */
+    private var introDone = false
+
+    private fun introTick(now: Long) {
+        introLearner.tick(now, player.isPlaying)?.let { end ->
+            introEnd = end
+            introDone = true
+            val id = seriesId ?: return@let
+            viewModelScope.launch { runCatching { db.seriesIntro().upsert(SeriesIntroEntity(id, end, System.currentTimeMillis())) } }
+        }
+        val offer = !introDone && playbackStarted && IntroLearner.offer(introEnd, player.currentPosition)
+        val to = if (offer) introEnd else null
+        if (_state.value.skipIntroTo != to) _state.update { it.copy(skipIntroTo = to) }
+    }
+
+    /** OK on the card. */
+    fun skipIntro() {
+        val to = introEnd ?: return
+        introDone = true
+        player.seekTo(to)
+        _state.update { it.copy(skipIntroTo = null) }
+    }
+
+    fun dismissIntro() {
+        introDone = true
+        _state.update { it.copy(skipIntroTo = null) }
     }
 
     // Kijkgeschiedenis

@@ -347,3 +347,9 @@ interface ChannelHealthDao {
     @Query("SELECT * FROM channel_swap") suspend fun swaps(): List<ChannelSwapEntity>
     @Query("SELECT * FROM channel_swap ORDER BY at DESC") fun observeSwaps(): Flow<List<ChannelSwapEntity>>
 }
+
+@Dao
+interface SeriesIntroDao {
+    @Upsert suspend fun upsert(item: SeriesIntroEntity)
+    @Query("SELECT endMs FROM series_intro WHERE seriesId = :seriesId") suspend fun end(seriesId: Int): Long?
+}
