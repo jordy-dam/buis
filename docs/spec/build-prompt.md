@@ -67,13 +67,23 @@ raw JSON. Parse XMLTV in streaming fashion (XmlPullParser), never as a whole doc
   - Not sure an icon reads? Then it's a word. Never invent an icon for something new (BUIS can't record,
     so there's no record icon).
 - **One place, one layout** (2026-10-29):
-  - Everything that asks for a moment is a corner card (`CornerCard`): bottom right, one at a time,
-    amber "what · when" line, title, a 16:9 plate on the left when there's something to show, actions
-    underneath. Cards that take focus have buttons; player cards (focus stays on the picture) have key
-    hints. Main action first as a word, other actions as round icon buttons or "key + icon" hints.
-  - Settings-style lists (Instellingen, player Opties): icon, short title, value on the right; no
+  - Everything that asks for a moment is a pop-up, a corner card (`CornerCard`): bottom right, one at
+    a time, amber "what · when" line, title, a 16:9 plate on the left when there's something to show,
+    choices underneath. In the player too (2026-10-29, replaces "player cards have key hints"): every
+    pop-up takes focus on its main choice, so one OK does it; that choice is a word, the others are round
+    icon buttons beside it; Back is the "no/close" choice. When it goes, focus returns to where it was,
+    and an OK that arrives just as it went by itself is dropped, not passed on. Pop-ups never cover the
+    player bar: they sit above it.
+  - One surface for everything that floats (`PopupSurface`, slightly see-through): the player bar, its
+    track lists and the pop-ups. Choices on it are one size (`ChoiceSize`), and focus on it is the light
+    fill with dark text or icon, never a grey step.
+  - Settings-style lists (Instellingen): icon, short title, value on the right on one centred line; no
     explanatory sentence, only a status line when it changes (Bijgewerkt …).
-  - Player bars: hints as icons in remote order (left action left, OK in the middle, right action right).
+  - The player bar is one surface: title and clock, progress, then round controls in remote order (10 s
+    back left, play/pause in the middle, 30 s forward right), then audio, subtitles, clock. Plain keys work
+    while the bar only shows; the controls take focus when asked for (Down in a film, Right in live, a
+    pause). Audio and subtitles open their choices in place, above their button. Back closes the innermost
+    layer first.
   - Colour means one thing each (blue selected/values, amber live/now, red heart). New meanings don't get
     a colour; use brightness, an icon or a word.
 

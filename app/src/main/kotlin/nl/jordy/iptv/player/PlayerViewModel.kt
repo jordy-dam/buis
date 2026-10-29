@@ -718,26 +718,20 @@ class PlayerViewModel @Inject constructor(
     private fun override(option: TrackOption): TrackSelectionOverride? =
         player.currentTracks.groups.getOrNull(option.group)?.let { TrackSelectionOverride(it.mediaTrackGroup, option.track) }
 
-    /** OK on "Geluid": the next audio track, for this title only. */
-    fun nextAudio() {
-        val s = _state.value
-        if (s.audio.size < 2) return
-        val next = s.audio[((s.audioSelected ?: -1) + 1) % s.audio.size]
-        val o = override(next) ?: return
+    /** An audio track picked in the player bar, for this title only. */
+    fun selectAudio(index: Int) {
+        val o = _state.value.audio.getOrNull(index)?.let(::override) ?: return
         player.trackSelectionParameters = player.trackSelectionParameters.buildUpon().setOverrideForType(o).build()
     }
 
-    /** OK on "Ondertitels": off, then each track, then off again; for this title only. */
-    fun nextSubtitle() {
-        val s = _state.value
-        if (s.subtitles.isEmpty()) return
-        val nextIndex = (s.subtitleSelected ?: -1) + 1
+    /** A subtitle track picked in the player bar, or null for off; for this title only. */
+    fun selectSubtitle(index: Int?) {
         val builder = player.trackSelectionParameters.buildUpon()
-        val next = s.subtitles.getOrNull(nextIndex)
-        if (next == null) {
+        val option = index?.let { _state.value.subtitles.getOrNull(it) }
+        if (option == null) {
             builder.setTrackTypeDisabled(C.TRACK_TYPE_TEXT, true)
         } else {
-            val o = override(next) ?: return
+            val o = override(option) ?: return
             builder.setTrackTypeDisabled(C.TRACK_TYPE_TEXT, false).setOverrideForType(o)
         }
         player.trackSelectionParameters = builder.build()

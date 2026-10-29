@@ -149,19 +149,19 @@ fun ReminderHost(active: Boolean, onWatch: (PlayerRoute) -> Unit, vm: ReminderVi
             PrimaryButton("Kijken", {
                 vm.dismiss(watched = true)
                 onWatch(live)
-            }, Modifier.focusRequester(watch))
+            }, Modifier.focusRequester(watch), large = true)
             // Secondary actions as icons: restart, later (close), the follow settings.
             if (started && m.hasArchive) {
                 IconButton(Icons.Filled.RestartAlt, "Vanaf begin", {
                     vm.dismiss(watched = true)
                     onWatch(live.copy(fromStart = true))
-                })
+                }, large = true)
             }
-            IconButton(Icons.Filled.Close, "Later", { vm.dismiss(watched = false) })
+            IconButton(Icons.Filled.Close, "Later", { vm.dismiss(watched = false) }, large = true)
             IconButton(Icons.Filled.Settings, "Volgen aanpassen", {
                 vm.dismiss(watched = true)
                 editFollows = true
-            })
+            }, large = true)
         }
         }
     }

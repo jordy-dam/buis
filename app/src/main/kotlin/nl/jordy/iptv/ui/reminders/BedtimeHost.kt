@@ -91,11 +91,11 @@ fun BedtimeHost(active: Boolean, vm: BedtimeViewModel = hiltViewModel()) {
                 title = "Doorkijken of lekker naar bed?",
                 modifier = Modifier.ignoreHeldKey(),
             ) {
-                PrimaryButton("Doorkijken", vm::dismiss, Modifier.focusRequester(stay))
+                PrimaryButton("Doorkijken", vm::dismiss, Modifier.focusRequester(stay), large = true)
                 SecondaryButton("Naar bed", {
                     vm.dismiss()
                     activity?.finish()
-                })
+                }, large = true)
             }
         }
     }
