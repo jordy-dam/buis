@@ -106,6 +106,19 @@ class MovieEnricherTest {
     }
 
     @Test
+    fun `details are written in groups, so the Films grid isn't refreshed for every film`() = runTest {
+        db.catalog().upsertMovies((7..45).map { MovieEntity("nl", it, "Film $it", null, null, null, "mp4", null, it, 1) })
+        var writes = 0
+        db.invalidationTracker.addObserver(object : androidx.room.InvalidationTracker.Observer("movie_info") {
+            override fun onInvalidated(tables: Set<String>) { writes++ }
+        })
+        assertEquals(45, enricher.run(creds, intervalMs = 0))
+        db.invalidationTracker.refreshVersionsSync()
+        assertTrue("45 films in at most a handful of writes, was $writes", writes in 1..5)
+        assertEquals(45 to 45, enricher.progress.first())
+    }
+
+    @Test
     fun `the genre filter shows only matching films, and Alle stays complete`() = runTest {
         enricher.run(creds, intervalMs = 0)
         val dao = db.catalog()

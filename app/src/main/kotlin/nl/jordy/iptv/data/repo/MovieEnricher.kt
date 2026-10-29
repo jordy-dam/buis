@@ -14,6 +14,8 @@ import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
+import kotlinx.coroutines.NonCancellable
 import nl.jordy.iptv.data.auth.CredentialStore
 import nl.jordy.iptv.data.db.AppDatabase
 import nl.jordy.iptv.data.db.MovieInfoEntity
@@ -56,17 +58,35 @@ class MovieEnricher @Inject constructor(
     /** Works through the pending films; returns how many it fetched. Public for tests. */
     suspend fun run(c: XtreamCredentials, intervalMs: Long = INTERVAL_MS, now: () -> Long = System::currentTimeMillis): Int {
         var fetched = 0
-        while (true) {
-            val countries = countries()
-            val batch = db.movieInfo().pending(countries, retryBefore = now() - RETRY_AFTER_MS, limit = BATCH)
-            if (batch.isEmpty()) return fetched
-            for (id in batch) {
-                playing.first { it == 0 }
-                val info = runCatching { XtreamParser.movieInfo(client.get(c, "get_vod_info", "vod_id" to "$id")) }.getOrNull()
-                db.movieInfo().upsert(info?.toEntity(id, now()) ?: MovieInfoEntity(id, null, null, null, null, null, now(), failed = true))
-                fetched++
-                delay(intervalMs)
+        // Written in groups: every write to movie_info re-runs whatever watches it (the Films grid's
+        // paging, the genre chips, Instellingen), and one write per film made that 4 times a second.
+        val done = mutableListOf<MovieInfoEntity>()
+        suspend fun flush() {
+            if (done.isEmpty()) return
+            db.movieInfo().upsertAll(done.toList())
+            done.clear()
+        }
+        try {
+            while (true) {
+                val countries = countries()
+                val batch = db.movieInfo().pending(countries, retryBefore = now() - RETRY_AFTER_MS, limit = BATCH)
+                if (batch.isEmpty()) return fetched
+                for (id in batch) {
+                    if (playing.value != 0) {
+                        flush()
+                        playing.first { it == 0 }
+                    }
+                    val info = runCatching { XtreamParser.movieInfo(client.get(c, "get_vod_info", "vod_id" to "$id")) }.getOrNull()
+                    done += info?.toEntity(id, now()) ?: MovieInfoEntity(id, null, null, null, null, null, now(), failed = true)
+                    fetched++
+                    if (done.size >= WRITE_EVERY) flush()
+                    delay(intervalMs)
+                }
+                // The next pending() must see this batch as done.
+                flush()
             }
+        } finally {
+            withContext(NonCancellable) { runCatching { flush() } }
         }
     }
 
@@ -80,6 +100,8 @@ class MovieEnricher @Inject constructor(
     companion object {
         const val INTERVAL_MS = 250L
         private const val BATCH = 50
+        /** Films per write: one write every ~5 s at [INTERVAL_MS]. */
+        const val WRITE_EVERY = 20
         private const val RETRY_AFTER_MS = 24 * 60 * 60 * 1000L
     }
 }

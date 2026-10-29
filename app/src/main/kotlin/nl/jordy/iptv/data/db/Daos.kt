@@ -255,6 +255,7 @@ interface EpgDao {
 @Dao
 interface MovieInfoDao {
     @Upsert suspend fun upsert(item: MovieInfoEntity)
+    @Upsert suspend fun upsertAll(items: List<MovieInfoEntity>)
     @Query("SELECT * FROM movie_info WHERE streamId = :streamId") suspend fun get(streamId: Int): MovieInfoEntity?
 
     /**
