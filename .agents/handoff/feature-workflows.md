@@ -16,7 +16,7 @@ cards, avatar top left, "Profiel bewerken" in Instellingen, film genres via back
 film with a version choice, text one step smaller, screen kept on while playing) is built and
 emulator-tested: `docs/plans/2026-10-28-phase-2f-eigen-gezicht.md`. 2f is on the tv. Phase 2g "volgen" is
 planned in four parts (`docs/plans/2026-10-29-phase-2g-volgen.md`); part 1 (neutral palette with logo
-blue/amber/red, light-bar focus, Left = vorige zender) is built and on the tv (2026-10-29); part 2 (next episode by itself, sleep timer per profile) and a polish round (subtle focus, smaller avatars, clearer Instellingen, pinned services, schema 9) are built and on the tv (2026-10-29, schema 7 → 9 migrated with profile, favourites and positions intact).
+blue/amber/red, light-bar focus, Left = vorige zender) is built and on the tv (2026-10-29); part 2 (next episode by itself, sleep timer per profile) and a polish round (subtle focus, smaller avatars, clearer Instellingen, pinned services, schema 9) are built and on the tv (2026-10-29, schema 7 → 9 migrated with profile, favourites and positions intact). Part 3 (vanaf begin via timeshift, schema 10) and the Vastgezet panel are built and emulator-tested, not on the tv.
 
 ## Current phase
 Phase 1 — done and tested on the real tv. Phase 2a — built and installed on the tv (not started yet
@@ -46,6 +46,8 @@ Phase 1 — done and tested on the real tv. Phase 2a — built and installed on 
 - No themes (decided against, see `product.md`)
 
 ## Emulator gotchas
+- The emulator clock can drift hours behind after a suspend; the mock guide is generated around real
+  time, so "NU" disappears. Resync: `adb -s emulator-5554 shell cmd alarm set-time $(($(date +%s)*1000))`.
 - The Google TV system image ships with `hw.keyboard=no`: the Mac keyboard does nothing until it's
   set to `yes` in `~/.android/avd/tv_1080p.avd/config.ini` (done on this machine).
 - After a cold boot Google TV may show "Choose an account" on top; press Back and relaunch the app.
@@ -64,7 +66,7 @@ See `.agents/onboarding/new-dev.md` (mock server: `./mockserver/generate-media.s
 
 ## Open questions
 - Does `xmltv.php` cover the Dutch channels? Only 45% of them have an EPG id (spike in 2a).
-- Do the `⏺` channels expose `tv_archive` for catch-up? (not stored yet)
+- Does Jordy's panel allow seeking inside a timeshift stream, and do Viaplay/ESPN have `tv_archive`? (stored since part 3; check on the tv)
 
 ## Real-tv notes
 - Install over Ethernet: USB debugging on, `adb connect 192.168.68.91:5555` (see onboarding).

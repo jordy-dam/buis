@@ -83,3 +83,9 @@
 **Why:** Jordy on the tv: the white focus bar was far too white, avatars too big next to the logo, the two settings sections looked alike, and he wants his own services (Netflix, Apple TV+) as shortcuts.
 **Alternatives rejected:** A coloured focus (competes with blue = selected and amber = live); a separate pin button per row (one more focus stop on every row); a Home row of services and service suggestions now (suggestions need viewing history, which is phase 3; the pinned group already is the shortcut).
 **Revisit if:** the subtle focus is hard to find from the couch in daylight, or Jordy wants the pinned services on Home too.
+
+## 2026-10-29 — 2g part 3: vanaf begin (catch-up), pinned panel without icons
+**Decision:** A live programme can be watched from its start when the channel keeps an archive (`tv_archive`, or the `⏺` name mark) and the programme started within the archive's days. Discovery is through the info overlay: the first OK shows it with "OK vanaf begin", OK while it shows plays the programme from its start through the Xtream timeshift URL (whole programme, start time in the panel's time zone); it then behaves like a film and Back returns to live. Pinned categories share one light-blue panel with a blue title, no icon or per-row bar, and no emoji in the UI.
+**Why:** Jordy uses "vanaf begin" often in another app. Putting it behind the overlay keeps OK harmless for someone who only wants to see what's on. The panel alone separates "mine" from the catalog clearly enough (Jordy's call).
+**Alternatives rejected:** A dedicated button on the remote (the TCL remote has no free key everyone knows); starting catch-up on the first OK (too easy to trigger by accident); guessing the tv's time zone for the timeshift start (panels count in their own zone, which can differ).
+**Revisit if:** the provider's timeshift can't seek or needs a different URL form, or a guide grid arrives (then past programmes get "Terugkijken" there).

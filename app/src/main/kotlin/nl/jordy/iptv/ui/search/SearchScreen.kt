@@ -91,7 +91,7 @@ fun SearchScreen(
                             name = c.name,
                             logoUrl = c.logoUrl,
                             quality = bestQuality(c.badges.split(",")),
-                            catchup = c.catchup,
+                            catchup = c.hasArchive,
                             onClick = { onPlay(PlayerRoute(PlayerRoute.Kind.LIVE, c.streamId, c.name, categoryId = c.categoryId)) },
                             onLongClick = {},
                             modifier = Modifier.width(720.dp),

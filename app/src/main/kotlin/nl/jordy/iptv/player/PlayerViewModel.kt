@@ -40,7 +40,10 @@ import nl.jordy.iptv.data.repo.LibraryRepository
 import nl.jordy.iptv.data.xtream.ContentType
 import nl.jordy.iptv.data.xtream.EpgEntry
 import nl.jordy.iptv.data.xtream.StreamUrls
+import nl.jordy.iptv.data.xtream.XtreamClient
 import nl.jordy.iptv.data.xtream.XtreamCredentials
+import nl.jordy.iptv.data.xtream.XtreamParser
+import java.time.ZoneId
 import nl.jordy.iptv.ui.PlayerRoute
 import javax.inject.Inject
 
@@ -59,6 +62,10 @@ data class PlayerUiState(
     val sleepSecondsLeft: Int? = null,
     /** The sleep timer ran out: the screen closes the player. */
     val finished: Boolean = false,
+    /** Live: the running programme can be watched from its start (the channel keeps an archive). */
+    val canRestart: Boolean = false,
+    /** Live: watching this programme from its start instead of live. */
+    val catchup: EpgEntry? = null,
 )
 
 /** [secondsLeft] counts down to the next episode; null means it waits for OK ("Kijk je nog?"). */
@@ -80,6 +87,7 @@ class PlayerViewModel @Inject constructor(
     private val enricher: MovieEnricher,
     private val history: ChannelHistory,
     private val profiles: ProfileRepository,
+    private val xtream: XtreamClient,
 ) : ViewModel() {
 
     val route = savedState.toRoute<PlayerRoute>()
@@ -213,6 +221,7 @@ class PlayerViewModel @Inject constructor(
 
     private fun playLive(streamId: Int, name: String) {
         val source = liveSources?.first(streamId) ?: return
+        liveStreamId = streamId
         history.watched(ChannelHistory.Entry(streamId, name, zapCategory))
         _state.update {
             PlayerUiState(title = name, channelNumber = channelIndex.takeIf { it >= 0 }?.plus(1), previous = history.previous?.name)
@@ -224,8 +233,42 @@ class PlayerViewModel @Inject constructor(
             // Let the stream start first; the EPG request must not compete with it during a zap.
             delay(400)
             val (now, next) = epg.nowAndNext(streamId)
-            _state.update { it.copy(now = now, next = next) }
+            val channel = channels.firstOrNull { it.streamId == streamId } ?: db.catalog().liveByIds(listOf(streamId)).firstOrNull()
+            _state.update { it.copy(now = now, next = next, canRestart = Catchup.canRestart(channel, now, System.currentTimeMillis() / 1000)) }
         }
+    }
+
+    // Vanaf begin
+
+    /** The live channel playing (or last played before going back in time). */
+    private var liveStreamId = route.id
+    /** The panel's time zone, asked once: timeshift URLs need the start time in it. */
+    private var panelZone: ZoneId? = null
+
+    /** OK on a programme with an archive: play it from its start, with normal seek controls. */
+    fun watchFromStart() {
+        val programme = _state.value.now?.takeIf { _state.value.canRestart } ?: return
+        val c = credentials ?: return
+        val base = c.baseUrl ?: return
+        val streamId = liveStreamId
+        viewModelScope.launch {
+            val zone = panelZone
+                ?: runCatching { XtreamParser.account(xtream.get(c)).timezone?.let(ZoneId::of) }.getOrNull()?.also { panelZone = it }
+                ?: ZoneId.systemDefault()
+            currentSource = null
+            epgJob?.cancel()
+            _state.update { it.copy(catchup = programme, buffering = true, error = null) }
+            val url = StreamUrls.timeshift(base, c, streamId, programme.start, Catchup.minutes(programme), zone)
+            player.setMediaItem(MediaItem.Builder().setUri(url).setMimeType(MimeTypes.VIDEO_MP2T).build())
+            player.prepare()
+            player.playWhenReady = true
+        }
+    }
+
+    /** Back while watching from the start: the channel live again. */
+    fun backToLive() {
+        val name = _state.value.title
+        playLive(liveStreamId, name)
     }
 
     private fun setSource(source: LiveSources.Source) {
@@ -241,8 +284,11 @@ class PlayerViewModel @Inject constructor(
     }
 
     private fun handleError(error: PlaybackException) {
+        if (isLive && _state.value.catchup != null) {
+            return showError("Terugkijken lukt niet voor dit programma. Druk op Terug voor live.")
+        }
         if (isLive) {
-            val streamId = channels.getOrNull(channelIndex)?.streamId ?: route.id
+            val streamId = liveStreamId
             val failed = currentSource
             val next = failed?.let { liveSources?.fallback(streamId, it) }
             if (next != null) return setSource(next)

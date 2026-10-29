@@ -53,6 +53,21 @@ class XtreamParserTest {
     }
 
     @Test
+    fun `catch-up days come from tv_archive, whatever type the panel sends`() {
+        fun days(json: String) = XtreamParser.liveStream(Json.parseToJsonElement(json))!!.archiveDays
+        assertEquals(3, days("""{"stream_id": 1, "tv_archive": 1, "tv_archive_duration": "3"}"""))
+        assertEquals("archive on, no duration: at least a day", 1, days("""{"stream_id": 1, "tv_archive": "1"}"""))
+        assertEquals("a duration without the archive switched on means nothing", 0, days("""{"stream_id": 1, "tv_archive": 0, "tv_archive_duration": 7}"""))
+        assertEquals(0, days("""{"stream_id": 1}"""))
+    }
+
+    @Test
+    fun `the panel's time zone is read from server_info`() {
+        val account = XtreamParser.account(Json.parseToJsonElement("""{"user_info": {"auth": 1}, "server_info": {"timezone": "Europe/Amsterdam"}}"""))
+        assertEquals("Europe/Amsterdam", account.timezone)
+    }
+
+    @Test
     fun `movie rating, year and container fall back sensibly`() {
         val movies = array("vod_streams.json").mapNotNull(XtreamParser::movie).associateBy { it.streamId }
         assertEquals("the fixture's films, including an NL-sub version of 5001", 8, movies.size)

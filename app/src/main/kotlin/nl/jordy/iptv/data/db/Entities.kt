@@ -42,7 +42,12 @@ data class LiveChannelEntity(
     @ColumnInfo(defaultValue = "") val badges: String = "",
     /** Provider marks the channel as having catch-up (`⏺` in the name). */
     @ColumnInfo(defaultValue = "0") val catchup: Boolean = false,
-)
+    /** Days the panel keeps for "vanaf begin" (`tv_archive_duration`); 0 = none, see [hasArchive]. */
+    @ColumnInfo(defaultValue = "0") val archiveDays: Int = 0,
+) {
+    /** The `⏺` mark alone also counts: some panels mark catch-up in the name and leave `tv_archive` at 0. */
+    val hasArchive get() = archiveDays > 0 || catchup
+}
 
 @Entity(tableName = "movie", primaryKeys = ["categoryId", "streamId"], indices = [Index("streamId")])
 data class MovieEntity(

@@ -20,6 +20,7 @@ object XtreamParser {
             status = user?.str("status"),
             expiresAt = user?.long("exp_date"),
             maxConnections = user?.int("max_connections"),
+            timezone = root.asObjectOrNull()?.obj("server_info")?.str("timezone"),
         )
     }
 
@@ -39,6 +40,8 @@ object XtreamParser {
             logoUrl = o.url("stream_icon"),
             epgChannelId = o.str("epg_channel_id"),
             number = o.int("num"),
+            // Panels that set tv_archive but forget the duration still keep at least a day.
+            archiveDays = if (o.int("tv_archive") == 1) (o.int("tv_archive_duration") ?: 1).coerceAtLeast(1) else 0,
         )
     }
 

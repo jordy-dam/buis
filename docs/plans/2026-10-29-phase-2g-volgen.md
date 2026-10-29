@@ -139,3 +139,23 @@ channels are in the Ziggo cable list, which has a guide.
 - Not done: a "Jouw diensten" row on Home and suggesting a service (that needs viewing history → phase 3);
   six or more profiles not walked on screen (layout rule unit-free, by reading).
 - On the tv (release, 2026-10-29): starts without errors, schema 7 → 9 migrated; profile, "Verder kijken" and favourite channels intact; the grey focus shows on Home.
+
+## Vastgezet panel (2026-10-29)
+Pinned categories sit together on one light-blue panel (`Brand` at 16%) with a blue "VASTGEZET" title;
+no icon and no bar per row (Jordy: the panel is enough, no emoji anywhere). The panel is one list item,
+so the focus-follow after pinning scrolls to it.
+
+## Part 3 — vanaf begin, built (2026-10-29)
+- `tv_archive` / `tv_archive_duration` → `live_channel.archiveDays` (schema 10, catalog re-syncs once);
+  `hasArchive` also counts the old `⏺` name mark, and the ↺ in channel rows and search now follows it.
+- Live player: OK shows the info with "OK vanaf begin" when the running programme is in the archive
+  (`Catchup.canRestart`); OK again plays it via `StreamUrls.timeshift` (whole programme, minutes rounded
+  up, start in the panel's time zone from `server_info.timezone`, asked once per player). It then
+  behaves like a film (OK pause, ◀ 10 s, 30 s ▶); Back returns to live; Up/Down/Left still zap.
+- Tested: unit 123 green (timeshift URL across time zones, archive parsing, `Catchup`, migration 9→10).
+  Emulator against the mock server (which now has archive channels and a `/timeshift/` route): ↺ on
+  archive channels, the hint, playback from 10:30 with the request
+  `timeshift/…/30/2026-10-29:10-30/1020.ts`, Back to live.
+- Not built from the plan: "Terugkijken" on past programmes in a guide (BUIS has no guide grid yet) and
+  "Vanaf begin" on the reminder banner (part 4). Not known yet: whether Jordy's panel allows seeking
+  inside a timeshift stream; the real-tv test will show it.

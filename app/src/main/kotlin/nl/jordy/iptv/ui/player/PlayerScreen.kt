@@ -60,6 +60,7 @@ import androidx.compose.foundation.border
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.ui.text.style.TextOverflow
 import nl.jordy.iptv.player.NextUpCard
+import nl.jordy.iptv.data.xtream.EpgEntry
 import nl.jordy.iptv.ui.theme.FocusBar
 import nl.jordy.iptv.ui.theme.Live
 import nl.jordy.iptv.ui.theme.SurfaceRaised
@@ -105,13 +106,12 @@ fun PlayerScreen(onExit: () -> Unit, vm: PlayerViewModel = hiltViewModel()) {
             view.keepScreenOn = false
         }
     }
-    if (!vm.isLive) {
-        LaunchedEffect(Unit) {
-            while (true) {
-                position = vm.player.currentPosition
-                duration = vm.player.duration.coerceAtLeast(0)
-                delay(500)
-            }
+    // Films, episodes and live programmes watched from the start all show a position.
+    LaunchedEffect(Unit) {
+        while (true) {
+            position = vm.player.currentPosition
+            duration = vm.player.duration.coerceAtLeast(0)
+            delay(500)
         }
     }
 
@@ -130,6 +130,8 @@ fun PlayerScreen(onExit: () -> Unit, vm: PlayerViewModel = hiltViewModel()) {
     }
 
     BackHandler { vm.saveNow(); onExit() }
+    // Watching from the start: Back returns to the channel live, a second Back leaves.
+    BackHandler(enabled = state.catchup != null) { vm.backToLive(); overlayTick++ }
     // Declared later, so it wins while the card shows: Back stops the countdown, not the episode.
     BackHandler(enabled = state.nextUp != null) { vm.dismissNextUp() }
     LaunchedEffect(state.finished) { if (state.finished) onExit() }
@@ -150,11 +152,15 @@ fun PlayerScreen(onExit: () -> Unit, vm: PlayerViewModel = hiltViewModel()) {
                     vm.playNextNow()
                     return@onKeyEvent true
                 }
-                val handled = if (vm.isLive) when (code) {
+                // Live from the start behaves like a film: pause and seek.
+                val live = vm.isLive && state.catchup == null
+                val handled = if (live) when (code) {
                     KeyEvent.KEYCODE_DPAD_UP, KeyEvent.KEYCODE_CHANNEL_UP -> { vm.zap(+1); true }
                     KeyEvent.KEYCODE_DPAD_DOWN, KeyEvent.KEYCODE_CHANNEL_DOWN -> { vm.zap(-1); true }
                     KeyEvent.KEYCODE_DPAD_LEFT, KeyEvent.KEYCODE_LAST_CHANNEL -> { vm.previousChannel(); true }
-                    KeyEvent.KEYCODE_DPAD_CENTER, KeyEvent.KEYCODE_ENTER, KeyEvent.KEYCODE_INFO -> true
+                    // First OK shows the info with "OK · vanaf begin"; OK while it shows starts it.
+                    KeyEvent.KEYCODE_DPAD_CENTER, KeyEvent.KEYCODE_ENTER -> { if (overlayVisible && state.canRestart) vm.watchFromStart(); true }
+                    KeyEvent.KEYCODE_INFO -> true
                     else -> false
                 } else when (code) {
                     KeyEvent.KEYCODE_DPAD_CENTER, KeyEvent.KEYCODE_ENTER, KeyEvent.KEYCODE_MEDIA_PLAY_PAUSE -> { vm.togglePause(); true }
@@ -204,7 +210,11 @@ fun PlayerScreen(onExit: () -> Unit, vm: PlayerViewModel = hiltViewModel()) {
                     .padding(start = SafeArea, end = SafeArea, bottom = SafeArea, top = 96.dp),
                 verticalArrangement = Arrangement.spacedBy(8.dp),
             ) {
-                if (vm.isLive) LiveInfo(state) else VodInfo(state.title, position, duration, vm.player.isPlaying)
+                when {
+                    state.catchup != null -> CatchupInfo(state, state.catchup!!, position, duration, vm.player.isPlaying)
+                    vm.isLive -> LiveInfo(state)
+                    else -> VodInfo(state.title, position, duration, vm.player.isPlaying)
+                }
             }
         }
 
@@ -227,10 +237,28 @@ private fun LiveInfo(state: nl.jordy.iptv.player.PlayerUiState) {
     }
     state.next?.let { Text("Straks ${clock.format(Instant.ofEpochSecond(it.start))}  ${it.title}", style = MaterialTheme.typography.bodyLarge, color = TextSecondary) }
     Text(
-        "▲▼ andere zender" + (state.previous?.let { "   ◀ terug naar $it" } ?: ""),
+        "▲▼ andere zender" + (state.previous?.let { "   ◀ terug naar $it" } ?: "") + (if (state.canRestart) "   OK vanaf begin" else ""),
         style = MaterialTheme.typography.bodyMedium,
         color = TextSecondary,
     )
+}
+
+/** A live programme from its start: the channel, the programme, film-style position and keys. */
+@Composable
+private fun CatchupInfo(state: nl.jordy.iptv.player.PlayerUiState, programme: EpgEntry, position: Long, duration: Long, playing: Boolean) {
+    Row(verticalAlignment = Alignment.Bottom) {
+        state.channelNumber?.let { Text("$it  ", style = MaterialTheme.typography.headlineMedium, color = Live) }
+        Text(state.title, style = MaterialTheme.typography.headlineMedium)
+    }
+    Text(
+        "Vanaf begin · ${clock.format(Instant.ofEpochSecond(programme.start))}  ${programme.title}",
+        style = MaterialTheme.typography.titleLarge,
+    )
+    if (duration > 0) ProgressBar(position.toFloat() / duration)
+    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+        Text("${if (playing) "▶" else "❚❚"}  ${formatTime(position)}", style = MaterialTheme.typography.titleMedium)
+        Text("◀ 10s   OK pauze   30s ▶   Terug: live", style = MaterialTheme.typography.bodyMedium, color = TextSecondary)
+    }
 }
 
 /** Bottom right, over the end credits: what's next and the two keys that matter. */

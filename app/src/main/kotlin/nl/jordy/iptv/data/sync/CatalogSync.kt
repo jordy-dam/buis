@@ -41,7 +41,7 @@ class CatalogSync @Inject constructor(
         sync(c, ContentType.LIVE, "get_live_categories", "get_live_streams", generation, onProgress,
             parse = XtreamParser::liveStream, category = { it.categoryId }, rawName = { it.name },
             toItem = { it, n, cat, i ->
-                Item(LiveChannelEntity(cat, it.streamId, n.title, it.logoUrl, it.epgChannelId, i, generation, n.badges.joinToString(","), n.catchup), it.streamId, n.title, n.country)
+                Item(LiveChannelEntity(cat, it.streamId, n.title, it.logoUrl, it.epgChannelId, i, generation, n.badges.joinToString(","), n.catchup, it.archiveDays), it.streamId, n.title, n.country)
             },
             write = dao::upsertLive, existing = dao::liveCount, deleteOld = dao::deleteOldLive)
 

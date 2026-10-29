@@ -136,6 +136,16 @@ private fun route(ex: HttpExchange, cfg: Config, catalog: Catalog) {
             }
         }
 
+        // timeshift/<user>/<pass>/<minutes>/<yyyy-MM-dd:HH-mm>/<id>.ts: any archived stretch plays the channel's stream.
+        path.startsWith("/timeshift/") -> {
+            val parts = path.split('/') // "", timeshift, u, p, minutes, start, file
+            if (parts.size != 7 || parts[2] != USER || parts[3] != PASS) return send(ex, 403, "text/plain", ByteArray(0))
+            if (!Regex("""\d{4}-\d{2}-\d{2}:\d{2}-\d{2}""").matches(parts[5]) || parts[4].toIntOrNull() == null) return send(ex, 400, "text/plain", ByteArray(0))
+            println("timeshift ${parts[4]} min from ${parts[5]} for ${parts[6]}")
+            val id = parts[6].substringBefore('.').toIntOrNull() ?: return send(ex, 404, "text/plain", ByteArray(0))
+            sendFile(ex, File(cfg.mediaDir, "live/${id % 4}/stream.ts"), "video/mp2t", cfg.mediaDir)
+        }
+
         path.startsWith("/movie/") || path.startsWith("/series/") -> {
             val parts = path.split('/')
             if (parts.size != 5 || parts[2] != USER || parts[3] != PASS) return send(ex, 403, "text/plain", ByteArray(0))
@@ -173,6 +183,9 @@ private class Catalog(private val cfg: Config) {
                     put("epg_channel_id", "kanaal$id")
                     put("added", "1700000000")
                     put("category_id", (100 + i % liveCatNames.size).toString())
+                    // Every other channel keeps a 3-day archive, sent as a string the way panels do.
+                    put("tv_archive", if (i % 2 == 0) 1 else 0)
+                    if (i % 2 == 0) put("tv_archive_duration", "3")
                 })
             }
             // The fixture's "NPO 2 HD" has no EPG id; this sibling has one, so the app can borrow it.

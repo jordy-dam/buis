@@ -8,6 +8,8 @@ data class Account(
     /** Epoch seconds, null when the subscription has no expiry. */
     val expiresAt: Long?,
     val maxConnections: Int?,
+    /** The panel's time zone ("Europe/Amsterdam"): timeshift URLs take their start time in it. */
+    val timezone: String? = null,
 )
 
 data class Category(val id: String, val name: String)
@@ -19,6 +21,8 @@ data class LiveStream(
     val logoUrl: String?,
     val epgChannelId: String?,
     val number: Int?,
+    /** Days of catch-up the panel keeps (`tv_archive` + `tv_archive_duration`), 0 = none. */
+    val archiveDays: Int = 0,
 )
 
 data class Movie(
