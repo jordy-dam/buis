@@ -18,6 +18,7 @@ import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.filterNotNull
 import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.mapLatest
+import nl.jordy.iptv.data.repo.FilmFilters
 import nl.jordy.iptv.data.repo.Genres
 import nl.jordy.iptv.data.settings.CategoryGroups
 import nl.jordy.iptv.data.settings.FilteredCategories
@@ -85,13 +86,21 @@ class MoviesViewModel @Inject constructor(db: AppDatabase, private val profiles:
 
     /** Film genres come from [nl.jordy.iptv.data.repo.MovieEnricher], so chips appear as details arrive. */
     val genre = MutableStateFlow<String?>(null)
+    /** Moods ("Licht", "Spannend") lead the genre chips once a category has film details to judge them on. */
     val genres = selected.filterNotNull().flatMapLatest { id -> dao.movieGenres(id).map { Genres.top(it) } }
+        .map { if (it.isEmpty()) it else FilmFilters.MOODS.keys.toList() + it }
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
 
+    /** Maximum running time in seconds, 0 = any; it stays as you browse other categories. */
+    val maxSecs = MutableStateFlow(0)
+    fun nextLength() { maxSecs.value = FilmFilters.nextLength(maxSecs.value) }
+
     /** One tile per film; its language versions are picked on the detail screen. */
-    val items: Flow<PagingData<MovieTile>> = combine(selected.filterNotNull(), genre) { id, g -> id to g }.flatMapLatest { (id, g) ->
+    val items: Flow<PagingData<MovieTile>> = combine(selected.filterNotNull(), genre, maxSecs) { id, g, max -> Triple(id, g, max) }.flatMapLatest { (id, g, max) ->
         Pager(pagingConfig) {
-            if (g == null) dao.movieTilesPaged(id) else Genres.patterns(g).let { (a, b) -> dao.movieTilesPagedByGenre(id, a, b) }
+            if (g == null && max == 0) dao.movieTilesPaged(id) else FilmFilters.slots(g).let { p ->
+                dao.movieTilesFiltered(id, g != null, p[0], p[1], p[2], p[3], p[4], p[5], max)
+            }
         }.flow
     }.cachedIn(viewModelScope)
 
@@ -151,10 +160,13 @@ fun MoviesScreen(onOpenMovie: (Int) -> Unit, vm: MoviesViewModel = hiltViewModel
     val progress by vm.progress.collectAsStateWithLifecycle()
     val genres by vm.genres.collectAsStateWithLifecycle()
     val genre by vm.genre.collectAsStateWithLifecycle()
+    val maxSecs by vm.maxSecs.collectAsStateWithLifecycle()
     val items = vm.items.collectAsLazyPagingItems()
     CategoryBrowser(sections, filtered, vm::toggleShowAll, selected, vm::select, items, { it.movie.streamId }, vm.focusMemory, onPin = vm::togglePin, above = {
-        GenreChips(genres, genre, { vm.genre.value = it })
-    }, tile = { tile, modifier ->
+        GenreChips(genres, genre, { vm.genre.value = it }, lengthLabel = FilmFilters.lengthLabel(maxSecs), lengthActive = maxSecs > 0, onLength = vm::nextLength)
+    }, emptyText = if (genre != null || maxSecs > 0) {
+        "Geen films die hier passen. Stemming en lengte werken met filmgegevens; BUIS haalt die op de achtergrond op voor je voorkeurslanden."
+    } else null, tile = { tile, modifier ->
         val movie = tile.movie
         PosterTile(
             title = movie.name,

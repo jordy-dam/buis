@@ -84,4 +84,4 @@ class MovieEnricher @Inject constructor(
     }
 }
 
-fun MovieInfo.toEntity(streamId: Int, at: Long) = MovieInfoEntity(streamId, genre, cast, director, plot, rating, at, tmdbId = tmdbId)
+fun MovieInfo.toEntity(streamId: Int, at: Long) = MovieInfoEntity(streamId, genre, cast, director, plot, rating, at, tmdbId = tmdbId, durationSecs = durationSecs?.takeIf { it > 0 })

@@ -4,6 +4,7 @@ import androidx.room.testing.MigrationTestHelper
 import androidx.sqlite.db.SupportSQLiteDatabase
 import androidx.test.platform.app.InstrumentationRegistry
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -290,6 +291,22 @@ class MigrationTest {
         helper.createDatabase(DB, 18).close()
         helper.runMigrationsAndValidate(DB, 19, true).use { db ->
             assertEquals(0, db.count("series_intro"))
+        }
+    }
+
+    @Test
+    fun `19 to 20 adds film running time and re-fetches details without losing their genres`() {
+        helper.createDatabase(DB, 19).use { db ->
+            db.execSQL("INSERT INTO movie_info (streamId, genre, cast, director, plot, rating, fetchedAt, failed, tmdbId) VALUES (5001, 'Comedy', NULL, NULL, NULL, NULL, 99, 0, NULL)")
+        }
+        helper.runMigrationsAndValidate(DB, 20, true).use { db ->
+            db.query("SELECT genre, failed, fetchedAt, durationSecs FROM movie_info").use {
+                it.moveToFirst()
+                assertEquals("Comedy", it.getString(0))
+                assertEquals("marked for a quiet re-fetch", 1, it.getInt(1))
+                assertEquals(0L, it.getLong(2))
+                assertTrue(it.isNull(3))
+            }
         }
     }
 

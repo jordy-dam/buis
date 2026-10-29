@@ -19,16 +19,28 @@ import androidx.tv.material3.Text
 import nl.jordy.iptv.ui.theme.Brand
 import nl.jordy.iptv.ui.theme.TextSecondary
 
-/** "Alle · Drama · Komedie …" above a grid. OK picks a genre; null is "Alle". */
+/**
+ * "Alle · Drama · Komedie …" above a grid. OK picks a genre; null is "Alle". Films add a length
+ * chip in front ([lengthLabel], OK steps it), which stays selected-looking while it filters.
+ */
 @OptIn(ExperimentalComposeUiApi::class)
 @Composable
-fun GenreChips(genres: List<String>, selected: String?, onSelect: (String?) -> Unit, modifier: Modifier = Modifier) {
+fun GenreChips(
+    genres: List<String>,
+    selected: String?,
+    onSelect: (String?) -> Unit,
+    modifier: Modifier = Modifier,
+    lengthLabel: String? = null,
+    lengthActive: Boolean = false,
+    onLength: (() -> Unit)? = null,
+) {
     if (genres.isEmpty()) return
     LazyRow(
         modifier = modifier.focusRestorer(),
         contentPadding = PaddingValues(horizontal = 4.dp, vertical = 6.dp),
         horizontalArrangement = Arrangement.spacedBy(8.dp),
     ) {
+        if (lengthLabel != null && onLength != null) item(key = "length") { Chip(lengthLabel, lengthActive, onClick = onLength) }
         item(key = "all") { Chip("Alle", selected == null) { onSelect(null) } }
         items(genres, key = { it }) { g -> Chip(g, selected == g) { onSelect(g) } }
     }

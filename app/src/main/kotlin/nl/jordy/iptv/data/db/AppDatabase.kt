@@ -30,7 +30,7 @@ import androidx.sqlite.db.SupportSQLiteDatabase
         ChannelSwapEntity::class,
         SeriesIntroEntity::class,
     ],
-    version = 19,
+    version = 20,
     exportSchema = true,
     autoMigrations = [
         AutoMigration(from = 1, to = 2, spec = AppDatabase.CatalogResync::class),
@@ -66,6 +66,8 @@ import androidx.sqlite.db.SupportSQLiteDatabase
         AutoMigration(from = 17, to = 18),
         // Intro overslaan, learned per series; a new, empty table.
         AutoMigration(from = 18, to = 19),
+        // Film running time for the length filter: film details are fetched again quietly.
+        AutoMigration(from = 19, to = 20, spec = AppDatabase.DurationRefetch::class),
     ],
 )
 abstract class AppDatabase : RoomDatabase() {
@@ -99,6 +101,13 @@ abstract class AppDatabase : RoomDatabase() {
      * Schema 7 adds TMDB ids: the catalog is emptied so the next sync fills `movie.tmdbId`, and
      * film details are marked for a quiet re-fetch (their genres keep working meanwhile).
      */
+    /** Schema 20 stores the running time: details are re-fetched in the background, genres keep working meanwhile. */
+    class DurationRefetch : AutoMigrationSpec {
+        override fun onPostMigrate(db: SupportSQLiteDatabase) {
+            db.execSQL("UPDATE movie_info SET failed = 1, fetchedAt = 0")
+        }
+    }
+
     class TmdbRefetch : AutoMigrationSpec {
         override fun onPostMigrate(db: SupportSQLiteDatabase) {
             CatalogResync().onPostMigrate(db)

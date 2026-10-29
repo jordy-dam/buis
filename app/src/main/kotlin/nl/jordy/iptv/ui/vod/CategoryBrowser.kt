@@ -11,6 +11,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
+import androidx.paging.LoadState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -65,6 +66,8 @@ fun <T : Any> CategoryBrowser(
     above: @Composable () -> Unit = {},
     /** Long-press or Menu on a category pins it to the top, or unpins it. */
     onPin: ((String) -> Unit)? = null,
+    /** Shown instead of an empty grid, when a filter left nothing. */
+    emptyText: String? = null,
 ) {
     val s = sections ?: return
     if (s.isEmpty()) {
@@ -90,6 +93,9 @@ fun <T : Any> CategoryBrowser(
         )
         Column(Modifier.padding(start = 16.dp).fillMaxSize().onFocusChanged { gridHasFocus = it.hasFocus }) {
             above()
+            if (emptyText != null && items.itemCount == 0 && items.loadState.refresh is LoadState.NotLoading) {
+                Text(emptyText, style = MaterialTheme.typography.bodyMedium, color = TextSecondary, modifier = Modifier.padding(start = 4.dp, top = 16.dp))
+            }
             LazyVerticalGrid(
                 columns = GridCells.Fixed(5),
                 modifier = Modifier.fillMaxSize().focusRequester(gridFocus).focusRestorer(),

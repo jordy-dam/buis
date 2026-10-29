@@ -67,6 +67,24 @@ interface CatalogDao {
     fun movieTilesPagedByGenre(categoryId: String, pattern: String, alt: String): PagingSource<Int, MovieTile>
 
     /**
+     * Films filtered at once by genre or mood ([anyGenre]: any of up to six LIKE patterns, see
+     * [nl.jordy.iptv.data.repo.FilmFilters]) and by running time ([maxSecs], 0 = any length).
+     * A film without details doesn't pass a filter it can't be judged on.
+     */
+    @Query(
+        "SELECT m.*, COUNT(*) AS versions, MIN(m.sortIndex) AS firstSort FROM movie m LEFT JOIN movie_info i ON i.streamId = m.streamId " +
+            "WHERE m.categoryId = :categoryId " +
+            "AND (:anyGenre = 0 OR i.genre LIKE :p1 OR i.genre LIKE :p2 OR i.genre LIKE :p3 OR i.genre LIKE :p4 OR i.genre LIKE :p5 OR i.genre LIKE :p6) " +
+            "AND (:maxSecs = 0 OR (i.durationSecs > 0 AND i.durationSecs <= :maxSecs)) " +
+            "GROUP BY $FILM_KEY ORDER BY firstSort",
+    )
+    fun movieTilesFiltered(
+        categoryId: String, anyGenre: Boolean,
+        p1: String, p2: String, p3: String, p4: String, p5: String, p6: String,
+        maxSecs: Int,
+    ): PagingSource<Int, MovieTile>
+
+    /**
      * Every version of a film in the whole catalog: the same TMDB id (from the list or the film's
      * details), or, without one, the same title and year.
      */

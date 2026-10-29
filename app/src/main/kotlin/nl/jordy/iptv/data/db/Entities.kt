@@ -238,6 +238,8 @@ data class MovieInfoEntity(
     @ColumnInfo(defaultValue = "0") val failed: Boolean = false,
     /** TMDB id from `get_vod_info`: groups language versions whose titles differ. */
     val tmdbId: Int? = null,
+    /** Running time from `get_vod_info`, for the length filter at Films; null when the provider has none. */
+    val durationSecs: Int? = null,
 )
 
 /** A search term a profile follows ("Formule 1", "FC Utrecht"): matching programmes get a reminder. */
