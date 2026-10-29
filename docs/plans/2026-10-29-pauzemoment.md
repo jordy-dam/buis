@@ -84,8 +84,8 @@ you set it, only for films and series, and with next-episode autoplay it counts 
   next-episode and break cards checked side by side in the new style.
 - Not checked: a real film over 15 minutes (mock media is 3 minutes), the sleep card in the corner (needs
   30 min without keys), a reminder appearing on top of a player card.
-- Seen in passing, not from this change: after autoplay from a "Verder kijken" episode, the player title
-  reads "Serie 33 · S1 A3 – Serie 20032 - S01E04" (the series name is cut on " – ", but the Home route uses " · ").
+- Fixed (same day): after autoplay from a "Verder kijken" episode the title read "Serie 33 · S1 A3 – Serie 20032 -
+  S01E04". The series name now comes from the catalog instead of the route title; checked on the emulator.
 
 ## Pauzeduur (2026-10-29, after Jordy's first look)
 - Jordy: make the length adjustable, 1–15 minutes, default 1. Instellingen → "Pauzeduur", right under

@@ -381,8 +381,9 @@ class PlayerViewModel @Inject constructor(
     private suspend fun loadSeries() {
         val ep = db.episodes().episode(route.id) ?: return
         episodes = db.episodes().forSeries(ep.seriesId).first()
-        // Same "<series> – <episode>" title the detail screen gives the first one.
-        seriesName = route.title.substringBefore(" – ")
+        // Next episodes get the "<series> – <episode>" title the detail screen gives the first one. The name
+        // comes from the catalog: the route's title differs per entry point ("<series> · S1 A3" from Home).
+        seriesName = db.catalog().series(ep.seriesId)?.name ?: route.title.substringBefore(" – ").substringBefore(" · ")
         nextEpisode = Autoplay.next(episodes, route.id)
     }
 
