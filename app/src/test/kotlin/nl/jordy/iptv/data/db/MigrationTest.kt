@@ -310,6 +310,19 @@ class MigrationTest {
         }
     }
 
+    @Test
+    fun `20 to 21 re-syncs the catalog for channel badges and keeps the household`() {
+        helper.createDatabase(DB, 20).use { db ->
+            db.execSQL("INSERT INTO profile (id, name, avatar, face, pinHash, preferredCountries, onlyPreferred, kids, lastUsedAt, createdAt, pinnedCategories) VALUES (1, 'Anna', 3, 2, NULL, 'NL', 1, 0, 5, 1, '')")
+            db.execSQL("INSERT INTO favorite (profileId, type, itemId, name, imageUrl, addedAt) VALUES (1, 'LIVE', 101, 'NPO 1', NULL, 1)")
+            db.execSQL("INSERT INTO sync_info (id, lastSyncAt, generation) VALUES (0, 3, 1)")
+        }
+        helper.runMigrationsAndValidate(DB, 21, true, AppDatabase.MIGRATION_20_21).use { db ->
+            assertEquals("next launch syncs the catalog", 0, db.count("sync_info"))
+            assertEquals("favourites stay", 1, db.count("favorite"))
+        }
+    }
+
     private fun SupportSQLiteDatabase.insertPhase1Data() {
         execSQL("INSERT INTO favorite (type, itemId, name, imageUrl, addedAt) VALUES ('LIVE', 101, '┃NL┃ NPO 1 HD', NULL, 1)")
         execSQL("INSERT INTO playback_position (type, itemId, positionMs, durationMs, updatedAt) VALUES ('MOVIE', 5001, 62000, 180000, 2)")

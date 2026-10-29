@@ -12,4 +12,10 @@ class BestQualityTest {
         assertEquals("HD", bestQuality(listOf("hd")))
         assertNull(bestQuality(listOf("Multi", "HEVC", "")))
     }
+
+    @Test
+    fun `SD shows too, so an HD and an SD version of a channel can be told apart`() {
+        assertEquals("SD", bestQuality(listOf("SD")))
+        assertEquals("HD", bestQuality(listOf("SD", "HD")))
+    }
 }

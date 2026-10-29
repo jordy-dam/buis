@@ -76,6 +76,12 @@ class NameParserTest {
     }
 
     @Test
+    fun `channels keep HD, so their HD and SD versions stay apart`() {
+        assertEquals("NPO 1" to listOf("HD"), NameParser.parse("┃NL┃ NPO 1 HD", keepHd = true).let { it.title to it.badges })
+        assertEquals("NPO 1" to listOf("SD"), NameParser.parse("┃NL┃ NPO 1 SD", keepHd = true).let { it.title to it.badges })
+    }
+
+    @Test
     fun `tags at the end are split off too, years stay in the title`() {
         val ziggo = p("┃UCL┃ ZIGGO SPORT 1 HD [NL]")
         assertEquals("ZIGGO SPORT 1" to "NL", ziggo.title to ziggo.country)

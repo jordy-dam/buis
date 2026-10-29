@@ -30,7 +30,7 @@ import androidx.sqlite.db.SupportSQLiteDatabase
         ChannelSwapEntity::class,
         SeriesIntroEntity::class,
     ],
-    version = 20,
+    version = 21,
     exportSchema = true,
     autoMigrations = [
         AutoMigration(from = 1, to = 2, spec = AppDatabase.CatalogResync::class),
@@ -116,6 +116,14 @@ abstract class AppDatabase : RoomDatabase() {
     }
 
     companion object {
+        /**
+         * Channels keep their "HD" badge from now on (HD and SD versions looked the same): the catalog
+         * is emptied so the next launch re-syncs it with the badges. Nothing else changes.
+         */
+        val MIGRATION_20_21 = object : Migration(20, 21) {
+            override fun migrate(db: SupportSQLiteDatabase) = CatalogResync().onPostMigrate(db)
+        }
+
         /** The profile that takes over everything saved before profiles existed. */
         const val FIRST_PROFILE_NAME = "Profiel 1"
 

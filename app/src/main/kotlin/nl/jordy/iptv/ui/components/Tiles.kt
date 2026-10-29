@@ -1,5 +1,6 @@
 package nl.jordy.iptv.ui.components
 
+import nl.jordy.iptv.ui.theme.Background
 import androidx.compose.material.icons.filled.Favorite
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.History
@@ -270,18 +271,21 @@ fun ChannelCard(name: String, logoUrl: String?, now: EpgEntry?, onClick: () -> U
 /** A quiet outlined label for picture quality, so it reads as a property, not a button. */
 @Composable
 private fun QualityLabel(text: String) {
+    // Drawn like Material's HD / SD / 4K icons (letters cut out of a filled block); there is no FHD
+    // icon, so all four share this one look instead of mixing icons and text.
     Text(
         text,
         style = MaterialTheme.typography.labelSmall,
-        color = TextSecondary,
+        fontWeight = androidx.compose.ui.text.font.FontWeight.Bold,
+        color = Background,
         maxLines = 1,
-        modifier = Modifier.border(1.dp, TextSecondary.copy(alpha = 0.6f), RoundedCornerShape(3.dp)).padding(horizontal = 4.dp, vertical = 1.dp),
+        modifier = Modifier.background(TextSecondary, RoundedCornerShape(3.dp)).padding(horizontal = 4.dp, vertical = 1.dp),
     )
 }
 
 /** The best picture quality among a channel's labels, or null; "Multi" and the like aren't qualities. */
 fun bestQuality(badges: List<String>): String? {
-    val rank = listOf("UHD", "4K", "FHD", "HD")
+    val rank = listOf("UHD", "4K", "FHD", "HD", "SD")
     return badges.map { it.uppercase() }.filter { it in rank }.minByOrNull { rank.indexOf(it) }
         ?.let { if (it == "UHD") "4K" else it }
 }

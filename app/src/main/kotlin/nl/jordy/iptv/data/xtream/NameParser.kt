@@ -51,7 +51,11 @@ object NameParser {
     private val languageGroups = setOf("EN")
 
     /** [stripQuality] is off for category names: "NEDERLAND 4K ULTRA" is a category, not a badge. */
-    fun parse(raw: String, stripQuality: Boolean = true): ParsedName {
+    /**
+     * [keepHd]: channels keep "HD" as a badge, so "NPO 1 HD" and "NPO 1 SD" stay apart in the lists;
+     * on films it's on nearly everything and says nothing.
+     */
+    fun parse(raw: String, stripQuality: Boolean = true, keepHd: Boolean = false): ParsedName {
         var rest = raw
         var country: String? = null
         val badges = mutableListOf<String>()
@@ -99,8 +103,8 @@ object NameParser {
                 found += m.groupValues[1].uppercase()
                 rest = rest.substring(0, m.range.first)
             }
-            // "HD" is on most channels and says nothing; the rarer ones help tell variants apart.
-            found.asReversed().map { if (it == "UHD") "4K" else it }.filter { it != "HD" }.distinct().forEach(badges::add)
+            // "HD" is on most films and says nothing there; the rarer ones help tell variants apart.
+            found.asReversed().map { if (it == "UHD") "4K" else it }.filter { keepHd || it != "HD" }.distinct().forEach(badges::add)
         }
 
         val title = spaces.replace(decoration.replace(rest, ""), " ").trim()

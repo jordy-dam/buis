@@ -108,7 +108,7 @@ class CatalogSync @Inject constructor(
         client.forEachInArray(c, itemsAction) { el ->
             val m = parse(el) ?: return@forEachInArray
             val cat = category(m) ?: UNCATEGORIZED.also { uncategorized = true }
-            val item = toItem(m, NameParser.parse(rawName(m)), cat, count++)
+            val item = toItem(m, NameParser.parse(rawName(m), keepHd = type == ContentType.LIVE), cat, count++)
             batch += item.entity
             // An item's own tag ("┃NL┃ Film" in an untagged category) beats its category's country.
             searchBatch += SearchEntity(item.title, type.name, item.id, cat, item.country ?: categoryCountry[cat])
