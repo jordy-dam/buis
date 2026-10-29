@@ -54,16 +54,19 @@ import androidx.tv.material3.MaterialTheme
 import androidx.tv.material3.Text
 import kotlinx.coroutines.delay
 import nl.jordy.iptv.player.PlayerViewModel
+import nl.jordy.iptv.ui.components.BreakIcons
+import nl.jordy.iptv.ui.components.CornerCard
 import nl.jordy.iptv.ui.components.PrimaryButton
+import androidx.compose.foundation.Image
+import androidx.compose.foundation.layout.size
+import androidx.compose.ui.graphics.ColorFilter
 import nl.jordy.iptv.ui.components.ProgressBar
 import androidx.compose.foundation.border
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.ui.text.style.TextOverflow
 import nl.jordy.iptv.player.NextUpCard
 import nl.jordy.iptv.data.xtream.EpgEntry
 import nl.jordy.iptv.ui.theme.FocusBar
 import nl.jordy.iptv.ui.theme.Live
-import nl.jordy.iptv.ui.theme.SurfaceRaised
 import nl.jordy.iptv.ui.theme.TextOnLight
 import nl.jordy.iptv.ui.theme.TextPrimary
 import nl.jordy.iptv.ui.theme.SafeArea
@@ -120,7 +123,7 @@ fun PlayerScreen(onExit: () -> Unit, vm: PlayerViewModel = hiltViewModel()) {
     DisposableEffect(lifecycle) {
         val observer = LifecycleEventObserver { _, event ->
             when (event) {
-                Lifecycle.Event.ON_STOP -> { vm.saveNow(); vm.player.pause() }
+                Lifecycle.Event.ON_STOP -> { vm.cancelBreak(); vm.saveNow(); vm.player.pause() }
                 Lifecycle.Event.ON_START -> if (vm.isLive) vm.player.play()
                 else -> Unit
             }
@@ -134,6 +137,8 @@ fun PlayerScreen(onExit: () -> Unit, vm: PlayerViewModel = hiltViewModel()) {
     BackHandler(enabled = state.catchup != null) { vm.backToLive(); overlayTick++ }
     // Declared later, so it wins while the card shows: Back stops the countdown, not the episode.
     BackHandler(enabled = state.nextUp != null) { vm.dismissNextUp() }
+    // Back on the break card: no break this time, play on.
+    BackHandler(enabled = state.breakSecondsLeft != null) { vm.endBreak() }
     LaunchedEffect(state.finished) { if (state.finished) onExit() }
 
     Box(
@@ -148,6 +153,13 @@ fun PlayerScreen(onExit: () -> Unit, vm: PlayerViewModel = hiltViewModel()) {
                 val wasAsking = state.sleepSecondsLeft != null
                 vm.userActive()
                 if (wasAsking) return@onKeyEvent true
+                // During the break only OK (and play) end it; someone walking past the remote doesn't.
+                if (state.breakSecondsLeft != null) {
+                    if (code == KeyEvent.KEYCODE_DPAD_CENTER || code == KeyEvent.KEYCODE_ENTER ||
+                        code == KeyEvent.KEYCODE_MEDIA_PLAY_PAUSE || code == KeyEvent.KEYCODE_MEDIA_PLAY
+                    ) vm.endBreak()
+                    return@onKeyEvent code != KeyEvent.KEYCODE_BACK
+                }
                 if (state.nextUp != null && (code == KeyEvent.KEYCODE_DPAD_CENTER || code == KeyEvent.KEYCODE_ENTER)) {
                     vm.playNextNow()
                     return@onKeyEvent true
@@ -218,8 +230,13 @@ fun PlayerScreen(onExit: () -> Unit, vm: PlayerViewModel = hiltViewModel()) {
             }
         }
 
-        state.nextUp?.let { NextUpPanel(it, Modifier.align(Alignment.BottomEnd).padding(SafeArea)) }
-        state.sleepSecondsLeft?.let { SleepWarning(it, Modifier.align(Alignment.TopCenter).padding(top = SafeArea)) }
+        // One card at a time, in the corner every card uses. The sleep timer wins: it stops playback.
+        val corner = Modifier.align(Alignment.BottomEnd).padding(SafeArea)
+        when {
+            state.sleepSecondsLeft != null -> SleepCard(state.sleepSecondsLeft!!, corner)
+            state.breakSecondsLeft != null -> BreakCard(state.breakSecondsLeft!!, corner)
+            state.nextUp != null -> NextEpisodeCard(state.nextUp!!, corner)
+        }
     }
 }
 
@@ -261,34 +278,49 @@ private fun CatchupInfo(state: nl.jordy.iptv.player.PlayerUiState, programme: Ep
     }
 }
 
-/** Bottom right, over the end credits: what's next and the two keys that matter. */
+/** Over the end credits: what's next and the two keys that matter. */
 @Composable
-private fun NextUpPanel(card: NextUpCard, modifier: Modifier) {
-    Column(
-        modifier.width(440.dp).background(SurfaceRaised.copy(alpha = 0.95f), RoundedCornerShape(12.dp)).padding(20.dp),
-        verticalArrangement = Arrangement.spacedBy(8.dp),
+private fun NextEpisodeCard(card: NextUpCard, modifier: Modifier) {
+    CornerCard(
+        label = card.secondsLeft?.let { "Volgende aflevering over $it s" } ?: "Kijk je nog?",
+        title = card.title,
+        modifier = modifier,
+        visual = { Text(card.code, style = MaterialTheme.typography.titleMedium, color = TextSecondary) },
     ) {
-        Text(
-            card.secondsLeft?.let { "Volgende aflevering over $it s" } ?: "Kijk je nog?",
-            style = MaterialTheme.typography.labelLarge,
-            color = Live,
-        )
-        Text(card.label, style = MaterialTheme.typography.titleLarge, maxLines = 2, overflow = TextOverflow.Ellipsis)
-        Row(horizontalArrangement = Arrangement.spacedBy(12.dp), modifier = Modifier.padding(top = 4.dp)) {
-            KeyHint("OK", if (card.secondsLeft == null) "Volgende aflevering" else "Nu kijken", primary = true)
-            KeyHint("Terug", "Stoppen", primary = false)
-        }
+        KeyHint("OK", if (card.secondsLeft == null) "Volgende aflevering" else "Nu kijken", primary = true)
+        KeyHint("Terug", "Stoppen", primary = false)
+    }
+}
+
+/** Pauzemoment, over the paused picture: toilet, drink, snack, and when it goes on. */
+@Composable
+private fun BreakCard(secondsLeft: Int, modifier: Modifier) {
+    CornerCard(
+        label = "Pauze · verder over ${formatTime(secondsLeft * 1000L)}",
+        title = "Even plassen, drinken of iets pakken",
+        modifier = modifier,
+        visual = {
+            Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                BreakIcons.all.forEach {
+                    Image(it, contentDescription = null, colorFilter = ColorFilter.tint(TextSecondary), modifier = Modifier.size(28.dp))
+                }
+            }
+        },
+    ) {
+        KeyHint("OK", "Verder", primary = true)
+        KeyHint("Terug", "Overslaan", primary = false)
     }
 }
 
 @Composable
-private fun SleepWarning(secondsLeft: Int, modifier: Modifier) {
-    Column(
-        modifier.background(SurfaceRaised.copy(alpha = 0.95f), RoundedCornerShape(12.dp)).padding(horizontal = 24.dp, vertical = 14.dp),
-        horizontalAlignment = Alignment.CenterHorizontally,
+private fun SleepCard(secondsLeft: Int, modifier: Modifier) {
+    CornerCard(
+        label = "Slaaptimer · stopt over $secondsLeft s",
+        title = "Kijk je nog?",
+        subtitle = "Druk op een knop om door te kijken.",
+        modifier = modifier,
     ) {
-        Text("Nog aan het kijken?", style = MaterialTheme.typography.titleLarge)
-        Text("Slaaptimer: stopt over $secondsLeft s. Druk op een knop om door te kijken.", style = MaterialTheme.typography.bodyMedium, color = TextSecondary)
+        KeyHint("Elke knop", "Doorkijken", primary = true)
     }
 }
 

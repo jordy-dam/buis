@@ -29,5 +29,6 @@ object Autoplay {
     /** [finishedUnattended] counts this episode too: the third one in a row without a key asks first. */
     fun asksFirst(finishedUnattended: Int): Boolean = finishedUnattended >= UNATTENDED_LIMIT
 
-    fun label(e: EpisodeEntity): String = "S${e.season} · A${e.number}  ${e.title}"
+    /** Season and episode as the card's plate shows them: "S1 · A3". */
+    fun code(e: EpisodeEntity): String = "S${e.season} · A${e.number}"
 }

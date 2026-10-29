@@ -200,6 +200,20 @@ class MigrationTest {
         }
     }
 
+    @Test
+    fun `12 to 13 adds a Pauzemoment that starts off and keeps the sleep timer`() {
+        helper.createDatabase(DB, 12).use { db ->
+            db.execSQL("INSERT INTO profile (id, name, avatar, face, pinHash, preferredCountries, onlyPreferred, kids, lastUsedAt, createdAt, sleepMinutes, pinnedCategories) VALUES (1, 'Anna', 3, 2, NULL, 'NL', 1, 0, 5, 1, 90, '')")
+        }
+        helper.runMigrationsAndValidate(DB, 13, true).use { db ->
+            db.query("SELECT breakMinutes, sleepMinutes FROM profile").use {
+                it.moveToFirst()
+                assertEquals(0, it.getInt(0))
+                assertEquals(90, it.getInt(1))
+            }
+        }
+    }
+
     private fun SupportSQLiteDatabase.insertPhase1Data() {
         execSQL("INSERT INTO favorite (type, itemId, name, imageUrl, addedAt) VALUES ('LIVE', 101, '┃NL┃ NPO 1 HD', NULL, 1)")
         execSQL("INSERT INTO playback_position (type, itemId, positionMs, durationMs, updatedAt) VALUES ('MOVIE', 5001, 62000, 180000, 2)")

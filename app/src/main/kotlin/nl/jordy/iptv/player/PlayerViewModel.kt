@@ -60,6 +60,8 @@ data class PlayerUiState(
     val nextUp: NextUpCard? = null,
     /** Sleep timer: seconds until playback stops, during the last minute. */
     val sleepSecondsLeft: Int? = null,
+    /** Pauzemoment: seconds until playback goes on, while the break card shows. */
+    val breakSecondsLeft: Int? = null,
     /** The sleep timer ran out: the screen closes the player. */
     val finished: Boolean = false,
     /** Live: the running programme can be watched from its start (the channel keeps an archive). */
@@ -69,7 +71,7 @@ data class PlayerUiState(
 )
 
 /** [secondsLeft] counts down to the next episode; null means it waits for OK ("Kijk je nog?"). */
-data class NextUpCard(val label: String, val secondsLeft: Int?)
+data class NextUpCard(val code: String, val title: String, val secondsLeft: Int?)
 
 /**
  * One ExoPlayer for the whole player screen. Zapping swaps the media item on the same instance:
@@ -166,7 +168,9 @@ class PlayerViewModel @Inject constructor(
         val c = credentialStore.current() ?: return showError("Niet ingelogd.")
         val base = c.baseUrl ?: return showError("Ongeldige server.")
         credentials = c
-        sleepTimer = SleepTimer(profiles.currentPrefs().sleepMinutes, SystemClock.elapsedRealtime())
+        val prefs = profiles.currentPrefs()
+        sleepTimer = SleepTimer(prefs.sleepMinutes, SystemClock.elapsedRealtime())
+        if (!isLive) breakTimer = BreakTimer(prefs.breakMinutes)
         when (route.kind) {
             PlayerRoute.Kind.LIVE -> {
                 liveSources = LiveSources(base, c)
@@ -357,7 +361,7 @@ class PlayerViewModel @Inject constructor(
         }
     }
 
-    // Next episode and sleep timer
+    // Next episode, sleep timer and Pauzemoment
 
     private var episodes: List<EpisodeEntity> = emptyList()
     private var seriesName = ""
@@ -369,6 +373,10 @@ class PlayerViewModel @Inject constructor(
     /** Back on the card: this episode just ends. */
     private var dismissedFor: Int? = null
     private var sleepTimer: SleepTimer? = null
+    private var breakTimer: BreakTimer? = null
+    private var breakStartedAt: Long? = null
+    /** The break took the place of the next-episode card: when it ends, the next episode starts. */
+    private var breakThenNext = false
 
     private suspend fun loadSeries() {
         val ep = db.episodes().episode(route.id) ?: return
@@ -407,7 +415,51 @@ class PlayerViewModel @Inject constructor(
             }
             else -> Unit
         }
+        breakTimer?.tick(now, player.isPlaying)
+        if (breakTick(now)) return
         if (route.kind == PlayerRoute.Kind.EPISODE) nextUpTick(now)
+    }
+
+    /** True while the break card shows, so the next-episode card waits. */
+    private fun breakTick(now: Long): Boolean {
+        breakStartedAt?.let { startedAt ->
+            val left = BreakTimer.BREAK_SECS - ((now - startedAt) / 1000).toInt()
+            if (left > 0) _state.update { it.copy(breakSecondsLeft = left) } else endBreak()
+            return true
+        }
+        val timer = breakTimer ?: return false
+        if (!playbackStarted) return false
+        val remaining = player.duration.takeIf { it > 0 }?.let { it - player.currentPosition }
+        val hasNext = route.kind == PlayerRoute.Kind.EPISODE && nextEpisode != null && dismissedFor != vodId
+        when (timer.placement(remaining, hasNext)) {
+            BreakTimer.Placement.NOW -> startBreak(now, thenNext = false)
+            BreakTimer.Placement.SKIP -> timer.taken()
+            // The next-episode card takes it, see nextUpTick.
+            BreakTimer.Placement.AT_END, BreakTimer.Placement.NONE -> return false
+        }
+        return breakStartedAt != null
+    }
+
+    private fun startBreak(now: Long, thenNext: Boolean) {
+        breakTimer?.taken()
+        breakStartedAt = now
+        breakThenNext = thenNext
+        player.pause()
+        _state.update { it.copy(nextUp = null, breakSecondsLeft = BreakTimer.BREAK_SECS) }
+    }
+
+    /** OK or Back on the break card, or the minute is over. */
+    fun endBreak() {
+        if (breakStartedAt == null) return
+        breakStartedAt = null
+        _state.update { it.copy(breakSecondsLeft = null) }
+        if (breakThenNext) nextEpisode?.let(::startEpisode) else player.play()
+    }
+
+    /** The app went to the background during the break: stop it there, nothing resumes by itself. */
+    fun cancelBreak() {
+        breakStartedAt = null
+        _state.update { it.copy(breakSecondsLeft = null) }
     }
 
     private fun nextUpTick(now: Long) {
@@ -417,16 +469,23 @@ class PlayerViewModel @Inject constructor(
             val ended = player.playbackState == Player.STATE_ENDED
             if (!Autoplay.cardDue(player.currentPosition, player.duration.coerceAtLeast(0), ended)) return
             asking = Autoplay.asksFirst(unattended + 1)
+            // "Kijk je nog?" waits for a key, so it is a break of its own.
+            if (asking) breakTimer?.taken()
             cardShownAt = now
             now
         }
+        if (!asking && breakTimer?.due == true) {
+            unattended++
+            startBreak(now, thenNext = true)
+            return
+        }
         if (asking) {
-            _state.update { it.copy(nextUp = NextUpCard(Autoplay.label(next), null)) }
+            _state.update { it.copy(nextUp = NextUpCard(Autoplay.code(next), next.title, null)) }
             return
         }
         val left = Autoplay.COUNTDOWN_SECS - ((now - shownAt) / 1000).toInt()
         if (left > 0) {
-            _state.update { it.copy(nextUp = NextUpCard(Autoplay.label(next), left)) }
+            _state.update { it.copy(nextUp = NextUpCard(Autoplay.code(next), next.title, left)) }
         } else {
             unattended++
             startEpisode(next)

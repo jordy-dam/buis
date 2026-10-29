@@ -3,7 +3,7 @@
 ---
 session_date: 2026-10-29
 tool: Claude Code
-session_focus: Phase 2g "volgen" from plan to tv, plus everything Jordy asked for while trying it
+session_focus: Brainstorm list, then Pauzemoment and one card style for all pop-ups
 ---
 
 ## TL;DR for the next person
@@ -11,6 +11,8 @@ BUIS runs on the real tv (TCL Smart TV Pro, Android 14) with Jordy's subscriptio
 Everything through phase 2g is on the tv and Jordy is happy with it. The code is on GitHub:
 `git@github-personal:jordy-dam/buis.git` (private, personal account), `main` = current state (776e166).
 Plan and per-part notes: `docs/plans/2026-10-29-phase-2g-volgen.md`. Decisions: `.agents/decisions/product.md`.
+New since: `docs/brainstorm.md` (open idea list) and **Pauzemoment** on branch `feat/pauzemoment`
+(plan `docs/plans/2026-10-29-pauzemoment.md`): built and emulator-tested, **not on the tv, not merged**.
 
 ## State
 **Where we are:**
@@ -26,14 +28,19 @@ Plan and per-part notes: `docs/plans/2026-10-29-phase-2g-volgen.md`. Decisions: 
 - Uitloggen keeps profiles, history, terms and film details (`SubscriptionData`); another server clears only
   provider-id data. "Alles wissen" wipes everything behind a grown-up PIN.
 
-**Last completed step:** `main` created from feat/phase-2a and pushed.
+- On `feat/pauzemoment` (schema 13): Pauzemoment per profile, and the reminder, next-episode, break and
+  sleep-timer cards share `CornerCard` (bottom right, one at a time in the player).
+
+**Last completed step:** Pauzemoment built and checked on the emulator; committed on `feat/pauzemoment`.
 
 **Mid-flight:** nothing — clean break. Jordy still has to set `main` as default branch on github.com.
 
 ## Next up
-1. Start new work from `main` on a fresh branch (not on feat/phase-2a).
-2. Wait for Jordy's report on vanaf begin on real channels (↺ on Viaplay F1/ESPN? seeking in timeshift?) — fix only if needed.
-3. Candidates when he asks: number-key zapping (parked), auto-play into a Home "Jouw diensten" row,
+1. Pauzemoment on the tv: release build from `feat/pauzemoment`, install only when Jordy says so. Then merge
+   to `main`. Ask Jordy: does a mid-film pause annoy, is the corner card style right for all four cards?
+2. Start other new work from `main` on a fresh branch. Ideas: `docs/brainstorm.md` (next pick: Home Assistant).
+3. Wait for Jordy's report on vanaf begin on real channels (↺ on Viaplay F1/ESPN? seeking in timeshift?) — fix only if needed.
+4. Candidates when he asks: number-key zapping (parked), auto-play into a Home "Jouw diensten" row,
    phase 3 suggestions (service suggestions belong there), a full EPG grid.
 
 ## Open questions

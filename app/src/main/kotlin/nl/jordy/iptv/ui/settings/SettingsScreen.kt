@@ -17,6 +17,7 @@ import nl.jordy.iptv.data.epg.XmltvProbe
 import nl.jordy.iptv.data.settings.CountryFilter
 import nl.jordy.iptv.data.profile.Pin
 import nl.jordy.iptv.data.profile.ProfileRepository
+import nl.jordy.iptv.player.BreakTimer
 import nl.jordy.iptv.player.SleepTimer
 import nl.jordy.iptv.ui.profiles.PinDialog
 import androidx.compose.runtime.rememberCoroutineScope
@@ -181,6 +182,11 @@ class SettingsViewModel @Inject constructor(
 
     fun toggleOnlyPreferred() = viewModelScope.launch { profiles.setOnlyPreferred(!prefs.value.onlyPreferred) }
     fun cycleSleepTimer() = viewModelScope.launch { profiles.setSleepMinutes(SleepTimer.nextChoice(prefs.value.sleepMinutes)) }
+    fun cycleBreak() = viewModelScope.launch {
+        // Debug builds add a 1-minute choice, to see the break without watching for an hour.
+        val choices = if (BuildConfig.DEBUG) BreakTimer.DEBUG_CHOICES else BreakTimer.CHOICES
+        profiles.setBreakMinutes(BreakTimer.nextChoice(prefs.value.breakMinutes, choices))
+    }
 
     init {
         viewModelScope.launch {
@@ -290,6 +296,12 @@ fun SettingsScreen(onRefreshCatalog: () -> Unit, onLoggedOut: () -> Unit, onEdit
             "Stopt het afspelen als er zo lang geen knop is ingedrukt. Een minuut ervoor vraagt BUIS of je nog kijkt.",
             value = if (prefs.sleepMinutes == 0) "Uit" else "${prefs.sleepMinutes} min",
             onClick = vm::cycleSleepTimer,
+        )
+        SettingRow(
+            "Pauzemoment",
+            "Na zo lang kijken pauzeert BUIS een minuut, zodat iedereen even kan plassen, drinken of iets pakken. Alleen bij films en series.",
+            value = if (prefs.breakMinutes == 0) "Uit" else "${prefs.breakMinutes} min",
+            onClick = vm::cycleBreak,
         )
         SettingRow(
             "Volgen",

@@ -1,6 +1,6 @@
 # 2026-10-29 — Pauzemoment
 
-Status: **planned, not built.** Branch `feat/pauzemoment`. Idea from `docs/brainstorm.md`.
+Status: **built and emulator-tested (2026-10-29); not on the tv.** Branch `feat/pauzemoment`. Idea from `docs/brainstorm.md`.
 
 ## Why
 Jordy: after an hour of a film or a run of episodes, BUIS should take a short break by itself so
@@ -66,3 +66,23 @@ you set it, only for films and series, and with next-episode autoplay it counts 
 - Is one minute long enough? If someone isn't back in time, they rewind with Left (10 s per press)
   or pause with OK — fine for now. If Jordy finds it too short, the fix is a break-length choice in
   Instellingen, not a "+5 min" button on the card.
+
+## Built (2026-10-29)
+- As planned, with one change from Jordy during the build: the break card is **not in the middle** but
+  in the corner, on a shared `CornerCard` with the reminder, next-episode and sleep-timer cards (same
+  place, size, colours and layout). The sleep warning moved from the top to that corner too. In the
+  player one card shows at a time: sleep timer > break > next episode. The break card: three icons on
+  the plate, "Pauze · verder over 0:51", "Even plassen, drinken of iets pakken", OK · Verder, Terug · Overslaan.
+- Code: `player/BreakTimer.kt` (logic + tests), `PlayerViewModel` (tick, start/end/cancel), `ui/components/CornerCard.kt`,
+  `ui/components/BreakIcons.kt`, schema 13 (`profile.breakMinutes`). Debug builds offer a 1-minute choice.
+- Going to the background during a break ends the break without playing on (`cancelBreak` on ON_STOP).
+- Tested: 8 `BreakTimerTest` cases + migration 12 → 13; full suite 155 green; lint unchanged from `main`
+  (the one error is the old `HomeScreen.kt:220` RememberInComposition).
+- Emulator (1 min setting, mock 3-minute episodes): break replaced the next-episode card at 2:40 and started
+  the next episode after the minute; arrows didn't end it; Back skipped it and the player stayed open.
+  With the near-end window temporarily at 30 s (reverted): mid-episode break, OK resumed at once. Reminder,
+  next-episode and break cards checked side by side in the new style.
+- Not checked: a real film over 15 minutes (mock media is 3 minutes), the sleep card in the corner (needs
+  30 min without keys), a reminder appearing on top of a player card.
+- Seen in passing, not from this change: after autoplay from a "Verder kijken" episode, the player title
+  reads "Serie 33 · S1 A3 – Serie 20032 - S01E04" (the series name is cut on " – ", but the Home route uses " · ").

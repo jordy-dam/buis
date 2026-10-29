@@ -36,6 +36,7 @@ import kotlinx.coroutines.launch
 import nl.jordy.iptv.data.repo.FollowMatches
 import nl.jordy.iptv.data.repo.FollowRepository
 import nl.jordy.iptv.ui.PlayerRoute
+import nl.jordy.iptv.ui.components.CornerCard
 import nl.jordy.iptv.ui.components.PrimaryButton
 import nl.jordy.iptv.ui.components.SecondaryButton
 import nl.jordy.iptv.ui.components.ignoreHeldKey
@@ -128,41 +129,34 @@ fun ReminderHost(active: Boolean, onWatch: (PlayerRoute) -> Unit, vm: ReminderVi
     Dialog(onDismissRequest = { vm.dismiss(watched = false) }, properties = DialogProperties(usePlatformDefaultWidth = false)) {
         (LocalView.current.parent as? DialogWindowProvider)?.window?.setDimAmount(0.25f)
         Box(Modifier.fillMaxSize().padding(SafeArea), contentAlignment = Alignment.BottomEnd) {
-        Column(
-            Modifier.ignoreHeldKey().width(560.dp).background(SurfaceRaised, RoundedCornerShape(16.dp)).padding(20.dp),
-            verticalArrangement = Arrangement.spacedBy(14.dp),
+        val minutes = ((m.start - System.currentTimeMillis() / 1000 + 59) / 60).coerceAtLeast(1)
+        val at = clock.format(Instant.ofEpochSecond(m.start))
+        CornerCard(
+            label = if (started) "Nu begonnen · $at" else "Over $minutes min · $at",
+            title = m.title,
+            subtitle = m.channelName,
+            modifier = Modifier.ignoreHeldKey(),
+            // Logo plate like the channel rows: logos are often transparent PNGs.
+            visual = {
+                Text(m.channelName.take(2).uppercase(), style = MaterialTheme.typography.titleMedium, color = TextSecondary)
+                if (m.logoUrl != null) AsyncImage(model = m.logoUrl, contentDescription = null, contentScale = ContentScale.Fit, modifier = Modifier.fillMaxSize().padding(6.dp))
+            },
         ) {
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                // Logo plate like the channel rows: logos are often transparent PNGs.
-                Box(Modifier.width(112.dp).aspectRatio(16f / 9f).background(SurfaceColor, RoundedCornerShape(8.dp)), contentAlignment = Alignment.Center) {
-                    Text(m.channelName.take(2).uppercase(), style = MaterialTheme.typography.titleMedium, color = TextSecondary)
-                    if (m.logoUrl != null) AsyncImage(model = m.logoUrl, contentDescription = null, contentScale = ContentScale.Fit, modifier = Modifier.fillMaxSize().padding(6.dp))
-                }
-                Column(Modifier.padding(start = 16.dp)) {
-                    val minutes = ((m.start - System.currentTimeMillis() / 1000 + 59) / 60).coerceAtLeast(1)
-                    val at = clock.format(Instant.ofEpochSecond(m.start))
-                    Text(if (started) "Nu begonnen · $at" else "Over $minutes min · $at", style = MaterialTheme.typography.labelLarge, color = Live)
-                    Text(m.title, style = MaterialTheme.typography.titleLarge, maxLines = 2, overflow = TextOverflow.Ellipsis)
-                    Text(m.channelName, style = MaterialTheme.typography.bodyMedium, color = TextSecondary, maxLines = 1)
-                }
-            }
-            Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                PrimaryButton("Kijken", {
+            PrimaryButton("Kijken", {
+                vm.dismiss(watched = true)
+                onWatch(live)
+            }, Modifier.focusRequester(watch))
+            if (started && m.hasArchive) {
+                SecondaryButton("Vanaf begin", {
                     vm.dismiss(watched = true)
-                    onWatch(live)
-                }, Modifier.focusRequester(watch))
-                if (started && m.hasArchive) {
-                    SecondaryButton("Vanaf begin", {
-                        vm.dismiss(watched = true)
-                        onWatch(live.copy(fromStart = true))
-                    })
-                }
-                SecondaryButton("Later", { vm.dismiss(watched = false) })
-                SecondaryButton("Volgen aanpassen", {
-                    vm.dismiss(watched = true)
-                    editFollows = true
+                    onWatch(live.copy(fromStart = true))
                 })
             }
+            SecondaryButton("Later", { vm.dismiss(watched = false) })
+            SecondaryButton("Volgen aanpassen", {
+                vm.dismiss(watched = true)
+                editFollows = true
+            })
         }
         }
     }

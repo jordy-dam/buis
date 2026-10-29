@@ -26,6 +26,7 @@ val ProfileEntity.prefs
         onlyPreferred = onlyPreferred,
         hideAdult = kids,
         sleepMinutes = sleepMinutes,
+        breakMinutes = breakMinutes,
     )
 
 /**
@@ -116,6 +117,7 @@ class ProfileRepository @Inject constructor(
     suspend fun setPreferredCountries(codes: Set<String>) = updateCurrent { it.copy(preferredCountries = codes.sorted().joinToString(",")) }
     suspend fun setOnlyPreferred(only: Boolean) = updateCurrent { it.copy(onlyPreferred = only) }
     suspend fun setSleepMinutes(minutes: Int) = updateCurrent { it.copy(sleepMinutes = minutes) }
+    suspend fun setBreakMinutes(minutes: Int) = updateCurrent { it.copy(breakMinutes = minutes) }
 
     /** What the active profile pinned in Films and Series. */
     val pinned: Flow<Set<String>> = current.filterNotNull().map { it.pinnedSet() }.distinctUntilChanged()

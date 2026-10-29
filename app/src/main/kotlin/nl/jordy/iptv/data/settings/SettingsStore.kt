@@ -19,6 +19,8 @@ data class UserPrefs(
     val hideAdult: Boolean = false,
     /** Sleep timer in minutes, 0 = off. */
     val sleepMinutes: Int = 0,
+    /** Pauzemoment in minutes of watching, 0 = off. */
+    val breakMinutes: Int = 0,
 )
 
 private val Context.settings by preferencesDataStore("settings")
