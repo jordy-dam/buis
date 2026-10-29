@@ -17,6 +17,7 @@ import nl.jordy.iptv.data.epg.XmltvProbe
 import nl.jordy.iptv.data.settings.CountryFilter
 import nl.jordy.iptv.data.profile.Pin
 import nl.jordy.iptv.data.profile.ProfileRepository
+import nl.jordy.iptv.player.SleepTimer
 import nl.jordy.iptv.ui.profiles.PinDialog
 import androidx.compose.runtime.rememberCoroutineScope
 import nl.jordy.iptv.data.settings.UserPrefs
@@ -147,6 +148,7 @@ class SettingsViewModel @Inject constructor(
     }
 
     fun toggleOnlyPreferred() = viewModelScope.launch { profiles.setOnlyPreferred(!prefs.value.onlyPreferred) }
+    fun cycleSleepTimer() = viewModelScope.launch { profiles.setSleepMinutes(SleepTimer.nextChoice(prefs.value.sleepMinutes)) }
 
     init {
         viewModelScope.launch {
@@ -232,6 +234,12 @@ fun SettingsScreen(onRefreshCatalog: () -> Unit, onLoggedOut: () -> Unit, onEdit
             "Andere landen blijven bereikbaar via \"Alle landen tonen\" onderaan elke lijst.",
             value = if (prefs.onlyPreferred) "Aan" else "Uit",
             onClick = vm::toggleOnlyPreferred,
+        )
+        SettingRow(
+            "Slaaptimer",
+            "Stopt het afspelen als er zo lang geen knop is ingedrukt. Een minuut ervoor vraagt BUIS of je nog kijkt.",
+            value = if (prefs.sleepMinutes == 0) "Uit" else "${prefs.sleepMinutes} min",
+            onClick = vm::cycleSleepTimer,
         )
 
         Header("Voor iedereen")

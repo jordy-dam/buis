@@ -56,7 +56,15 @@ import kotlinx.coroutines.delay
 import nl.jordy.iptv.player.PlayerViewModel
 import nl.jordy.iptv.ui.components.PrimaryButton
 import nl.jordy.iptv.ui.components.ProgressBar
+import androidx.compose.foundation.border
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.ui.text.style.TextOverflow
+import nl.jordy.iptv.player.NextUpCard
+import nl.jordy.iptv.ui.theme.FocusBar
 import nl.jordy.iptv.ui.theme.Live
+import nl.jordy.iptv.ui.theme.SurfaceRaised
+import nl.jordy.iptv.ui.theme.TextOnLight
+import nl.jordy.iptv.ui.theme.TextPrimary
 import nl.jordy.iptv.ui.theme.SafeArea
 import nl.jordy.iptv.ui.theme.TextSecondary
 import java.time.Instant
@@ -122,6 +130,9 @@ fun PlayerScreen(onExit: () -> Unit, vm: PlayerViewModel = hiltViewModel()) {
     }
 
     BackHandler { vm.saveNow(); onExit() }
+    // Declared later, so it wins while the card shows: Back stops the countdown, not the episode.
+    BackHandler(enabled = state.nextUp != null) { vm.dismissNextUp() }
+    LaunchedEffect(state.finished) { if (state.finished) onExit() }
 
     Box(
         Modifier
@@ -131,6 +142,14 @@ fun PlayerScreen(onExit: () -> Unit, vm: PlayerViewModel = hiltViewModel()) {
             .onKeyEvent { e ->
                 if (e.type != KeyEventType.KeyDown) return@onKeyEvent false
                 val code = e.key.nativeKeyCode
+                // The sleep timer's "still watching?": the key that answers it does nothing else.
+                val wasAsking = state.sleepSecondsLeft != null
+                vm.userActive()
+                if (wasAsking) return@onKeyEvent true
+                if (state.nextUp != null && (code == KeyEvent.KEYCODE_DPAD_CENTER || code == KeyEvent.KEYCODE_ENTER)) {
+                    vm.playNextNow()
+                    return@onKeyEvent true
+                }
                 val handled = if (vm.isLive) when (code) {
                     KeyEvent.KEYCODE_DPAD_UP, KeyEvent.KEYCODE_CHANNEL_UP -> { vm.zap(+1); true }
                     KeyEvent.KEYCODE_DPAD_DOWN, KeyEvent.KEYCODE_CHANNEL_DOWN -> { vm.zap(-1); true }
@@ -188,6 +207,9 @@ fun PlayerScreen(onExit: () -> Unit, vm: PlayerViewModel = hiltViewModel()) {
                 if (vm.isLive) LiveInfo(state) else VodInfo(state.title, position, duration, vm.player.isPlaying)
             }
         }
+
+        state.nextUp?.let { NextUpPanel(it, Modifier.align(Alignment.BottomEnd).padding(SafeArea)) }
+        state.sleepSecondsLeft?.let { SleepWarning(it, Modifier.align(Alignment.TopCenter).padding(top = SafeArea)) }
     }
 }
 
@@ -208,6 +230,50 @@ private fun LiveInfo(state: nl.jordy.iptv.player.PlayerUiState) {
         "▲▼ andere zender" + (state.previous?.let { "   ◀ terug naar $it" } ?: ""),
         style = MaterialTheme.typography.bodyMedium,
         color = TextSecondary,
+    )
+}
+
+/** Bottom right, over the end credits: what's next and the two keys that matter. */
+@Composable
+private fun NextUpPanel(card: NextUpCard, modifier: Modifier) {
+    Column(
+        modifier.width(440.dp).background(SurfaceRaised.copy(alpha = 0.95f), RoundedCornerShape(12.dp)).padding(20.dp),
+        verticalArrangement = Arrangement.spacedBy(8.dp),
+    ) {
+        Text(
+            card.secondsLeft?.let { "Volgende aflevering over $it s" } ?: "Kijk je nog?",
+            style = MaterialTheme.typography.labelLarge,
+            color = Live,
+        )
+        Text(card.label, style = MaterialTheme.typography.titleLarge, maxLines = 2, overflow = TextOverflow.Ellipsis)
+        Row(horizontalArrangement = Arrangement.spacedBy(12.dp), modifier = Modifier.padding(top = 4.dp)) {
+            KeyHint("OK", if (card.secondsLeft == null) "Volgende aflevering" else "Nu kijken", primary = true)
+            KeyHint("Terug", "Stoppen", primary = false)
+        }
+    }
+}
+
+@Composable
+private fun SleepWarning(secondsLeft: Int, modifier: Modifier) {
+    Column(
+        modifier.background(SurfaceRaised.copy(alpha = 0.95f), RoundedCornerShape(12.dp)).padding(horizontal = 24.dp, vertical = 14.dp),
+        horizontalAlignment = Alignment.CenterHorizontally,
+    ) {
+        Text("Nog aan het kijken?", style = MaterialTheme.typography.titleLarge)
+        Text("Slaaptimer: stopt over $secondsLeft s. Druk op een knop om door te kijken.", style = MaterialTheme.typography.bodyMedium, color = TextSecondary)
+    }
+}
+
+/** A key and what it does; the primary one looks like the focus bar, so it reads as "this one". */
+@Composable
+private fun KeyHint(key: String, action: String, primary: Boolean) {
+    val shape = RoundedCornerShape(50)
+    Text(
+        "$key · $action",
+        style = MaterialTheme.typography.labelLarge,
+        color = if (primary) TextOnLight else TextPrimary,
+        modifier = (if (primary) Modifier.background(FocusBar, shape) else Modifier.border(1.dp, TextSecondary, shape))
+            .padding(horizontal = 12.dp, vertical = 6.dp),
     )
 }
 

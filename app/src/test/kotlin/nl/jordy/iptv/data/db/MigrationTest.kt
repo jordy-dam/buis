@@ -132,6 +132,20 @@ class MigrationTest {
         }
     }
 
+    @Test
+    fun `7 to 8 adds a sleep timer that starts off and keeps the profile`() {
+        helper.createDatabase(DB, 7).use { db ->
+            db.execSQL("INSERT INTO profile (id, name, avatar, face, pinHash, preferredCountries, onlyPreferred, kids, lastUsedAt, createdAt) VALUES (1, 'Anna', 3, 2, NULL, 'NL,BE', 1, 0, 5, 1)")
+        }
+        helper.runMigrationsAndValidate(DB, 8, true).use { db ->
+            db.query("SELECT sleepMinutes, preferredCountries FROM profile").use {
+                it.moveToFirst()
+                assertEquals(0, it.getInt(0))
+                assertEquals("NL,BE", it.getString(1))
+            }
+        }
+    }
+
     private fun SupportSQLiteDatabase.insertPhase1Data() {
         execSQL("INSERT INTO favorite (type, itemId, name, imageUrl, addedAt) VALUES ('LIVE', 101, '┃NL┃ NPO 1 HD', NULL, 1)")
         execSQL("INSERT INTO playback_position (type, itemId, positionMs, durationMs, updatedAt) VALUES ('MOVIE', 5001, 62000, 180000, 2)")

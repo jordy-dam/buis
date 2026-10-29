@@ -16,7 +16,7 @@ cards, avatar top left, "Profiel bewerken" in Instellingen, film genres via back
 film with a version choice, text one step smaller, screen kept on while playing) is built and
 emulator-tested: `docs/plans/2026-10-28-phase-2f-eigen-gezicht.md`. 2f is on the tv. Phase 2g "volgen" is
 planned in four parts (`docs/plans/2026-10-29-phase-2g-volgen.md`); part 1 (neutral palette with logo
-blue/amber/red, light-bar focus, Left = vorige zender) is built and on the tv (2026-10-29).
+blue/amber/red, light-bar focus, Left = vorige zender) is built and on the tv (2026-10-29); part 2 (next episode by itself, sleep timer per profile) is built and emulator-tested, not on the tv.
 
 ## Current phase
 Phase 1 — done and tested on the real tv. Phase 2a — built and installed on the tv (not started yet
@@ -42,7 +42,7 @@ Phase 1 — done and tested on the real tv. Phase 2a — built and installed on 
 
 ## What's not (yet)
 - EPG grid, hide/reorder categories, ratings, service rows (after measuring) and phase 3 (suggestions)
-- No auto-play of the next episode
+- Sleep warning and stop not yet seen on a screen (unit-tested)
 - No themes (decided against, see `product.md`)
 
 ## Emulator gotchas

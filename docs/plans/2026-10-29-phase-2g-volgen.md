@@ -1,7 +1,7 @@
 # 2026-10-29 — Phase 2g: volgen
 
 Status: **part 1 (colours, light-bar focus, vorige zender) built and on the tv (2026-10-29).
-Parts 2–4 not built.** Branch `feat/phase-2a`. Decision: `.agents/decisions/product.md` (2g part 1).
+Part 2 (volgende aflevering, slaaptimer) built and emulator-tested; not on the tv. Parts 3–4 not built.** Branch `feat/phase-2a`. Decision: `.agents/decisions/product.md` (2g part 1).
 
 ## Why
 Jordy's feedback on 2f on the tv: duplicate films are better but the version choice is clunky and
@@ -59,8 +59,8 @@ channels are in the Ziggo cable list, which has a guide.
 - Instellingen → "Voor <naam>" → **Slaaptimer**: Uit, 30, 60, 90, 120 min (per profile, so a kids
   profile can have its own bedtime).
 - Counts from the start of playback and restarts on every key press. One minute before the end a
-  banner "Nog aan het kijken?" with **Blijf kijken**; no answer → playback stops, the player closes
-  to Home and the screen may go to the screensaver (keep-screen-on is released).
+  banner "Nog aan het kijken?" (any key answers it); no answer → playback stops, the player closes
+  back to where it was opened and the screen may go to the screensaver (keep-screen-on is released).
 
 ### 7. Vanaf begin kijken (catch-up)
 - Store `tv_archive` and `tv_archive_duration` from `get_live_streams` (schema 8); the `⏺` name mark
@@ -109,3 +109,17 @@ channels are in the Ziggo cable list, which has a guide.
 - On the tv (release): Home shows the light bar and amber progress. Seen there: the "VIAPLAY FORMULE 1"
   favourite card shows no programme, so that channel lacks guide data from the provider's EPG; part 4
   (volgen) must find F1 through the Ziggo cable channel or a channel alias.
+
+## Part 2 — built (2026-10-29)
+- `Autoplay` (next episode across seasons, card timing, ask after three unattended) and `SleepTimer`
+  (warning in the last minute, reset on a key), both pure and unit-tested.
+- Player: the next episode swaps the media item on the same player; resume positions follow the
+  episode that plays (`vodId`). Card bottom right: "Volgende aflevering over N s", OK = nu kijken,
+  Terug = stoppen (this episode just ends). Sleep warning top centre; the key that answers it does nothing else.
+- Schema 8: `profile.sleepMinutes` (auto-migration, 0 = off), Instellingen → "Voor <naam>" → Slaaptimer
+  cycles Uit / 30 / 60 / 90 / 120.
+- Tested: unit 109 green (Autoplay, SleepTimer, migration 7→8). Emulator: S1 A1 → card counts down →
+  S2 A1 starts by itself (next season); Terug on the card stops the countdown and nothing starts; no card
+  after the last episode; S2 A1 resumes where it was left; Slaaptimer row in Instellingen goes Uit → 30 min.
+- Not seen on screen: the sleep warning and the stop itself (30 minutes); covered by `SleepTimerTest` only.
+  The "Kijk je nog?" variant after three episodes is unit-tested, not walked.

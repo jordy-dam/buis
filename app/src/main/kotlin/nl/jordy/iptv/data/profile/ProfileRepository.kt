@@ -24,6 +24,7 @@ val ProfileEntity.prefs
         preferredCountries = preferredCountries.split(',').filter { it.isNotBlank() }.toSet().ifEmpty { setOf("NL") },
         onlyPreferred = onlyPreferred,
         hideAdult = kids,
+        sleepMinutes = sleepMinutes,
     )
 
 /**
@@ -111,6 +112,7 @@ class ProfileRepository @Inject constructor(
 
     suspend fun setPreferredCountries(codes: Set<String>) = updateCurrent { it.copy(preferredCountries = codes.sorted().joinToString(",")) }
     suspend fun setOnlyPreferred(only: Boolean) = updateCurrent { it.copy(onlyPreferred = only) }
+    suspend fun setSleepMinutes(minutes: Int) = updateCurrent { it.copy(sleepMinutes = minutes) }
 
     private suspend fun updateCurrent(change: (ProfileEntity) -> ProfileEntity) = dao.update(change(fresh()))
 

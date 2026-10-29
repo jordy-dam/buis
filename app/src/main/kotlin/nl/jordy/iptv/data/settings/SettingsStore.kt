@@ -17,6 +17,8 @@ data class UserPrefs(
     val onlyPreferred: Boolean = true,
     /** Kids profile: adult categories are hidden everywhere. */
     val hideAdult: Boolean = false,
+    /** Sleep timer in minutes, 0 = off. */
+    val sleepMinutes: Int = 0,
 )
 
 private val Context.settings by preferencesDataStore("settings")

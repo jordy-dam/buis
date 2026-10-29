@@ -109,6 +109,8 @@ data class ProfileEntity(
     val onlyPreferred: Boolean = true,
     /** Hides adult categories everywhere. */
     val kids: Boolean = false,
+    /** Sleep timer in minutes without a key press, 0 = off (2g). */
+    @ColumnInfo(defaultValue = "0") val sleepMinutes: Int = 0,
     /** The profile with the highest value is the active one; picking a profile bumps it. */
     val lastUsedAt: Long = 0,
     val createdAt: Long = 0,

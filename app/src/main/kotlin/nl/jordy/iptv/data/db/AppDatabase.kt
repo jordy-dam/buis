@@ -24,7 +24,7 @@ import androidx.sqlite.db.SupportSQLiteDatabase
         EpgInfoEntity::class,
         MovieInfoEntity::class,
     ],
-    version = 7,
+    version = 8,
     exportSchema = true,
     autoMigrations = [
         AutoMigration(from = 1, to = 2, spec = AppDatabase.CatalogResync::class),
@@ -36,6 +36,8 @@ import androidx.sqlite.db.SupportSQLiteDatabase
         AutoMigration(from = 5, to = 6),
         // TMDB ids, to merge language versions with different titles: catalog re-syncs, film details are fetched again.
         AutoMigration(from = 6, to = 7, spec = AppDatabase.TmdbRefetch::class),
+        // Sleep timer per profile, off for everyone at first.
+        AutoMigration(from = 7, to = 8),
     ],
 )
 abstract class AppDatabase : RoomDatabase() {
