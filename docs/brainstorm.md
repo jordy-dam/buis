@@ -86,20 +86,9 @@ profile, ratings, voice search, Google TV "Watch Next".
 - **Trakt sync**: scrobble what you watch, import your watchlist. Viewing history leaves the
   tv by design, so a deliberate per-profile opt-in. `M` ⚠️
 - **Letterboxd/IMDb watchlist import** (file export, read once, nothing sent back). `S`
-- **Trailers** from YouTube on the film detail page (needs a player for YouTube). `M` ⚠️
 - **Bioscoopreleases**: a "Binnenkort in de bios" row from TMDB's NL now-playing/upcoming lists,
   ranked on the tv by the profile's genres (phase 3 weights). Only the region query goes out, never
   the profile or history. OK on a title adds it to the Wachtlijst, so you get it once it streams. `M` ⚠️
-
-### YouTube
-- **Open in the YouTube app**: a "YouTube" item or a trailer button that deep-links into the official
-  YouTube app on Google TV (an intent, no player of our own). Simple and within YouTube's terms. `S`
-- **YouTube inside BUIS** (channels you follow next to live tv, F1 highlights after a race):
-  needs the YouTube Data API plus a player; YouTube's terms don't allow playing their streams in a
-  custom player like ExoPlayer, so this would be the IFrame player in a WebView, which the spec
-  rules out. Deep-linking is the realistic version. `L` ⚠️
-- **Na de race**: when a followed programme ends, offer "Samenvatting op YouTube" as a search
-  deep-link (e.g. "F1 highlights <race>"). Builds on Volgen. `S`
 
 ### Own media
 - **Jellyfin/Plex/SMB source** next to Xtream: your own films in the same Films grid. `L`
@@ -121,7 +110,13 @@ profile, ratings, voice search, Google TV "Watch Next".
 
 ---
 
+## Niet doen
+- **YouTube** (trailers, channels, highlights after a race), 2026-10-29. Jordy wants an in-app
+  experience without trips to other apps, and YouTube's terms only allow their own player (a
+  WebView, which the spec rules out). Deep-linking to the YouTube app was the only clean option.
+
 ## If I had to pick
-Home Assistant first: you already run it, it stays in the house (no principle to break), and
+Pauzemoment first: small, all on the tv, and it reuses the sleep timer and the next-episode card.
+Then Home Assistant: you already run it, it stays in the house (no principle to break), and
 Bioscoopmodus plus Volgen-notifications on your phone are small on top of what exists.
 Then the phone companion page, because it fixes the one thing a remote is worst at: typing.
