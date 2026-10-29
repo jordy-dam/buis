@@ -25,8 +25,9 @@ import androidx.sqlite.db.SupportSQLiteDatabase
         MovieInfoEntity::class,
         FollowEntity::class,
         ReminderEntity::class,
+        WatchLogEntity::class,
     ],
-    version = 16,
+    version = 17,
     exportSchema = true,
     autoMigrations = [
         AutoMigration(from = 1, to = 2, spec = AppDatabase.CatalogResync::class),
@@ -56,6 +57,8 @@ import androidx.sqlite.db.SupportSQLiteDatabase
         AutoMigration(from = 14, to = 15),
         // Bedtijd per profile, off for everyone at first.
         AutoMigration(from = 15, to = 16),
+        // Kijkgeschiedenis; a new, empty table.
+        AutoMigration(from = 16, to = 17),
     ],
 )
 abstract class AppDatabase : RoomDatabase() {
@@ -70,6 +73,7 @@ abstract class AppDatabase : RoomDatabase() {
     abstract fun movieInfo(): MovieInfoDao
     abstract fun follows(): FollowDao
     abstract fun reminders(): ReminderDao
+    abstract fun watchLog(): WatchLogDao
 
     /**
      * The catalog is a cache of the provider: after a schema change it's emptied and the next

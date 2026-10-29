@@ -16,6 +16,7 @@ import javax.inject.Singleton
  * sleep timers. Favourites, resume positions, one-off reminders, pins and film details point at the
  * provider's ids, so they stay as long as the server stays the same (a renewed or new account on the
  * same panel) and are cleared only when a different server logs in, where those ids mean other films.
+ * The watch log goes with them: "play again" would open another film.
  */
 @Singleton
 class SubscriptionData @Inject constructor(@ApplicationContext context: Context, private val db: AppDatabase) {
@@ -60,7 +61,7 @@ class SubscriptionData @Inject constructor(@ApplicationContext context: Context,
         )
 
         /** The household's data that refers to the provider's ids. */
-        val PROVIDER_IDS = listOf("favorite", "playback_position", "reminder", "movie_info")
+        val PROVIDER_IDS = listOf("favorite", "playback_position", "reminder", "movie_info", "watch_log")
 
         /** Same panel = same host and port; the username may change with a new subscription. */
         fun serverKey(c: XtreamCredentials): String? = c.baseUrl?.let { "${it.host}:${it.port}" }

@@ -41,6 +41,9 @@ import nl.jordy.iptv.data.profile.ProfileRepository
 import nl.jordy.iptv.data.repo.EpgRepository
 import nl.jordy.iptv.data.repo.MovieEnricher
 import nl.jordy.iptv.data.repo.LibraryRepository
+import nl.jordy.iptv.data.repo.WatchCounter
+import nl.jordy.iptv.data.repo.WatchItem
+import nl.jordy.iptv.data.repo.WatchLog
 import nl.jordy.iptv.data.xtream.ContentType
 import nl.jordy.iptv.data.xtream.EpgEntry
 import nl.jordy.iptv.data.xtream.StreamUrls
@@ -104,6 +107,7 @@ class PlayerViewModel @Inject constructor(
     private val history: ChannelHistory,
     private val profiles: ProfileRepository,
     private val xtream: XtreamClient,
+    private val watchLog: WatchLog,
 ) : ViewModel() {
 
     val route = savedState.toRoute<PlayerRoute>()
@@ -198,9 +202,14 @@ class PlayerViewModel @Inject constructor(
                 val channel = channels.getOrNull(channelIndex)
                 playLive(route.id, channel?.name ?: route.title)
             }
-            PlayerRoute.Kind.MOVIE -> playVod(StreamUrls.movie(base, c, route.id, route.containerExtension), ContentType.MOVIE)
+            PlayerRoute.Kind.MOVIE -> {
+                watching(WatchItem(ContentType.MOVIE, route.id, route.title, containerExtension = route.containerExtension))
+                playVod(StreamUrls.movie(base, c, route.id, route.containerExtension), ContentType.MOVIE)
+            }
             PlayerRoute.Kind.EPISODE -> {
                 loadSeries()
+                val title = episodes.firstOrNull { it.episodeId == route.id }?.let { "$seriesName – ${it.title}" } ?: route.title
+                watching(WatchItem(ContentType.SERIES, route.id, title, containerExtension = route.containerExtension))
                 playVod(StreamUrls.episode(base, c, route.id, route.containerExtension), ContentType.SERIES)
             }
         }
@@ -246,8 +255,9 @@ class PlayerViewModel @Inject constructor(
         val source = liveSources?.first(streamId) ?: return
         liveStreamId = streamId
         history.watched(ChannelHistory.Entry(streamId, name, zapCategory))
+        watching(WatchItem(ContentType.LIVE, streamId, name, categoryId = zapCategory))
         _state.update {
-            PlayerUiState(title = name, channelNumber = channelIndex.takeIf { it >= 0 }?.plus(1), previous = history.previous?.name)
+            PlayerUiState(title = name, channelNumber = channelIndex.takeIf { it >= 0 }?.plus(1), previous = history.previous?.name, showClock = it.showClock)
         }
         zapStartedAt = SystemClock.elapsedRealtime()
         setSource(source)
@@ -258,6 +268,7 @@ class PlayerViewModel @Inject constructor(
             val (now, next) = epg.nowAndNext(streamId)
             val channel = channels.firstOrNull { it.streamId == streamId } ?: db.catalog().liveByIds(listOf(streamId)).firstOrNull()
             _state.update { it.copy(now = now, next = next, canRestart = Catchup.canRestart(channel, now, System.currentTimeMillis() / 1000)) }
+            if (watchItem?.itemId == streamId) watchItem = watchItem?.copy(detail = now?.title)
             // "Vanaf begin" from a reminder: once, for the channel the player opened on.
             if (startFromBeginning && streamId == route.id) {
                 startFromBeginning = false
@@ -374,6 +385,7 @@ class PlayerViewModel @Inject constructor(
     }
 
     fun saveNow() {
+        logWatched()
         val profile = profileId ?: return
         if (!isLive && playbackStarted) {
             library.reportProgressDetached(profile, vodType, vodId, player.currentPosition, player.duration.coerceAtLeast(0))
@@ -436,6 +448,7 @@ class PlayerViewModel @Inject constructor(
             else -> Unit
         }
         breakTimer?.tick(now, player.isPlaying)
+        watchCounter.tick(now, player.isPlaying)
         if (breakTick(now)) return
         if (route.kind == PlayerRoute.Kind.EPISODE) nextUpTick(now)
     }
@@ -517,6 +530,7 @@ class PlayerViewModel @Inject constructor(
         val c = credentials ?: return
         val base = c.baseUrl ?: return
         saveNow()
+        watching(WatchItem(ContentType.SERIES, e.episodeId, "$seriesName – ${e.title}", containerExtension = e.containerExtension))
         vodId = e.episodeId
         playbackStarted = false
         cardShownAt = null
@@ -531,6 +545,25 @@ class PlayerViewModel @Inject constructor(
     fun seekBy(ms: Long) {
         val target = (player.currentPosition + ms).coerceAtLeast(0)
         player.seekTo(if (player.duration > 0) target.coerceAtMost(player.duration) else target)
+    }
+
+    // Kijkgeschiedenis
+
+    private val watchCounter = WatchCounter()
+    private var watchItem: WatchItem? = null
+    private var watchStartedAt = System.currentTimeMillis()
+
+    /** Something else is on screen now: what was on before goes into the history first. */
+    private fun watching(item: WatchItem) {
+        logWatched()
+        watchItem = item
+    }
+
+    /** Writes what played since the last write (a minute or more), and keeps counting from now. */
+    private fun logWatched() {
+        val played = watchCounter.take()
+        watchItem?.let { watchLog.record(it, watchStartedAt, played) }
+        watchStartedAt = System.currentTimeMillis()
     }
 
     // Audio, subtitles and the clock

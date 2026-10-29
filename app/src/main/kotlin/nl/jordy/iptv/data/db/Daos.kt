@@ -322,3 +322,13 @@ interface ReminderDao {
     @Query("DELETE FROM reminder WHERE stop <= :now") suspend fun deleteOver(now: Long)
 }
 
+
+/** Kijkgeschiedenis, per profile. */
+@Dao
+interface WatchLogDao {
+    @Insert suspend fun insert(item: WatchLogEntity)
+    @Query("SELECT * FROM watch_log WHERE profileId = :profileId AND startedAt >= :since ORDER BY startedAt DESC")
+    fun since(profileId: Long, since: Long): Flow<List<WatchLogEntity>>
+    @Query("DELETE FROM watch_log WHERE startedAt < :before")
+    suspend fun prune(before: Long)
+}

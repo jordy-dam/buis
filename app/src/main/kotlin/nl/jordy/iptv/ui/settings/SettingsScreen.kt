@@ -248,7 +248,7 @@ class SettingsViewModel @Inject constructor(
  */
 @OptIn(ExperimentalComposeUiApi::class)
 @Composable
-fun SettingsScreen(onRefreshCatalog: () -> Unit, onLoggedOut: () -> Unit, onEditProfile: (Long) -> Unit, vm: SettingsViewModel = hiltViewModel()) {
+fun SettingsScreen(onRefreshCatalog: () -> Unit, onLoggedOut: () -> Unit, onEditProfile: (Long) -> Unit, onOpenHistory: () -> Unit, vm: SettingsViewModel = hiltViewModel()) {
     val scope = rememberCoroutineScope()
     // PIN checks still to pass before "Profiel bewerken" opens, as in "Wie kijkt er?".
     var gates by remember { mutableStateOf<Pair<Long, List<List<String>>>?>(null) }
@@ -351,6 +351,11 @@ fun SettingsScreen(onRefreshCatalog: () -> Unit, onLoggedOut: () -> Unit, onEdit
             "Vijf minuten voordat een programma met deze woorden begint, laat BUIS het weten.",
             value = followTerms.joinToString(", ").ifEmpty { "Niets" },
             onClick = { editFollows = true },
+        )
+        SettingRow(
+            "Kijkgeschiedenis",
+            "Wat je keek, met je weekoverzicht: uren, zenders, je langste binge.",
+            onClick = onOpenHistory,
         )
 
         Header("Voor iedereen", "Het abonnement, de catalogus en de gids delen alle profielen.") {

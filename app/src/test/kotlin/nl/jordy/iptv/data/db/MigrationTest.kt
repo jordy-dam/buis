@@ -260,6 +260,18 @@ class MigrationTest {
         }
     }
 
+    @Test
+    fun `16 to 17 adds an empty watch log and keeps resume positions`() {
+        helper.createDatabase(DB, 16).use { db ->
+            db.execSQL("INSERT INTO profile (id, name, avatar, face, pinHash, preferredCountries, onlyPreferred, kids, lastUsedAt, createdAt, pinnedCategories) VALUES (1, 'Anna', 3, 2, NULL, 'NL', 1, 0, 5, 1, '')")
+            db.execSQL("INSERT INTO playback_position (profileId, type, itemId, positionMs, durationMs, updatedAt) VALUES (1, 'MOVIE', 5001, 62000, 180000, 2)")
+        }
+        helper.runMigrationsAndValidate(DB, 17, true).use { db ->
+            assertEquals(0, db.count("watch_log"))
+            assertEquals(1, db.count("playback_position"))
+        }
+    }
+
     private fun SupportSQLiteDatabase.insertPhase1Data() {
         execSQL("INSERT INTO favorite (type, itemId, name, imageUrl, addedAt) VALUES ('LIVE', 101, '┃NL┃ NPO 1 HD', NULL, 1)")
         execSQL("INSERT INTO playback_position (type, itemId, positionMs, durationMs, updatedAt) VALUES ('MOVIE', 5001, 62000, 180000, 2)")

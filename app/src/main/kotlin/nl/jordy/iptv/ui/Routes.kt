@@ -15,6 +15,8 @@ import kotlinx.serialization.Serializable
 /** Add (id 0) or edit a profile. */
 @Serializable data class ProfileEditRoute(val id: Long = 0)
 @Serializable data class MovieDetailRoute(val streamId: Int)
+/** Kijkgeschiedenis and the weekoverzicht of the active profile. */
+@Serializable data object HistoryRoute
 @Serializable data class SeriesDetailRoute(val seriesId: Int)
 
 /** What to play. Live carries its category so up/down can zap through the same list. */

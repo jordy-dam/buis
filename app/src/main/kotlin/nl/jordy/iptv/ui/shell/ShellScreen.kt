@@ -99,6 +99,7 @@ fun ShellScreen(
     onOpenSeries: (Int) -> Unit,
     onRefreshCatalog: () -> Unit,
     onEditProfile: (Long) -> Unit,
+    onOpenHistory: () -> Unit,
     onLoggedOut: () -> Unit,
     vm: ShellViewModel = hiltViewModel(),
 ) {
@@ -206,7 +207,7 @@ fun ShellScreen(
                 Tab.SERIES -> SeriesScreen(onOpenSeries = onOpenSeries)
                 Tab.FAVORITES -> FavoritesScreen(onPlay = onPlay, onOpenMovie = onOpenMovie, onOpenSeries = onOpenSeries)
                 Tab.SEARCH -> SearchScreen(onPlay = onPlay, onOpenMovie = onOpenMovie, onOpenSeries = onOpenSeries)
-                Tab.SETTINGS -> SettingsScreen(onRefreshCatalog = onRefreshCatalog, onLoggedOut = onLoggedOut, onEditProfile = onEditProfile)
+                Tab.SETTINGS -> SettingsScreen(onRefreshCatalog = onRefreshCatalog, onLoggedOut = onLoggedOut, onEditProfile = onEditProfile, onOpenHistory = onOpenHistory)
             }
         }
     }

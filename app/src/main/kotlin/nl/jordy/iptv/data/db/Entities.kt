@@ -273,3 +273,31 @@ data class ReminderEntity(
     val hasArchive: Boolean,
 )
 
+
+/**
+ * What a profile watched: one row per film, episode or channel watched for at least a minute
+ * ([nl.jordy.iptv.data.repo.WatchLog.MIN_SECONDS]), so zapping past channels isn't history.
+ * Feeds "Kijkgeschiedenis" and the weekoverzicht. Kept 90 days.
+ */
+@Entity(
+    tableName = "watch_log",
+    indices = [Index("profileId", "startedAt")],
+    foreignKeys = [ForeignKey(ProfileEntity::class, ["id"], ["profileId"], onDelete = ForeignKey.CASCADE)],
+)
+data class WatchLogEntity(
+    @PrimaryKey(autoGenerate = true) val id: Long = 0,
+    val profileId: Long,
+    val type: ContentType,
+    /** Stream id for live and films, episode id for series: what "play again" opens. */
+    val itemId: Int,
+    /** Channel name, film title, or "<series> – <episode>". */
+    val title: String,
+    /** Live: the programme that was on. */
+    val detail: String?,
+    val containerExtension: String,
+    /** Live: the category to zap through when played again. */
+    val categoryId: String?,
+    /** Wall clock, epoch ms. */
+    val startedAt: Long,
+    val seconds: Int,
+)

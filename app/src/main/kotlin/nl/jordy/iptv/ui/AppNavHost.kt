@@ -19,6 +19,7 @@ import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
 import androidx.navigation.toRoute
 import nl.jordy.iptv.ui.detail.MovieDetailScreen
+import nl.jordy.iptv.ui.history.HistoryScreen
 import nl.jordy.iptv.ui.detail.SeriesDetailScreen
 import nl.jordy.iptv.ui.login.LoginScreen
 import nl.jordy.iptv.ui.player.PlayerScreen
@@ -37,7 +38,7 @@ fun AppNavHost(start: Any) {
     val entry by nav.currentBackStackEntryAsState()
     // Reminders only where someone is watching: not over login, the catalog sync or "Wie kijkt er?".
     val dest = entry?.destination
-    val watching = dest != null && (dest.hasRoute<ShellRoute>() || dest.hasRoute<PlayerRoute>() || dest.hasRoute<MovieDetailRoute>() || dest.hasRoute<SeriesDetailRoute>())
+    val watching = dest != null && (dest.hasRoute<ShellRoute>() || dest.hasRoute<PlayerRoute>() || dest.hasRoute<MovieDetailRoute>() || dest.hasRoute<SeriesDetailRoute>() || dest.hasRoute<HistoryRoute>())
     // One card at a time: whichever is up stays until it's answered, the other waits and then opens
     // with focus of its own. Reminders go first when both are due at once.
     val reminders: ReminderViewModel = hiltViewModel()
@@ -83,11 +84,13 @@ fun AppNavHost(start: Any) {
                 onOpenSeries = { nav.navigate(SeriesDetailRoute(it)) },
                 onRefreshCatalog = { nav.navigate(SyncRoute) { popUpTo(ShellRoute) { inclusive = true } } },
                 onEditProfile = { nav.navigate(ProfileEditRoute(it)) },
+                onOpenHistory = { nav.navigate(HistoryRoute) },
                 onLoggedOut = { nav.navigate(LoginRoute) { popUpTo(ShellRoute) { inclusive = true } } },
             )
         }
         composable<MovieDetailRoute> { MovieDetailScreen(onPlay = { nav.navigate(it) }) }
         composable<SeriesDetailRoute> { SeriesDetailScreen(onPlay = { nav.navigate(it) }) }
         composable<PlayerRoute> { PlayerScreen(onExit = { nav.popBackStack() }) }
+        composable<HistoryRoute> { HistoryScreen(onPlay = { nav.navigate(it) }) }
     }
 }
