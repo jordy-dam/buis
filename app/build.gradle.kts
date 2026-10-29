@@ -117,4 +117,9 @@ dependencies {
     testImplementation(libs.androidx.test.core)
     testImplementation(libs.okhttp.mockwebserver)
     testImplementation(libs.room.testing)
+    // Compose layout tests under Robolectric (the profile picker must show every profile).
+    testImplementation(platform(libs.compose.bom))
+    testImplementation(libs.compose.ui.test.junit4)
+    testImplementation(libs.espresso.core)
+    debugImplementation(libs.compose.ui.test.manifest)
 }

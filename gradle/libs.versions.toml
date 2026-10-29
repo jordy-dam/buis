@@ -37,6 +37,10 @@ compose-ui = { module = "androidx.compose.ui:ui" }
 # Material icons (replay 10, forward 30, subtitles, audio…): the last release, no longer in the BOM. R8 keeps only what's used.
 compose-material-icons = { module = "androidx.compose.material:material-icons-extended", version = "1.7.8" }
 compose-foundation = { module = "androidx.compose.foundation:foundation" }
+compose-ui-test-junit4 = { module = "androidx.compose.ui:ui-test-junit4" }
+compose-ui-test-manifest = { module = "androidx.compose.ui:ui-test-manifest" }
+# ui-test pulls in Espresso 3.5, which calls an InputManager method newer Android no longer has.
+espresso-core = { module = "androidx.test.espresso:espresso-core", version = "3.7.0" }
 compose-ui-tooling-preview = { module = "androidx.compose.ui:ui-tooling-preview" }
 compose-ui-tooling = { module = "androidx.compose.ui:ui-tooling" }
 tv-material = { module = "androidx.tv:tv-material", version.ref = "tvMaterial" }

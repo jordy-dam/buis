@@ -5,8 +5,7 @@ import androidx.activity.compose.LocalActivity
 import androidx.compose.foundation.focusGroup
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.ExperimentalLayoutApi
-import androidx.compose.foundation.layout.FlowRow
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.ui.input.key.nativeKeyCode
 import androidx.compose.ui.input.key.key
@@ -69,7 +68,7 @@ class ProfilePickerViewModel @Inject constructor(private val profiles: ProfileRe
  * "Profielen beheren" turns the avatars into edit buttons. PIN profiles ask their PIN; once there
  * is a kids profile, managing asks for a grown-up's PIN (see [ProfileRepository.managementLock]).
  */
-@OptIn(ExperimentalComposeUiApi::class, ExperimentalLayoutApi::class)
+@OptIn(ExperimentalComposeUiApi::class)
 @Composable
 fun ProfilePickerScreen(
     atLaunch: Boolean,
@@ -118,8 +117,26 @@ fun ProfilePickerScreen(
         })
         return
     }
-    Column(
-        Modifier.fillMaxSize().padding(SafeArea).onPreviewKeyEvent { e ->
+    PickerLayout(
+        profiles = s.profiles,
+        managing = managing,
+        focus = focus,
+        onProfile = { p ->
+            if (managing) {
+                whenUnlocked {
+                    val hash = p.pinHash
+                    if (hash == null || hash in lock) onEdit(p.id)
+                    else pinFor = PinRequest("Pincode van ${p.name}", null, listOf(hash)) { onEdit(p.id) }
+                }
+            } else {
+                val hash = p.pinHash
+                if (hash == null) vm.pick(p.id, onPicked)
+                else pinFor = PinRequest("Pincode van ${p.name}", null, listOf(hash)) { vm.pick(p.id, onPicked) }
+            }
+        },
+        onAdd = { whenUnlocked { onEdit(0) } },
+        onManage = { if (managing) managing = false else whenUnlocked { managing = true } },
+        modifier = Modifier.onPreviewKeyEvent { e ->
             when (e.type) {
                 KeyEventType.KeyDown -> e.nativeKeyEvent.repeatCount == 0 && code.feed(e.key.nativeKeyCode).also {
                     if (it) {
@@ -131,55 +148,7 @@ fun ProfilePickerScreen(
                 else -> false
             }
         },
-        horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.spacedBy(32.dp, Alignment.CenterVertically),
-    ) {
-        Image(painterResource(R.drawable.ic_buis), contentDescription = "BUIS", modifier = Modifier.size(96.dp))
-        Text(if (managing) "Profielen beheren" else "Wie kijkt er?", style = MaterialTheme.typography.displaySmall)
-        // Smaller than the logo, up to five in a row; more wrap into two even rows (6 → 3 + 3).
-        val tiles = s.profiles.size + if (s.profiles.size < ProfileRepository.MAX_PROFILES) 1 else 0
-        FlowRow(
-            Modifier.focusRestorer().focusGroup(),
-            horizontalArrangement = Arrangement.spacedBy(24.dp, Alignment.CenterHorizontally),
-            verticalArrangement = Arrangement.spacedBy(24.dp),
-            maxItemsInEachRow = if (tiles <= 5) tiles else (tiles + 1) / 2,
-        ) {
-            s.profiles.forEachIndexed { i, p ->
-                AvatarTile(
-                    name = p.name,
-                    avatar = p.avatar,
-                    face = p.face,
-                    caption = when {
-                        managing -> "Bewerken"
-                        p.kids -> "Kinderprofiel"
-                        p.pinHash != null -> "Pincode"
-                        else -> null
-                    },
-                    modifier = Modifier.focusRequester(focus[i]),
-                    onClick = {
-                        if (managing) {
-                            whenUnlocked {
-                                val hash = p.pinHash
-                                if (hash == null || hash in lock) onEdit(p.id)
-                                else pinFor = PinRequest("Pincode van ${p.name}", null, listOf(hash)) { onEdit(p.id) }
-                            }
-                        } else {
-                            val hash = p.pinHash
-                            if (hash == null) vm.pick(p.id, onPicked)
-                            else pinFor = PinRequest("Pincode van ${p.name}", null, listOf(hash)) { vm.pick(p.id, onPicked) }
-                        }
-                    },
-                )
-            }
-            if (s.profiles.size < ProfileRepository.MAX_PROFILES) {
-                AvatarTile(name = "Toevoegen", avatar = AvatarAdd, symbol = "+", onClick = { whenUnlocked { onEdit(0) } })
-            }
-        }
-        SecondaryButton(
-            if (managing) "Klaar" else "Profielen beheren",
-            { if (managing) managing = false else whenUnlocked { managing = true } },
-        )
-    }
+    )
 
     pinFor?.let { req ->
         PinDialog(
@@ -194,6 +163,68 @@ fun ProfilePickerScreen(
             },
             onDismiss = { pinFor = null },
         )
+    }
+}
+
+/**
+ * Logo, title, the profile tiles and the manage button. Up to five tiles sit in one row; more go
+ * into two even rows (6 → 3 + 3, 9 → 5 + 4) with smaller avatars and no logo, so eight profiles
+ * and "+" still fit a 540 dp tall screen. Plain rows on purpose: a FlowRow that runs out of height
+ * silently leaves out the rows that don't fit, which made the fifth profile "delete" two others.
+ */
+@Composable
+internal fun PickerLayout(
+    profiles: List<ProfileEntity>,
+    managing: Boolean,
+    focus: List<FocusRequester>,
+    onProfile: (ProfileEntity) -> Unit,
+    onAdd: () -> Unit,
+    onManage: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    val canAdd = profiles.size < ProfileRepository.MAX_PROFILES
+    val tiles: List<ProfileEntity?> = profiles + if (canAdd) listOf(null) else emptyList()
+    val twoRows = tiles.size > 5
+    val perRow = if (twoRows) (tiles.size + 1) / 2 else tiles.size
+    Column(
+        modifier.fillMaxSize().padding(SafeArea),
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.spacedBy(if (twoRows) 20.dp else 32.dp, Alignment.CenterVertically),
+    ) {
+        if (!twoRows) Image(painterResource(R.drawable.ic_buis), contentDescription = "BUIS", modifier = Modifier.size(96.dp))
+        Text(if (managing) "Profielen beheren" else "Wie kijkt er?", style = MaterialTheme.typography.displaySmall)
+        Column(
+            Modifier.focusRestorer().focusGroup(),
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.spacedBy(16.dp),
+        ) {
+            tiles.chunked(perRow).forEach { row ->
+                Row(horizontalArrangement = Arrangement.spacedBy(24.dp)) {
+                    row.forEach { p ->
+                        val size = if (twoRows) 72.dp else 88.dp
+                        if (p == null) {
+                            AvatarTile(name = "Toevoegen", avatar = AvatarAdd, symbol = "+", size = size, onClick = onAdd)
+                        } else {
+                            AvatarTile(
+                                name = p.name,
+                                avatar = p.avatar,
+                                face = p.face,
+                                size = size,
+                                caption = when {
+                                    managing -> "Bewerken"
+                                    p.kids -> "Kinderprofiel"
+                                    p.pinHash != null -> "Pincode"
+                                    else -> null
+                                },
+                                modifier = Modifier.focusRequester(focus[profiles.indexOf(p)]),
+                                onClick = { onProfile(p) },
+                            )
+                        }
+                    }
+                }
+            }
+        }
+        SecondaryButton(if (managing) "Klaar" else "Profielen beheren", onManage)
     }
 }
 
