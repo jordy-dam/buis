@@ -19,6 +19,9 @@ import nl.jordy.iptv.data.profile.Pin
 import nl.jordy.iptv.data.profile.ProfileRepository
 import nl.jordy.iptv.player.BreakTimer
 import nl.jordy.iptv.player.SleepTimer
+import androidx.compose.ui.window.DialogProperties
+import nl.jordy.iptv.ui.dream.DreamScreen
+import nl.jordy.iptv.ui.dream.DreamPosters
 import nl.jordy.iptv.player.TrackLabels
 import nl.jordy.iptv.data.profile.Bedtime
 import nl.jordy.iptv.ui.profiles.PinDialog
@@ -118,7 +121,11 @@ class SettingsViewModel @Inject constructor(
     private val guide: EpgGuide,
     enricher: MovieEnricher,
     private val follows: FollowRepository,
+    private val posters: DreamPosters,
 ) : ViewModel() {
+    /** Debug builds: the screensaver's posters, for its preview. */
+    suspend fun dreamPosters() = posters.load()
+
     val followTerms = follows.terms.stateIn(viewModelScope, SharingStarted.Eagerly, emptyList())
     /** Per term what the guide has next, so a term that finds nothing shows it right away. */
     @OptIn(kotlinx.coroutines.ExperimentalCoroutinesApi::class)
@@ -252,6 +259,7 @@ fun SettingsScreen(onRefreshCatalog: () -> Unit, onLoggedOut: () -> Unit, onEdit
     val scope = rememberCoroutineScope()
     // PIN checks still to pass before "Profiel bewerken" opens, as in "Wie kijkt er?".
     var gates by remember { mutableStateOf<Pair<Long, List<List<String>>>?>(null) }
+    var dreamPreview by remember { mutableStateOf(false) }
     fun openEdit() = scope.launch {
         val (id, g) = vm.editGates()
         if (g.isEmpty()) onEditProfile(id) else gates = id to g
@@ -393,6 +401,13 @@ fun SettingsScreen(onRefreshCatalog: () -> Unit, onLoggedOut: () -> Unit, onEdit
         if (BuildConfig.DEBUG) {
             Header("Ontwikkeling")
             SettingRow("EPG controleren", epgCheck ?: "Hoeveel van je voorkeurszenders een programmagids hebben.", onClick = vm::checkEpg)
+            SettingRow("Screensaver bekijken", "Zoals de tv hem toont. Terug sluit hem.", onClick = { dreamPreview = true })
+        }
+    }
+
+    if (dreamPreview) {
+        Dialog(onDismissRequest = { dreamPreview = false }, properties = DialogProperties(usePlatformDefaultWidth = false)) {
+            DreamScreen(vm::dreamPosters)
         }
     }
 
