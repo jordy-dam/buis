@@ -63,6 +63,8 @@ fun <T : Any> CategoryBrowser(
     focusMemory: FocusMemory,
     tile: @Composable (item: T, modifier: Modifier) -> Unit,
     above: @Composable () -> Unit = {},
+    /** Long-press or Menu on a category pins it to the top, or unpins it. */
+    onPin: ((String) -> Unit)? = null,
 ) {
     val s = sections ?: return
     if (s.isEmpty()) {
@@ -83,6 +85,7 @@ fun <T : Any> CategoryBrowser(
             onClick = { runCatching { gridFocus.requestFocus() } },
             filter = filter,
             onToggleFilter = onToggleFilter,
+            onLongClick = onPin,
             modifier = Modifier.width(208.dp).fillMaxHeight().focusRequester(listFocus),
         )
         Column(Modifier.padding(start = 16.dp).fillMaxSize().onFocusChanged { gridHasFocus = it.hasFocus }) {

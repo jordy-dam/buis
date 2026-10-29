@@ -16,7 +16,8 @@ import androidx.tv.material3.darkColorScheme
 /*
  * Neutral greys with three colours that each mean one thing (2g): the logo's blue for buttons and
  * what's selected, amber for live ("NU", progress, reminders), red for the heart. Focus is not a
- * colour but a light bar: the focused row turns [FocusBar] with dark text.
+ * colour but a step in lightness: the focused row turns [FocusFill]. [onLight] covers the few light
+ * surfaces ([FocusBar] key hints).
  */
 val Background = Color(0xFF131416)
 val SurfaceColor = Color(0xFF1C1D21)
@@ -25,6 +26,10 @@ val SurfaceRaised = Color(0xFF26282D)
 val Brand = Color(0xFF2D6AA8)
 val Heart = Color(0xFFE5484D)
 val FocusBar = Color(0xFFECEBE7)
+/** Focus on rows, chips and buttons: one clear step lighter than a row, text stays light (2g, after the white bar). */
+val FocusFill = Color(0xFF3B3E46)
+/** The logo blue as text: values in Instellingen, readable on the dark background. */
+val BrandText = Color(0xFF8DB8E8)
 val TextPrimary = Color(0xFFF3F3F1)
 val TextOnLight = Color(0xFF131416)
 

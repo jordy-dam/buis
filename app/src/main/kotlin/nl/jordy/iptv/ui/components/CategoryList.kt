@@ -7,7 +7,13 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.runtime.Composable
+import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
+import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.ExperimentalComposeUiApi
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusRequester
@@ -36,10 +42,32 @@ fun CategoryList(
     filter: FilteredCategories?,
     onToggleFilter: () -> Unit,
     modifier: Modifier = Modifier,
+    /** Long-press or Menu on a category (Films/Series: pin it). */
+    onLongClick: ((String) -> Unit)? = null,
 ) {
     // Entering from the rail lands on the active category, not on whichever row happens to be nearest.
     val selectedFocus = remember { FocusRequester() }
+    val listState = rememberLazyListState()
+    // Pinning moves the focused category to the top, out of view: follow it, or focus is lost.
+    var follow by remember { mutableStateOf<String?>(null) }
+    LaunchedEffect(sections) {
+        val id = follow ?: return@LaunchedEffect
+        follow = null
+        var index = 0
+        for ((header, categories) in sections) {
+            if (header != null) index++
+            val at = categories.indexOfFirst { it.id == id }
+            if (at >= 0) {
+                listState.scrollToItem((index + at - 1).coerceAtLeast(0))
+                withFrameNanos { }
+                runCatching { selectedFocus.requestFocus() }
+                return@LaunchedEffect
+            }
+            index += categories.size
+        }
+    }
     LazyColumn(
+        state = listState,
         modifier = modifier.focusRestorer(selectedFocus).focusGroup(),
         contentPadding = PaddingValues(vertical = 8.dp, horizontal = 8.dp),
         verticalArrangement = Arrangement.spacedBy(4.dp),
@@ -60,6 +88,7 @@ fun CategoryList(
                     text = cat.name,
                     selected = cat.id == selected,
                     onClick = onClick,
+                    onLongClick = onLongClick?.let { { follow = cat.id; it(cat.id) } },
                     modifier = Modifier
                         .then(if (cat.id == selected) Modifier.focusRequester(selectedFocus) else Modifier)
                         .onFocusChanged { if (it.isFocused) onFocus(cat.id) },

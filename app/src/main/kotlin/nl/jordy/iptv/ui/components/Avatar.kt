@@ -67,11 +67,11 @@ fun AvatarTile(
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
     caption: String? = null,
-    size: Dp = 128.dp,
+    size: Dp = 88.dp,
     symbol: String? = null,
     face: Int = 0,
 ) {
-    Column(Modifier.width(size + 40.dp), horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(14.dp)) {
+    Column(Modifier.width(size + 40.dp), horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(10.dp)) {
         Surface(
             onClick = onClick,
             modifier = modifier.size(size),

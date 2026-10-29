@@ -37,7 +37,7 @@ import androidx.tv.material3.Surface
 import androidx.tv.material3.Text
 import nl.jordy.iptv.ui.theme.Brand
 import nl.jordy.iptv.ui.theme.FocusBar
-import nl.jordy.iptv.ui.theme.TextOnLight
+import nl.jordy.iptv.ui.theme.FocusFill
 import nl.jordy.iptv.ui.theme.SurfaceColor
 import nl.jordy.iptv.ui.theme.SurfaceRaised
 import nl.jordy.iptv.ui.theme.TextPrimary
@@ -118,6 +118,9 @@ fun TvTextField(
     }
 }
 
+/** The primary button one step lighter when focused, like every other focus. */
+private val BrandFocus = androidx.compose.ui.graphics.Color(0xFF3F7FC2)
+
 @Composable
 fun PrimaryButton(text: String, onClick: () -> Unit, modifier: Modifier = Modifier, enabled: Boolean = true) {
     Button(
@@ -128,8 +131,8 @@ fun PrimaryButton(text: String, onClick: () -> Unit, modifier: Modifier = Modifi
         colors = ButtonDefaults.colors(
             containerColor = Brand,
             contentColor = TextPrimary,
-            focusedContainerColor = FocusBar,
-            focusedContentColor = TextOnLight,
+            focusedContainerColor = BrandFocus,
+            focusedContentColor = TextPrimary,
         ),
     ) { Text(text) }
 }
@@ -151,8 +154,8 @@ fun SecondaryButton(text: String, onClick: () -> Unit, modifier: Modifier = Modi
         colors = ButtonDefaults.colors(
             containerColor = androidx.compose.ui.graphics.Color.Transparent,
             contentColor = TextPrimary,
-            focusedContainerColor = FocusBar,
-            focusedContentColor = TextOnLight,
+            focusedContainerColor = FocusFill,
+            focusedContentColor = TextPrimary,
         ),
     ) { Text(text) }
 }

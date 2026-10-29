@@ -24,7 +24,7 @@ import androidx.sqlite.db.SupportSQLiteDatabase
         EpgInfoEntity::class,
         MovieInfoEntity::class,
     ],
-    version = 8,
+    version = 9,
     exportSchema = true,
     autoMigrations = [
         AutoMigration(from = 1, to = 2, spec = AppDatabase.CatalogResync::class),
@@ -38,6 +38,8 @@ import androidx.sqlite.db.SupportSQLiteDatabase
         AutoMigration(from = 6, to = 7, spec = AppDatabase.TmdbRefetch::class),
         // Sleep timer per profile, off for everyone at first.
         AutoMigration(from = 7, to = 8),
+        // Pinned services per profile, none at first.
+        AutoMigration(from = 8, to = 9),
     ],
 )
 abstract class AppDatabase : RoomDatabase() {

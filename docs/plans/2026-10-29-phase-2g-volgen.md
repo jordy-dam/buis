@@ -123,3 +123,18 @@ channels are in the Ziggo cable list, which has a guide.
   after the last episode; S2 A1 resumes where it was left; Slaaptimer row in Instellingen goes Uit → 30 min.
 - Not seen on screen: the sleep warning and the stop itself (30 minutes); covered by `SleepTimerTest` only.
   The "Kijk je nog?" variant after three episodes is unit-tested, not walked.
+
+## Polish from Jordy's tv feedback — built (2026-10-29)
+- **Focus**: the white bar was too bright; rows, chips and buttons now step up to `FocusFill` (#3B3E46)
+  with light text, the primary button to a lighter blue. Posters keep the thin light outline.
+- **Avatars** in "Wie kijkt er?": 88dp (smaller than the 96dp logo), up to five in a row, more wrap into
+  two even rows (`FlowRow`, 6 → 3 + 3, 9 → 5 + 4).
+- **Instellingen**: values you can change in logo blue (`BrandText`), on/off as a switch, sections headed by
+  the profile's avatar ("Voor Bas") and the BUIS logo ("Voor iedereen", with one line on what's shared).
+- **Diensten A–Z** and **pinning per profile** (schema 9, `profile.pinnedCategories`): long-press OK or Menu
+  on any category in Films/Series pins it under "Vastgezet" at the top (A–Z), again to unpin; films and
+  series pins are separate. Focus follows the category when it moves.
+- Tested: unit 113 green (grouping A–Z and pins, migration 8→9). Emulator: picker, Instellingen (focus,
+  blue values, switch, headers), pinning Drama and Thriller incl. after a restart.
+- Not done: a "Jouw diensten" row on Home and suggesting a service (that needs viewing history → phase 3);
+  six or more profiles not walked on screen (layout rule unit-free, by reading).

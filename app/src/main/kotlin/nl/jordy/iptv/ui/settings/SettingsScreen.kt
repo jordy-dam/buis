@@ -67,6 +67,17 @@ import nl.jordy.iptv.data.repo.MovieEnricher
 import nl.jordy.iptv.ui.components.PrimaryButton
 import nl.jordy.iptv.ui.components.SecondaryButton
 import nl.jordy.iptv.ui.theme.onLight
+import nl.jordy.iptv.ui.theme.Brand
+import nl.jordy.iptv.ui.theme.BrandText
+import nl.jordy.iptv.ui.theme.TextPrimary
+import nl.jordy.iptv.ui.components.AvatarCircle
+import nl.jordy.iptv.R
+import androidx.compose.foundation.Image
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.ui.res.painterResource
 import nl.jordy.iptv.ui.theme.SurfaceColor
 import nl.jordy.iptv.ui.theme.SurfaceRaised
 import nl.jordy.iptv.ui.theme.TextSecondary
@@ -106,6 +117,7 @@ class SettingsViewModel @Inject constructor(
 
     val prefs = profiles.prefs.stateIn(viewModelScope, SharingStarted.Eagerly, UserPrefs())
     val profileName = profiles.current.map { it?.name.orEmpty() }.stateIn(viewModelScope, SharingStarted.Eagerly, "")
+    val profile = profiles.current.stateIn(viewModelScope, SharingStarted.Eagerly, null)
 
     /** The watching profile's id and the PIN checks before it may be edited (see [ProfileRepository.editGates]). */
     suspend fun editGates(): Pair<Long, List<List<String>>> {
@@ -200,6 +212,7 @@ fun SettingsScreen(onRefreshCatalog: () -> Unit, onLoggedOut: () -> Unit, onEdit
     val state by vm.state.collectAsStateWithLifecycle()
     val prefs by vm.prefs.collectAsStateWithLifecycle()
     val profileName by vm.profileName.collectAsStateWithLifecycle()
+    val profile by vm.profile.collectAsStateWithLifecycle()
     val countries by vm.countries.collectAsStateWithLifecycle()
     val epgCheck by vm.epgCheck.collectAsStateWithLifecycle()
     val guideStatus by vm.guideStatus.collectAsStateWithLifecycle()
@@ -216,7 +229,7 @@ fun SettingsScreen(onRefreshCatalog: () -> Unit, onLoggedOut: () -> Unit, onEdit
     ) {
         Text("Instellingen", style = MaterialTheme.typography.headlineMedium, modifier = Modifier.padding(bottom = 8.dp))
 
-        Header("Voor $profileName")
+        Header("Voor $profileName") { profile?.let { AvatarCircle(it.name, it.avatar, 28.dp, face = it.face) } }
         SettingRow(
             "Profiel bewerken",
             "Naam, kleur, pincode en kinderprofiel.",
@@ -232,7 +245,7 @@ fun SettingsScreen(onRefreshCatalog: () -> Unit, onLoggedOut: () -> Unit, onEdit
         SettingRow(
             "Alleen voorkeurslanden tonen",
             "Andere landen blijven bereikbaar via \"Alle landen tonen\" onderaan elke lijst.",
-            value = if (prefs.onlyPreferred) "Aan" else "Uit",
+            toggle = prefs.onlyPreferred,
             onClick = vm::toggleOnlyPreferred,
         )
         SettingRow(
@@ -242,7 +255,9 @@ fun SettingsScreen(onRefreshCatalog: () -> Unit, onLoggedOut: () -> Unit, onEdit
             onClick = vm::cycleSleepTimer,
         )
 
-        Header("Voor iedereen")
+        Header("Voor iedereen", "Het abonnement, de catalogus en de gids delen alle profielen.") {
+            Image(painterResource(R.drawable.ic_buis), contentDescription = null, modifier = Modifier.size(28.dp))
+        }
         SettingRow(
             "Catalogus vernieuwen",
             state.lastSync?.let { "Bijgewerkt $it · ${state.counts}" } ?: "Nog nooit opgehaald.",
@@ -288,14 +303,22 @@ fun SettingsScreen(onRefreshCatalog: () -> Unit, onLoggedOut: () -> Unit, onEdit
     }
 }
 
+/**
+ * A section: whose settings these are, with their avatar (or the BUIS logo for the household), so
+ * "Voor Bas" and "Voor iedereen" read as two different places, not as two captions.
+ */
 @Composable
-internal fun Header(title: String) {
-    Text(
-        title.uppercase(),
-        style = MaterialTheme.typography.labelLarge,
-        color = TextSecondary,
-        modifier = Modifier.padding(start = 16.dp, top = 18.dp, bottom = 2.dp),
-    )
+internal fun Header(title: String, description: String? = null, icon: (@Composable () -> Unit)? = null) {
+    Row(Modifier.padding(start = 16.dp, top = 24.dp, bottom = 6.dp), verticalAlignment = Alignment.CenterVertically) {
+        icon?.let {
+            it()
+            Spacer(Modifier.width(12.dp))
+        }
+        Column {
+            Text(title, style = MaterialTheme.typography.titleLarge)
+            description?.let { Text(it, style = MaterialTheme.typography.bodyMedium, color = TextSecondary) }
+        }
+    }
 }
 
 /**
@@ -309,6 +332,8 @@ internal fun SettingRow(
     value: String? = null,
     onClick: (() -> Unit)? = null,
     destructive: Boolean = false,
+    /** On/off settings show a switch instead of a value. */
+    toggle: Boolean? = null,
     modifier: Modifier = Modifier,
 ) {
     val content: @Composable () -> Unit = {
@@ -317,7 +342,9 @@ internal fun SettingRow(
                 Text(title, style = MaterialTheme.typography.titleMedium, color = if (destructive) danger() else androidx.compose.ui.graphics.Color.Unspecified)
                 description?.let { Text(it, style = MaterialTheme.typography.bodyMedium, color = TextSecondary) }
             }
-            value?.let { Text(it, style = MaterialTheme.typography.titleMedium, color = if (onClick != null) androidx.compose.ui.graphics.Color.Unspecified else TextSecondary, modifier = Modifier.padding(start = 24.dp)) }
+            // Values you can change are blue; plain information stays grey.
+            value?.let { Text(it, style = MaterialTheme.typography.titleMedium, color = if (onClick != null) BrandText else TextSecondary, modifier = Modifier.padding(start = 24.dp)) }
+            toggle?.let { Switch(it, Modifier.padding(start = 24.dp)) }
         }
     }
     if (onClick == null) {
@@ -332,6 +359,18 @@ internal fun SettingRow(
         colors = Focus.bar(),
     ) { content() }
 }
+
+@Composable
+private fun Switch(on: Boolean, modifier: Modifier = Modifier) {
+    Box(
+        modifier.size(width = 44.dp, height = 24.dp).background(if (on) Brand else SwitchOff, RoundedCornerShape(50)).padding(3.dp),
+        contentAlignment = if (on) Alignment.CenterEnd else Alignment.CenterStart,
+    ) {
+        Box(Modifier.size(18.dp).background(TextPrimary, CircleShape))
+    }
+}
+
+private val SwitchOff = androidx.compose.ui.graphics.Color(0xFF4A4D55)
 
 /** Red for "Uitloggen"; darker on the focus bar so it stays readable there. */
 @Composable

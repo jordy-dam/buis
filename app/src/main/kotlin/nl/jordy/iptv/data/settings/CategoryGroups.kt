@@ -3,12 +3,19 @@ package nl.jordy.iptv.data.settings
 import nl.jordy.iptv.data.db.CategoryEntity
 
 /**
- * Splits a VOD category list into services (Netflix, Disney+ …), genres (Actie, Horror …) and the
- * rest, each in the order it already had (preferred countries first, see [CountryFilter]).
- * Providers name categories after the service or genre, so this works on names alone.
+ * Splits a VOD category list into what the profile pinned, services (Netflix, Disney+ …) A–Z,
+ * genres (Actie, Horror …) and the rest; genres and the rest keep the order they had (preferred
+ * countries first, see [CountryFilter]). Providers name categories after the service or genre, so
+ * this works on names alone.
  */
 object CategoryGroups {
-    enum class Kind(val title: String) { SERVICE("Diensten"), GENRE("Genres"), OTHER("Overig") }
+    enum class Kind(val title: String) { PINNED("Vastgezet"), SERVICE("Diensten"), GENRE("Genres"), OTHER("Overig") }
+
+    /** How a pinned category is stored on the profile; films and series have separate id spaces. */
+    fun pinKey(c: CategoryEntity) = "${c.type.name}:${c.id}"
+
+    /** A–Z as people read it: case and leading symbols ("★ Disney+") don't count. */
+    private val alphabetical = compareBy<CategoryEntity> { it.name.dropWhile { ch -> !ch.isLetter() }.lowercase() }
 
     data class Group(val kind: Kind, val categories: List<CategoryEntity>)
 
@@ -31,9 +38,11 @@ object CategoryGroups {
         else -> Kind.OTHER
     }
 
-    /** Non-empty groups in the order services, genres, rest. */
-    fun group(categories: List<CategoryEntity>): List<Group> {
-        val byKind = categories.groupBy { kind(it.name) }
-        return Kind.entries.mapNotNull { k -> byKind[k]?.let { Group(k, it) } }
+    /** Non-empty groups in the order pinned, services, genres, rest. A pinned category shows only once, on top. */
+    fun group(categories: List<CategoryEntity>, pinned: Set<String> = emptySet()): List<Group> {
+        val byKind = categories.groupBy { if (pinKey(it) in pinned) Kind.PINNED else kind(it.name) }
+        return Kind.entries.mapNotNull { k ->
+            byKind[k]?.let { Group(k, if (k == Kind.PINNED || k == Kind.SERVICE) it.sortedWith(alphabetical) else it) }
+        }
     }
 }

@@ -42,10 +42,10 @@ import javax.inject.Inject
 
 private val pagingConfig = PagingConfig(pageSize = 40, prefetchDistance = 20, enablePlaceholders = false)
 
-/** Category list with "Diensten", "Genres" and "Overig" headers, after the country filter. */
-private fun Flow<FilteredCategories?>.sections() = map { f ->
+/** Category list with "Vastgezet", "Diensten", "Genres" and "Overig" headers, after the country filter. */
+private fun Flow<FilteredCategories?>.sections(pinned: Flow<Set<String>>) = combine(this, pinned) { f, pins ->
     f?.shown?.let { shown ->
-        val groups = CategoryGroups.group(shown)
+        val groups = CategoryGroups.group(shown, pins)
         // One kind only: no header needed.
         if (groups.size == 1) listOf(null to groups[0].categories) else groups.map { it.kind.title to it.categories }
     }
@@ -63,14 +63,18 @@ private fun selectedOf(picked: Flow<String?>, sections: Flow<List<Pair<String?, 
 
 @OptIn(ExperimentalCoroutinesApi::class)
 @HiltViewModel
-class MoviesViewModel @Inject constructor(db: AppDatabase, profiles: ProfileRepository, private val library: LibraryRepository) : ViewModel() {
+class MoviesViewModel @Inject constructor(db: AppDatabase, private val profiles: ProfileRepository, private val library: LibraryRepository) : ViewModel() {
     private val dao = db.catalog()
     val focusMemory = FocusMemory()
 
     private val showAll = MutableStateFlow(false)
     val filtered = dao.movieCategories().filteredBy(profiles.prefs, showAll).stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), null)
-    val sections = filtered.sections().stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), null)
+    val sections = filtered.sections(profiles.pinned).stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), null)
     fun toggleShowAll() { showAll.value = !showAll.value }
+    /** Long-press or Menu on a category: pin it to the top for this profile, or unpin it. */
+    fun togglePin(id: String) = viewModelScope.launch {
+        filtered.value?.shown?.firstOrNull { it.id == id }?.let { profiles.togglePinned(CategoryGroups.pinKey(it)) }
+    }
 
     private val picked = MutableStateFlow<String?>(null)
     val selected = selectedOf(picked, sections).stateIn(viewModelScope, SharingStarted.Eagerly, null)
@@ -102,14 +106,18 @@ class MoviesViewModel @Inject constructor(db: AppDatabase, profiles: ProfileRepo
 
 @OptIn(ExperimentalCoroutinesApi::class)
 @HiltViewModel
-class SeriesViewModel @Inject constructor(db: AppDatabase, profiles: ProfileRepository, private val library: LibraryRepository) : ViewModel() {
+class SeriesViewModel @Inject constructor(db: AppDatabase, private val profiles: ProfileRepository, private val library: LibraryRepository) : ViewModel() {
     private val dao = db.catalog()
     val focusMemory = FocusMemory()
 
     private val showAll = MutableStateFlow(false)
     val filtered = dao.seriesCategories().filteredBy(profiles.prefs, showAll).stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), null)
-    val sections = filtered.sections().stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), null)
+    val sections = filtered.sections(profiles.pinned).stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), null)
     fun toggleShowAll() { showAll.value = !showAll.value }
+    /** Long-press or Menu on a category: pin it to the top for this profile, or unpin it. */
+    fun togglePin(id: String) = viewModelScope.launch {
+        filtered.value?.shown?.firstOrNull { it.id == id }?.let { profiles.togglePinned(CategoryGroups.pinKey(it)) }
+    }
 
     private val picked = MutableStateFlow<String?>(null)
     val selected = selectedOf(picked, sections).stateIn(viewModelScope, SharingStarted.Eagerly, null)
@@ -144,7 +152,7 @@ fun MoviesScreen(onOpenMovie: (Int) -> Unit, vm: MoviesViewModel = hiltViewModel
     val genres by vm.genres.collectAsStateWithLifecycle()
     val genre by vm.genre.collectAsStateWithLifecycle()
     val items = vm.items.collectAsLazyPagingItems()
-    CategoryBrowser(sections, filtered, vm::toggleShowAll, selected, vm::select, items, { it.movie.streamId }, vm.focusMemory, above = {
+    CategoryBrowser(sections, filtered, vm::toggleShowAll, selected, vm::select, items, { it.movie.streamId }, vm.focusMemory, onPin = vm::togglePin, above = {
         GenreChips(genres, genre, { vm.genre.value = it })
     }, tile = { tile, modifier ->
         val movie = tile.movie
@@ -175,7 +183,7 @@ fun SeriesScreen(onOpenSeries: (Int) -> Unit, vm: SeriesViewModel = hiltViewMode
     val genre by vm.genre.collectAsStateWithLifecycle()
     val items = vm.items.collectAsLazyPagingItems()
     CategoryBrowser(
-        sections, filtered, vm::toggleShowAll, selected, vm::select, items, { it.seriesId }, vm.focusMemory,
+        sections, filtered, vm::toggleShowAll, selected, vm::select, items, { it.seriesId }, vm.focusMemory, onPin = vm::togglePin,
         tile = { series, modifier ->
             PosterTile(
                 title = series.name,

@@ -5,7 +5,8 @@ import androidx.activity.compose.LocalActivity
 import androidx.compose.foundation.focusGroup
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.runtime.Composable
@@ -63,7 +64,7 @@ class ProfilePickerViewModel @Inject constructor(private val profiles: ProfileRe
  * "Profielen beheren" turns the avatars into edit buttons. PIN profiles ask their PIN; once there
  * is a kids profile, managing asks for a grown-up's PIN (see [ProfileRepository.managementLock]).
  */
-@OptIn(ExperimentalComposeUiApi::class)
+@OptIn(ExperimentalComposeUiApi::class, ExperimentalLayoutApi::class)
 @Composable
 fun ProfilePickerScreen(
     atLaunch: Boolean,
@@ -106,7 +107,14 @@ fun ProfilePickerScreen(
     ) {
         Image(painterResource(R.drawable.ic_buis), contentDescription = "BUIS", modifier = Modifier.size(96.dp))
         Text(if (managing) "Profielen beheren" else "Wie kijkt er?", style = MaterialTheme.typography.displaySmall)
-        Row(Modifier.focusRestorer().focusGroup(), horizontalArrangement = Arrangement.spacedBy(32.dp)) {
+        // Smaller than the logo, up to five in a row; more wrap into two even rows (6 → 3 + 3).
+        val tiles = s.profiles.size + if (s.profiles.size < ProfileRepository.MAX_PROFILES) 1 else 0
+        FlowRow(
+            Modifier.focusRestorer().focusGroup(),
+            horizontalArrangement = Arrangement.spacedBy(24.dp, Alignment.CenterHorizontally),
+            verticalArrangement = Arrangement.spacedBy(24.dp),
+            maxItemsInEachRow = if (tiles <= 5) tiles else (tiles + 1) / 2,
+        ) {
             s.profiles.forEachIndexed { i, p ->
                 AvatarTile(
                     name = p.name,

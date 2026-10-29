@@ -114,6 +114,17 @@ class ProfileRepository @Inject constructor(
     suspend fun setOnlyPreferred(only: Boolean) = updateCurrent { it.copy(onlyPreferred = only) }
     suspend fun setSleepMinutes(minutes: Int) = updateCurrent { it.copy(sleepMinutes = minutes) }
 
+    /** What the active profile pinned in Films and Series. */
+    val pinned: Flow<Set<String>> = current.filterNotNull().map { it.pinnedSet() }.distinctUntilChanged()
+
+    /** Pins a category for the active profile, or unpins it when it was pinned. */
+    suspend fun togglePinned(key: String) = updateCurrent { p ->
+        val set = p.pinnedSet()
+        p.copy(pinnedCategories = (if (key in set) set - key else set + key).sorted().joinToString(","))
+    }
+
+    private fun ProfileEntity.pinnedSet() = pinnedCategories.split(',').filter { it.isNotBlank() }.toSet()
+
     private suspend fun updateCurrent(change: (ProfileEntity) -> ProfileEntity) = dao.update(change(fresh()))
 
     private suspend fun fresh(): ProfileEntity = dao.get(currentId()) ?: current.filterNotNull().first()

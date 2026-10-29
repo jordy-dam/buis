@@ -77,3 +77,9 @@
 **Why:** Jordy asked for both; per profile so a kids profile can have its own bedtime. Counting from the last key press means someone actively watching is never cut off.
 **Alternatives rejected:** A household-wide sleep timer (no kids bedtime); a timer that counts from the start regardless of keys (stops someone watching); focusable buttons on the card (moving focus off the player breaks its key handling; key hints are enough on a remote).
 **Revisit if:** the 20-second window cuts into real content on the provider's episodes (end credits vary), or the timer should also work outside the player.
+
+## 2026-10-29 — 2g polish: subtle focus, smaller avatars, clearer Instellingen, pinned services
+**Decision:** Supersedes the light-bar focus of 2g part 1: focus on rows, chips and buttons is one clear step lighter (`FocusFill`) with the text staying light; the primary button gets a lighter blue. Avatars in the picker are 88dp, at most five per row, more wrap into two even rows. In Instellingen changeable values are logo blue, on/off settings are switches, and each section is headed by whose it is (the profile's avatar, or the BUIS logo for "Voor iedereen"). Services in Films/Series are sorted A–Z; each profile can pin categories (long-press OK or Menu, same gesture as favourites) to a "Vastgezet" group on top.
+**Why:** Jordy on the tv: the white focus bar was far too white, avatars too big next to the logo, the two settings sections looked alike, and he wants his own services (Netflix, Apple TV+) as shortcuts.
+**Alternatives rejected:** A coloured focus (competes with blue = selected and amber = live); a separate pin button per row (one more focus stop on every row); a Home row of services and service suggestions now (suggestions need viewing history, which is phase 3; the pinned group already is the shortcut).
+**Revisit if:** the subtle focus is hard to find from the couch in daylight, or Jordy wants the pinned services on Home too.

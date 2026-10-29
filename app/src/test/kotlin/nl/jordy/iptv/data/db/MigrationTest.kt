@@ -146,6 +146,20 @@ class MigrationTest {
         }
     }
 
+    @Test
+    fun `8 to 9 adds pinned categories, empty, and keeps the sleep timer`() {
+        helper.createDatabase(DB, 8).use { db ->
+            db.execSQL("INSERT INTO profile (id, name, avatar, face, pinHash, preferredCountries, onlyPreferred, kids, lastUsedAt, createdAt, sleepMinutes) VALUES (1, 'Anna', 3, 2, NULL, 'NL', 1, 0, 5, 1, 60)")
+        }
+        helper.runMigrationsAndValidate(DB, 9, true).use { db ->
+            db.query("SELECT pinnedCategories, sleepMinutes FROM profile").use {
+                it.moveToFirst()
+                assertEquals("", it.getString(0))
+                assertEquals(60, it.getInt(1))
+            }
+        }
+    }
+
     private fun SupportSQLiteDatabase.insertPhase1Data() {
         execSQL("INSERT INTO favorite (type, itemId, name, imageUrl, addedAt) VALUES ('LIVE', 101, '┃NL┃ NPO 1 HD', NULL, 1)")
         execSQL("INSERT INTO playback_position (type, itemId, positionMs, durationMs, updatedAt) VALUES ('MOVIE', 5001, 62000, 180000, 2)")

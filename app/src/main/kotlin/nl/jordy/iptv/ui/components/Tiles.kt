@@ -57,7 +57,7 @@ import nl.jordy.iptv.ui.theme.Brand
 import nl.jordy.iptv.ui.theme.FocusBar
 import nl.jordy.iptv.ui.theme.Heart
 import nl.jordy.iptv.ui.theme.Live
-import nl.jordy.iptv.ui.theme.TextOnLight
+import nl.jordy.iptv.ui.theme.FocusFill
 import nl.jordy.iptv.ui.theme.SurfaceColor
 import nl.jordy.iptv.ui.theme.SurfaceRaised
 import nl.jordy.iptv.ui.theme.TextPrimary
@@ -67,8 +67,8 @@ private val tileShape = RoundedCornerShape(10.dp)
 
 /**
  * Two focus treatments (2g). Artwork (posters, episodes): scale ~1.1 and a thin light outline, as
- * there's no surface to fill. Everything else (rows, chips, buttons, the rail): [bar], the row turns
- * light with dark text, no border; [TextSecondary] and [Live] follow along via [onLight].
+ * there's no surface to fill. Everything else (rows, chips, buttons, the rail): [bar], the row steps
+ * up to [FocusFill], no border. A white bar was tried first and was too bright from the couch.
  */
 object Focus {
     const val SCALE = 1.1f
@@ -78,10 +78,10 @@ object Focus {
     fun bar(container: Color = SurfaceColor) = ClickableSurfaceDefaults.colors(
         containerColor = container,
         contentColor = TextPrimary,
-        focusedContainerColor = FocusBar,
-        focusedContentColor = TextOnLight,
-        pressedContainerColor = FocusBar,
-        pressedContentColor = TextOnLight,
+        focusedContainerColor = FocusFill,
+        focusedContentColor = TextPrimary,
+        pressedContainerColor = FocusFill,
+        pressedContentColor = TextPrimary,
     )
 }
 
@@ -309,10 +309,12 @@ fun ListItemSurface(
     selected: Boolean,
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
+    onLongClick: (() -> Unit)? = null,
 ) {
     Surface(
         onClick = onClick,
-        modifier = modifier.fillMaxWidth(),
+        onLongClick = onLongClick,
+        modifier = modifier.fillMaxWidth().then(if (onLongClick != null) Modifier.onMenuKey(onLongClick) else Modifier),
         shape = ClickableSurfaceDefaults.shape(RoundedCornerShape(8.dp)),
         scale = ClickableSurfaceDefaults.scale(focusedScale = 1.02f),
         colors = Focus.bar(container = if (selected) Brand.copy(alpha = 0.35f) else Color.Transparent),
