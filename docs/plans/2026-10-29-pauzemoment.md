@@ -93,4 +93,4 @@ you set it, only for films and series, and with next-episode autoplay it counts 
   15 single steps would mean up to 14 presses). Schema 14 (`profile.breakLength`, default 1).
 - Tests: length default/clamping and the cycle in `BreakTimerTest`, migration 13 → 14; 157 green.
 - Emulator: the row shows "1 min" after the migration, OK made it "2 min", and the break card counted
-  down from 2:00 between episodes.
+  down from 2:00 between episodes. On the tv since 13:38 (release, e31aaa2).
