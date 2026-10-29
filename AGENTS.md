@@ -55,6 +55,7 @@ Same lazy-loading rule applies — load only what the task needs:
 | What to build, stack, phases, done-criteria | `docs/spec/build-prompt.md` |
 | A dated task plan | `docs/plans/{date}-{slug}.md` |
 | External links (API docs, design guidelines) | `docs/resources.md` |
+| Feature ideas and integrations (not yet planned) | `docs/brainstorm.md` |
 
 Start at `docs/overview.md` if unsure.
 

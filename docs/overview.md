@@ -6,6 +6,7 @@ Project knowledge: what's true about *this project*. Humans and agents both read
 - Build spec: stack, Xtream API, design principles, phases → `spec/build-prompt.md`
 - Dated task plans → `plans/` (e.g. `2026-11-02-phase-1-plan.md`)
 - External links registry → `resources.md`
+- Open idea list (features, integrations; not a plan) → `brainstorm.md`
 
 Trigger-activated (add when the project has it, see `.agents/GUIDE.md`):
 - Architecture & domain knowledge → `wiki/`
