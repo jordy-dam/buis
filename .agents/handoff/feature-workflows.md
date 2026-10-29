@@ -31,12 +31,16 @@ New since: `docs/brainstorm.md` (open idea list) and **Pauzemoment** on branch `
 - On `feat/pauzemoment` (schema 13): Pauzemoment per profile, and the reminder, next-episode, break and
   sleep-timer cards share `CornerCard` (bottom right, one at a time in the player).
 
-**Last completed step:** autoplay-title fix installed on the tv (release from `feat/pauzemoment`, 29cef3d, schema 14); started fine.
+- Phase 2h on the same branch (schema 20): Opties in the player, Bedtijd, Kijkgeschiedenis + weekoverzicht,
+  Zenderstatus, Intro overslaan, Stemming/lengte, instant replay, Testbeeld easter egg, round PIN keys,
+  screensaver. Plan: `docs/plans/2026-10-29-phase-2h-brainstorm.md`. Emulator-tested; **not on the tv**.
+
+**Last completed step:** phase 2h built and committed (f90b431); release build ready, not installed.
 
 **Mid-flight:** nothing — clean break. Jordy still has to set `main` as default branch on github.com.
 
 ## Next up
-1. Wait for Jordy's tv test of Pauzemoment, then merge `feat/pauzemoment` to `main` and push. Ask Jordy: does a mid-film pause annoy, is the corner card style right for all four cards?
+1. Install 2h on the tv when Jordy says so; screensaver needs his OK for `settings put secure screensaver_components`. Then his tv test, then merge `feat/pauzemoment` to `main` and push. Ask Jordy: does a mid-film pause annoy, is the corner card style right for all four cards?
 2. Start other new work from `main` on a fresh branch. Ideas: `docs/brainstorm.md` (next pick: Home Assistant).
 3. Wait for Jordy's report on vanaf begin on real channels (↺ on Viaplay F1/ESPN? seeking in timeshift?) — fix only if needed.
 4. Candidates when he asks: number-key zapping (parked), auto-play into a Home "Jouw diensten" row,
