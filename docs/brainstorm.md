@@ -25,7 +25,7 @@ profile, ratings, voice search, Google TV "Watch Next".
 - **Stream health overlay** (long-press Info): bitrate, resolution, codec, buffer, dropped frames. `S`
 - **Auto-fallback**: when a channel stalls, try the same channel in another category/quality. `M`
 - **Sleep timer from anywhere**, not just in the player (revisit from 2g part 2). `S`
-- **Pauzemoment**: opt-in per profile. After an hour of watching (films and episodes over an hour,
+- **Pauzemoment** → planned in `plans/2026-10-29-pauzemoment.md`. Opt-in per profile. After an hour of watching (films and episodes over an hour,
   or the running total when next-episode autoplay chains episodes), BUIS pauses for a minute and
   shows a card with three icons (wc, flesje, snack) and a countdown; OK resumes now, Back skips
   this one. Between episodes is the natural spot: when the hour is up there, the next-episode
