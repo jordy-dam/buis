@@ -88,6 +88,7 @@ fun CategoryList(
         @Composable
         fun row(cat: CategoryEntity) = ListItemSurface(
             text = cat.name,
+            tags = categoryTags(cat.badges),
             selected = cat.id == selected,
             onClick = onClick,
             onLongClick = onLongClick?.let { { follow = cat.id; it(cat.id) } },

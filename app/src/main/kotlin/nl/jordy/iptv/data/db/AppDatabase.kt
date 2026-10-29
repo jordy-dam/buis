@@ -30,7 +30,7 @@ import androidx.sqlite.db.SupportSQLiteDatabase
         ChannelSwapEntity::class,
         SeriesIntroEntity::class,
     ],
-    version = 21,
+    version = 22,
     exportSchema = true,
     autoMigrations = [
         AutoMigration(from = 1, to = 2, spec = AppDatabase.CatalogResync::class),
@@ -68,6 +68,8 @@ import androidx.sqlite.db.SupportSQLiteDatabase
         AutoMigration(from = 18, to = 19),
         // Film running time for the length filter: film details are fetched again quietly.
         AutoMigration(from = 19, to = 20, spec = AppDatabase.DurationRefetch::class),
+        // Category labels ("PPV", "FHD") apart from the name, and cleaner channel names: catalog re-syncs.
+        AutoMigration(from = 21, to = 22, spec = AppDatabase.CatalogResync::class),
     ],
 )
 abstract class AppDatabase : RoomDatabase() {

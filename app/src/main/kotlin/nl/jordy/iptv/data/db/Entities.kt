@@ -27,6 +27,8 @@ data class CategoryEntity(
     val country: String? = null,
     /** Adult content by the provider's name (`ADULT`, `XXX`, `18+`); hidden on kids profiles. */
     @ColumnInfo(defaultValue = "0") val adult: Boolean = false,
+    /** Labels split off the raw name ("PPV", "FHD"), comma-separated; drawn next to the name. */
+    @ColumnInfo(defaultValue = "") val badges: String = "",
 )
 
 @Entity(tableName = "live_channel", primaryKeys = ["categoryId", "streamId"], indices = [Index("streamId")])

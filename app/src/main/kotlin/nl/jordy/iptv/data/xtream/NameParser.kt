@@ -28,7 +28,10 @@ object NameParser {
     // "… [NL]", "… [DOLBY]", "… (NL GESPROKEN)"; years like "(2024)" are left alone.
     private val trailingTag = Regex("""\s*[$BARS\[(]\s*([^$BARS\[\]()]{2,16}?)\s*[$BARS\])]\s*$""")
     private val year = Regex("""^(19|20)\d{2}$""")
-    private val qualitySuffix = Regex("""\s+(FHD|UHD|8K|4K|HD|SD|HEVC|H265|RAW)\s*$""", RegexOption.IGNORE_CASE)
+    // "SBS 6 FHD 50FPS", "SBS 6 8K+": frame rates and a trailing "+" are quality marks too; "UFC PPV" ends in its tag.
+    private val qualitySuffix = Regex("""\s+(FHD|UHD|8K|4K|HD|SD|HEVC|H265|RAW|PPV|\d{2,3} ?FPS)\+?\s*$""", RegexOption.IGNORE_CASE)
+    // "CLIPMYHORSE.TV": a web address as a name; the domain says nothing.
+    private val domain = Regex("""\.TV\b""", RegexOption.IGNORE_CASE)
     private val decoration = Regex("""^[\s=#*─━_~$BARS-]+|[\s=#*─━_~$BARS-]+$""")
     private val spaces = Regex("""\s{2,}""")
 
@@ -72,12 +75,15 @@ object NameParser {
             // "NL: Name" only for real country codes, so "WWE: Raw" keeps its title.
             leadingCode.find(rest)?.let { m -> country(m.groupValues[1])?.let { (it to null as String?) to m } }
         }
+        var leadingBadge: String? = null
         if (classified != null) {
             val (result, match) = classified
             country = result.first
+            leadingBadge = result.second
             result.second?.let(badges::add)
             rest = rest.substring(match.range.last + 1)
         }
+        rest = domain.replace(rest, "")
 
         while (true) {
             val m = trailingTag.find(rest) ?: break
@@ -100,7 +106,7 @@ object NameParser {
             val found = mutableListOf<String>()
             while (true) {
                 val m = qualitySuffix.find(rest) ?: break
-                found += m.groupValues[1].uppercase()
+                found += m.groupValues[1].uppercase().replace(" ", "")
                 rest = rest.substring(0, m.range.first)
             }
             // "HD" is on most films and says nothing there; the rarer ones help tell variants apart.
@@ -108,6 +114,8 @@ object NameParser {
         }
 
         val title = spaces.replace(decoration.replace(rest, ""), " ").trim()
+        // "┃CAR┃ CARIBBEAN": the tag only abbreviates the name, so as a badge it repeats it.
+        if (leadingBadge != null && leadingBadge.length >= 3 && title.uppercase().startsWith(leadingBadge)) badges.remove(leadingBadge)
         return ParsedName(
             title = title.ifEmpty { raw.trim() },
             country = country,

@@ -76,6 +76,25 @@ class NameParserTest {
     }
 
     @Test
+    fun `frame rates and a plus sign leave the channel name too`() {
+        // Seen on the real panel: the list showed "SBS 6 FHD 50FPS" and "SBS 6 8K+" as names.
+        assertEquals("SBS 6" to listOf("FHD", "50FPS"), p("┃NL┃ SBS 6 FHD 50FPS").let { it.title to it.badges })
+        assertEquals("SBS 6" to listOf("8K"), p("┃NL┃ SBS 6 8K+").let { it.title to it.badges })
+        assertEquals("RTL 4" to listOf("60FPS"), p("┃NL┃ RTL 4 60 FPS").let { it.title to it.badges })
+        assertEquals("a plus that belongs to the name stays", "APPLE TV+", p("┃NL┃ APPLE TV+").title)
+    }
+
+    @Test
+    fun `category names lose repeated tags and web domains`() {
+        // Seen on the real panel as "UFC PPV · PPV", "CARIBBEAN · CAR" and "CLIPMYHORSE.TV PPV".
+        assertEquals("UFC" to listOf("PPV"), p("┃PPV┃ UFC PPV").let { it.title to it.badges })
+        assertEquals("CARIBBEAN" to emptyList<String>(), p("┃CAR┃ CARIBBEAN").let { it.title to it.badges })
+        assertEquals("CLIPMYHORSE" to listOf("PPV"), p("CLIPMYHORSE.TV PPV").let { it.title to it.badges })
+        assertEquals("ODIDO" to listOf("FHD", "50FPS"), NameParser.parse("ODIDO FHD 50FPS", keepHd = true).let { it.title to it.badges })
+        assertEquals("a tag that isn't the name's start stays", listOf("PPV"), p("┃PPV┃ BOXING").badges)
+    }
+
+    @Test
     fun `channels keep HD, so their HD and SD versions stay apart`() {
         assertEquals("NPO 1" to listOf("HD"), NameParser.parse("┃NL┃ NPO 1 HD", keepHd = true).let { it.title to it.badges })
         assertEquals("NPO 1" to listOf("SD"), NameParser.parse("┃NL┃ NPO 1 SD", keepHd = true).let { it.title to it.badges })

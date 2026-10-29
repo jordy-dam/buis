@@ -80,10 +80,9 @@ class CatalogSync @Inject constructor(
         val categories = mutableListOf<CategoryEntity>()
         client.forEachInArray(c, categoriesAction) { el ->
             XtreamParser.category(el)?.let {
-                val n = NameParser.parse(it.name, stripQuality = false)
-                // "APPLE TV+ · Multi": the badge stays readable next to the name.
-                val name = (listOf(n.title) + n.badges).joinToString(" · ")
-                categories += CategoryEntity(type, it.id, name, categories.size, generation, n.country, adult = NameParser.isAdult(it.name))
+                // "ODIDO FHD 50FPS" → "ODIDO" with its labels, drawn next to the name; HD stays, it tells categories apart.
+                val n = NameParser.parse(it.name, keepHd = true)
+                categories += CategoryEntity(type, it.id, n.title, categories.size, generation, n.country, adult = NameParser.isAdult(it.name), badges = n.badges.joinToString(","))
             }
         }
         val categoryCountry = categories.associate { it.id to it.country }

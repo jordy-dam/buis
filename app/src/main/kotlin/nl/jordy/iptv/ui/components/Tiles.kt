@@ -224,7 +224,7 @@ fun ChannelTile(
                 Row(Modifier.width(72.dp), horizontalArrangement = Arrangement.End, verticalAlignment = Alignment.CenterVertically) {
                     // Terugkijken: the programme can be watched from its start.
                     if (catchup) androidx.tv.material3.Icon(Icons.Filled.History, contentDescription = "Terugkijken", tint = TextSecondary, modifier = Modifier.padding(end = 6.dp).size(18.dp))
-                    if (quality != null) QualityLabel(quality)
+                    if (quality != null) TagLabel(quality)
                 }
             }
             if (now != null) {
@@ -269,9 +269,9 @@ fun ChannelCard(name: String, logoUrl: String?, now: EpgEntry?, onClick: () -> U
     }
 }
 
-/** A quiet outlined label for picture quality, so it reads as a property, not a button. */
+/** A quiet label for picture quality or a tag like "PPV", so it reads as a property, not a button. */
 @Composable
-private fun QualityLabel(text: String) {
+fun TagLabel(text: String) {
     // Drawn like Material's HD / SD / 4K icons (letters in a block). Better is lighter, not a colour:
     // colours each mean one thing in BUIS (blue selected, amber live, red heart), and most channels are
     // HD, so a coloured badge would tint whole lists. SD is only an outline.
@@ -297,6 +297,16 @@ fun bestQuality(badges: List<String>): String? {
     val rank = listOf("8K", "UHD", "4K", "FHD", "HD", "SD")
     return badges.map { it.uppercase() }.filter { it in rank }.minByOrNull { rank.indexOf(it) }
         ?.let { if (it == "UHD") "4K" else it }
+}
+
+/**
+ * The labels a category shows next to its name: its best quality, then tags like "PPV" or "Multi".
+ * Frame rates stay out. Codecs stay in: "BEIN SPORTS" with HEVC and with RAW are different categories.
+ */
+fun categoryTags(badges: String): List<String> {
+    val all = badges.split(',').map { it.trim() }.filter { it.isNotEmpty() }
+    val technical = Regex("""\d+FPS|8K|UHD|4K|FHD|HD|SD""", RegexOption.IGNORE_CASE)
+    return listOfNotNull(bestQuality(all)) + all.filterNot { technical.matches(it) }
 }
 
 /** How far the programme is, 0..1, at this moment. */
@@ -329,6 +339,8 @@ fun ListItemSurface(
     onLongClick: (() -> Unit)? = null,
     /** Multi-select lists: a check in front of picked items (and room for it in front of the others). */
     checked: Boolean? = null,
+    /** Labels after the name ("PPV", "FHD"), see [categoryTags]. */
+    tags: List<String> = emptyList(),
 ) {
     Surface(
         onClick = onClick,
@@ -350,7 +362,9 @@ fun ListItemSurface(
                 fontWeight = if (selected) FontWeight.Medium else null,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
+                modifier = Modifier.weight(1f, fill = false),
             )
+            tags.forEach { Spacer(Modifier.width(8.dp)); TagLabel(it) }
         }
     }
 }

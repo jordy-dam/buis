@@ -124,7 +124,8 @@ class CatalogSyncTest {
 
         val cats = db.catalog().liveCategories().first().associateBy { it.id }
         assertEquals("ALGEMEEN" to "NL", cats.getValue("1").let { it.name to it.country })
-        assertEquals("APPLE TV+ · Multi", cats.getValue("2").name)
+        // The tag is drawn as a label next to the name, so it's stored apart from it.
+        assertEquals("APPLE TV+" to "Multi", cats.getValue("2").let { it.name to it.badges })
 
         val npo = db.catalog().liveInCategory("1").single()
         assertEquals("NPO 1", npo.name)
