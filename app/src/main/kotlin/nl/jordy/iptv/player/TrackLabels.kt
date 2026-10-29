@@ -47,6 +47,14 @@ object TrackLabels {
         listOfNotNull(language(language) ?: label?.takeIf { it.isNotBlank() } ?: "Spoor ${index + 1}", channels(channelCount))
             .joinToString(" · ")
 
+    /**
+     * The subtitle language a live channel starts with: none on Dutch channels (they burn their own
+     * translation into the picture), the profile's language elsewhere, Dutch when the profile has none.
+     * [country] is the channel's category country; null (PPV, sports packs) counts as foreign.
+     */
+    fun liveSubtitleLang(country: String?, profileLang: String): String =
+        if (country == "NL") "" else profileLang.ifEmpty { "nl" }
+
     fun subtitle(language: String?, label: String?, forced: Boolean, index: Int): String =
         (language(language) ?: label?.takeIf { it.isNotBlank() } ?: "Ondertitels ${index + 1}") + if (forced) " (alleen vertaling)" else ""
 }

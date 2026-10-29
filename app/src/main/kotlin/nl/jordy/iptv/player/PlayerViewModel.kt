@@ -159,6 +159,8 @@ class PlayerViewModel @Inject constructor(
     private var currentSource: LiveSources.Source? = null
     private var channels: List<LiveChannelEntity> = emptyList()
     private var channelIndex = -1
+    /** Live category id → country, for [TrackLabels.liveSubtitleLang]. */
+    private var categoryCountries: Map<String, String?> = emptyMap()
     /** The category Up/Down zap through; changes when Left goes back to a channel from another one. */
     private var zapCategory = route.categoryId
     private var epgJob: Job? = null
@@ -213,6 +215,7 @@ class PlayerViewModel @Inject constructor(
             PlayerRoute.Kind.LIVE -> {
                 liveSources = LiveSources(base, c)
                 swaps = runCatching { channelHealth.swapMap() }.getOrDefault(emptyMap())
+                categoryCountries = db.catalog().liveCategoryCountries().associate { it.id to it.country }
                 channels = loadZapList()
                 channelIndex = channels.indexOfFirst { it.streamId == route.id }
                 val channel = channels.getOrNull(channelIndex)
@@ -280,6 +283,10 @@ class PlayerViewModel @Inject constructor(
             PlayerUiState(title = name, channelNumber = channelIndex.takeIf { it >= 0 }?.plus(1), previous = history.previous?.name, showClock = it.showClock)
         }
         zapStartedAt = SystemClock.elapsedRealtime()
+        // Subtitles per channel: a track picked on the previous channel was for that one only.
+        channels.firstOrNull { it.streamId == streamId }?.let { ch ->
+            applyTracks(TrackLabels.liveSubtitleLang(categoryCountries[ch.categoryId], profilePrefs.subtitleLang))
+        }
         setSource(source)
         epgJob?.cancel()
         epgJob = viewModelScope.launch {
@@ -680,13 +687,20 @@ class PlayerViewModel @Inject constructor(
     private var profilePrefs = UserPrefs()
 
     /** The profile's languages: the player picks them when the stream has them; otherwise its default. */
-    private fun applyProfileTracks() {
-        val p = profilePrefs
+    private fun applyProfileTracks() = applyTracks(profilePrefs.subtitleLang)
+
+    /**
+     * [subtitleLang] empty = off. Only a track in that language shows: a stream's "default" or
+     * "forced" flag must not switch on Polish subtitles when Dutch was asked for.
+     */
+    private fun applyTracks(subtitleLang: String) {
         player.trackSelectionParameters = player.trackSelectionParameters.buildUpon()
             .clearOverrides()
-            .setPreferredAudioLanguage(p.audioLang.ifEmpty { null })
-            .setPreferredTextLanguage(p.subtitleLang.ifEmpty { null })
-            .setTrackTypeDisabled(C.TRACK_TYPE_TEXT, p.subtitleLang.isEmpty())
+            .setPreferredAudioLanguage(profilePrefs.audioLang.ifEmpty { null })
+            .setPreferredTextLanguage(subtitleLang.ifEmpty { null })
+            .setIgnoredTextSelectionFlags(C.SELECTION_FLAG_DEFAULT or C.SELECTION_FLAG_FORCED)
+            .setSelectUndeterminedTextLanguage(false)
+            .setTrackTypeDisabled(C.TRACK_TYPE_TEXT, subtitleLang.isEmpty())
             .build()
     }
 

@@ -31,6 +31,10 @@ interface CatalogDao {
     @Query("SELECT * FROM category c WHERE c.type = 'SERIES' AND EXISTS (SELECT 1 FROM series x WHERE x.categoryId = c.id) ORDER BY c.sortIndex")
     fun seriesCategories(): Flow<List<CategoryEntity>>
 
+    /** Each live category's country, for the player's subtitle rule. */
+    @Query("SELECT id, country FROM category WHERE type = 'LIVE'")
+    suspend fun liveCategoryCountries(): List<CategoryCountry>
+
     @Query("SELECT * FROM live_channel WHERE categoryId = :categoryId ORDER BY sortIndex")
     fun livePaged(categoryId: String): PagingSource<Int, LiveChannelEntity>
     /** Full ordered list of a category, for zapping up/down in the player. */
@@ -232,6 +236,8 @@ interface SyncInfoDao {
 }
 
 data class LiveGuideRow(val streamId: Int, val name: String, val epgChannelId: String?, val country: String?)
+
+data class CategoryCountry(val id: String, val country: String?)
 
 @Dao
 interface EpgDao {

@@ -43,4 +43,15 @@ class TrackLabelsTest {
         assertEquals("nl", TrackLabels.next("de", TrackLabels.SUBTITLE_CHOICES))
         assertEquals("Uit", TrackLabels.name("", TrackLabels.SUBTITLE_CHOICES))
     }
+
+    @Test
+    fun `live subtitles are off on Dutch channels and Dutch elsewhere`() {
+        // Dutch channels burn their own translation in: a second line of text on top would double it.
+        assertEquals("", TrackLabels.liveSubtitleLang("NL", profileLang = ""))
+        assertEquals("", TrackLabels.liveSubtitleLang("NL", profileLang = "en"))
+        // Foreign channels and untagged ones (PPV, sports packs) get Dutch, unless the profile chose another language.
+        assertEquals("nl", TrackLabels.liveSubtitleLang("GB", profileLang = ""))
+        assertEquals("nl", TrackLabels.liveSubtitleLang(null, profileLang = ""))
+        assertEquals("en", TrackLabels.liveSubtitleLang("DE", profileLang = "en"))
+    }
 }
