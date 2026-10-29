@@ -166,4 +166,4 @@ Long-press OK or Menu on a "Verder kijken" tile asks "Uit Verder kijken halen?" 
 it forgets that profile's position, so a later play starts at the beginning. Focus moves to the next
 tile (or the previous one). Tested: unit 124 (removal is per profile); emulator: dialog, removal of the
 only tile, row disappears and focus lands on the rail. Moving focus to a neighbour tile not walked.
-- On the tv (release, 2026-10-29): starts, catalog re-synced, Verder kijken and favourite channels shown. "RTL 7 8K+" no longer appears among the favourite channels on Home (it did this morning); unclear whether it was unfavourited or dropped.
+- On the tv (release, 2026-10-29): starts, catalog re-synced, Verder kijken and favourite channels shown. "RTL 7 8K+" no longer appears among the favourite channels on Home (it did this morning); Jordy removed it himself; not a bug.
