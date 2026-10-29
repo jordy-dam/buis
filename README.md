@@ -1,4 +1,4 @@
-# iptv
+# BUIS
 
 > A calm, remote-friendly IPTV app for Google TV, on top of an Xtream Codes login.
 
