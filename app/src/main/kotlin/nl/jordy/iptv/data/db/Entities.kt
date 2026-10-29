@@ -126,6 +126,10 @@ data class ProfileEntity(
     @ColumnInfo(defaultValue = "") val subtitleLang: String = "",
     /** A small clock in the player bar. */
     @ColumnInfo(defaultValue = "1") val showClock: Boolean = true,
+    /** Bedtijd in minutes after midnight, -1 = off; see [nl.jordy.iptv.data.profile.Bedtime]. */
+    @ColumnInfo(defaultValue = "-1") val bedtime: Int = -1,
+    /** The evenings Bedtijd is on, Monday = bit 0; Sunday to Thursday at first. */
+    @ColumnInfo(defaultValue = "79") val bedtimeDays: Int = 79,
     /** Categories pinned to the top of Films/Series, as [nl.jordy.iptv.data.settings.CategoryGroups.pinKey]s, comma-separated. */
     @ColumnInfo(defaultValue = "") val pinnedCategories: String = "",
     /** The profile with the highest value is the active one; picking a profile bumps it. */

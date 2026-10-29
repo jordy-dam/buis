@@ -31,6 +31,8 @@ val ProfileEntity.prefs
         audioLang = audioLang,
         subtitleLang = subtitleLang,
         showClock = showClock,
+        bedtime = bedtime,
+        bedtimeDays = bedtimeDays,
     )
 
 /**
@@ -126,6 +128,8 @@ class ProfileRepository @Inject constructor(
     suspend fun setAudioLang(code: String) = updateCurrent { it.copy(audioLang = code) }
     suspend fun setSubtitleLang(code: String) = updateCurrent { it.copy(subtitleLang = code) }
     suspend fun setShowClock(on: Boolean) = updateCurrent { it.copy(showClock = on) }
+    suspend fun setBedtime(minutes: Int) = updateCurrent { it.copy(bedtime = minutes) }
+    suspend fun setBedtimeDays(mask: Int) = updateCurrent { it.copy(bedtimeDays = mask) }
 
     /** What the active profile pinned in Films and Series. */
     val pinned: Flow<Set<String>> = current.filterNotNull().map { it.pinnedSet() }.distinctUntilChanged()

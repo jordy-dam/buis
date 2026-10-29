@@ -244,6 +244,22 @@ class MigrationTest {
         }
     }
 
+    @Test
+    fun `15 to 16 adds Bedtijd, off, on school nights once switched on`() {
+        helper.createDatabase(DB, 15).use { db ->
+            db.execSQL("INSERT INTO profile (id, name, avatar, face, pinHash, preferredCountries, onlyPreferred, kids, lastUsedAt, createdAt, sleepMinutes, breakMinutes, breakLength, audioLang, subtitleLang, showClock, pinnedCategories) VALUES (1, 'Anna', 3, 2, NULL, 'NL', 1, 0, 5, 1, 0, 0, 1, 'nl', '', 0, '')")
+        }
+        helper.runMigrationsAndValidate(DB, 16, true).use { db ->
+            db.query("SELECT bedtime, bedtimeDays, audioLang, showClock FROM profile").use {
+                it.moveToFirst()
+                assertEquals(-1, it.getInt(0))
+                assertEquals(nl.jordy.iptv.data.profile.Bedtime.DEFAULT_DAYS, it.getInt(1))
+                assertEquals("nl", it.getString(2))
+                assertEquals(0, it.getInt(3))
+            }
+        }
+    }
+
     private fun SupportSQLiteDatabase.insertPhase1Data() {
         execSQL("INSERT INTO favorite (type, itemId, name, imageUrl, addedAt) VALUES ('LIVE', 101, '┃NL┃ NPO 1 HD', NULL, 1)")
         execSQL("INSERT INTO playback_position (type, itemId, positionMs, durationMs, updatedAt) VALUES ('MOVIE', 5001, 62000, 180000, 2)")

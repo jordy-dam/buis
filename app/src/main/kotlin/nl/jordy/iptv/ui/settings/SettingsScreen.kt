@@ -20,6 +20,7 @@ import nl.jordy.iptv.data.profile.ProfileRepository
 import nl.jordy.iptv.player.BreakTimer
 import nl.jordy.iptv.player.SleepTimer
 import nl.jordy.iptv.player.TrackLabels
+import nl.jordy.iptv.data.profile.Bedtime
 import nl.jordy.iptv.ui.profiles.PinDialog
 import androidx.compose.runtime.rememberCoroutineScope
 import nl.jordy.iptv.data.settings.UserPrefs
@@ -190,6 +191,8 @@ class SettingsViewModel @Inject constructor(
     }
     fun cycleAudioLang() = viewModelScope.launch { profiles.setAudioLang(TrackLabels.next(prefs.value.audioLang, TrackLabels.AUDIO_CHOICES)) }
     fun cycleSubtitleLang() = viewModelScope.launch { profiles.setSubtitleLang(TrackLabels.next(prefs.value.subtitleLang, TrackLabels.SUBTITLE_CHOICES)) }
+    fun cycleBedtime() = viewModelScope.launch { profiles.setBedtime(Bedtime.nextTime(prefs.value.bedtime)) }
+    fun cycleBedtimeDays() = viewModelScope.launch { profiles.setBedtimeDays(Bedtime.nextDays(prefs.value.bedtimeDays)) }
     fun cycleBreakLength() = viewModelScope.launch {
         profiles.setBreakLength(BreakTimer.nextChoice(prefs.value.breakLength, BreakTimer.LENGTHS))
     }
@@ -315,6 +318,20 @@ fun SettingsScreen(onRefreshCatalog: () -> Unit, onLoggedOut: () -> Unit, onEdit
             value = if (prefs.sleepMinutes == 0) "Uit" else "${prefs.sleepMinutes} min",
             onClick = vm::cycleSleepTimer,
         )
+        SettingRow(
+            "Bedtijd",
+            "Op dit tijdstip vraagt BUIS één keer: doorkijken of lekker naar bed?",
+            value = Bedtime.timeName(prefs.bedtime),
+            onClick = vm::cycleBedtime,
+        )
+        if (prefs.bedtime >= 0) {
+            SettingRow(
+                "Bedtijd op",
+                "Zo–do: de avonden voor een werk- of schooldag.",
+                value = Bedtime.daysName(prefs.bedtimeDays),
+                onClick = vm::cycleBedtimeDays,
+            )
+        }
         SettingRow(
             "Pauzemoment",
             "Na zo lang kijken pauzeert BUIS even, zodat iedereen kan plassen, drinken of iets pakken. Alleen bij films en series.",

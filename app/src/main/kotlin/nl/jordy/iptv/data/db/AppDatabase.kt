@@ -26,7 +26,7 @@ import androidx.sqlite.db.SupportSQLiteDatabase
         FollowEntity::class,
         ReminderEntity::class,
     ],
-    version = 15,
+    version = 16,
     exportSchema = true,
     autoMigrations = [
         AutoMigration(from = 1, to = 2, spec = AppDatabase.CatalogResync::class),
@@ -54,6 +54,8 @@ import androidx.sqlite.db.SupportSQLiteDatabase
         AutoMigration(from = 13, to = 14),
         // Audio and subtitle language and the player clock per profile: stream default, subtitles off, clock on.
         AutoMigration(from = 14, to = 15),
+        // Bedtijd per profile, off for everyone at first.
+        AutoMigration(from = 15, to = 16),
     ],
 )
 abstract class AppDatabase : RoomDatabase() {

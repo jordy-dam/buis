@@ -3,7 +3,15 @@ package nl.jordy.iptv.ui
 import androidx.compose.runtime.getValue
 import androidx.navigation.NavDestination.Companion.hasRoute
 import androidx.navigation.compose.currentBackStackEntryAsState
+import nl.jordy.iptv.ui.reminders.BedtimeHost
 import nl.jordy.iptv.ui.reminders.ReminderHost
+import androidx.compose.runtime.setValue
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.mutableStateOf
+import nl.jordy.iptv.ui.reminders.BedtimeViewModel
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
+import nl.jordy.iptv.ui.reminders.ReminderViewModel
 
 import androidx.compose.runtime.Composable
 import androidx.navigation.compose.NavHost
@@ -30,11 +38,20 @@ fun AppNavHost(start: Any) {
     // Reminders only where someone is watching: not over login, the catalog sync or "Wie kijkt er?".
     val dest = entry?.destination
     val watching = dest != null && (dest.hasRoute<ShellRoute>() || dest.hasRoute<PlayerRoute>() || dest.hasRoute<MovieDetailRoute>() || dest.hasRoute<SeriesDetailRoute>())
-    ReminderHost(watching, onWatch = { route ->
+    // One card at a time: whichever is up stays until it's answered, the other waits and then opens
+    // with focus of its own. Reminders go first when both are due at once.
+    val reminders: ReminderViewModel = hiltViewModel()
+    val bedtime: BedtimeViewModel = hiltViewModel()
+    val reminderUp = reminders.due.collectAsStateWithLifecycle().value != null
+    val bedtimeDue = bedtime.due.collectAsStateWithLifecycle().value != null
+    var bedtimeOnScreen by remember { mutableStateOf(false) }
+    if (!bedtimeDue) bedtimeOnScreen = false else if (!reminderUp) bedtimeOnScreen = true
+    ReminderHost(watching && !bedtimeOnScreen, vm = reminders, onWatch = { route ->
         // From another channel or a film: the reminder's channel replaces it, Back still leads home.
         if (nav.currentDestination?.hasRoute<PlayerRoute>() == true) nav.popBackStack()
         nav.navigate(route)
     })
+    BedtimeHost(watching && bedtimeOnScreen, vm = bedtime)
     NavHost(navController = nav, startDestination = start) {
         composable<LoginRoute> {
             LoginScreen(onLoggedIn = { nav.navigate(SyncRoute) { popUpTo(LoginRoute) { inclusive = true } } })

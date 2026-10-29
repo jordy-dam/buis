@@ -28,6 +28,9 @@ data class UserPrefs(
     /** Preferred subtitle language, empty = off. */
     val subtitleLang: String = "",
     val showClock: Boolean = true,
+    /** Bedtijd in minutes after midnight, -1 = off. */
+    val bedtime: Int = -1,
+    val bedtimeDays: Int = 79,
 )
 
 private val Context.settings by preferencesDataStore("settings")
