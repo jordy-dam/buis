@@ -1,82 +1,64 @@
 # Handoff — feature work
 
+---
+session_date: 2026-10-29
+tool: Claude Code
+session_focus: Phase 2g "volgen" from plan to tv, plus everything Jordy asked for while trying it
+---
+
 ## TL;DR for the next person
-Phase 1 runs on the real tv (TCL Smart TV Pro, Android 14, 32-bit) with Jordy's real subscription.
-Phase 2a "vinden" is on the tv but not yet tried by Jordy. Phase 2b "huishouden" (profiles, Home,
-PIN, kids profile) is built and tested on the emulator, not on the tv:
-`docs/plans/2026-10-28-phase-2b-huishouden.md`. 2b is installed on the tv. Phase 2c "kijken" (full EPG,
-compact channel list, collapsing rail, search on top) is built and emulator-tested, not on the tv:
-`docs/plans/2026-10-28-phase-2c-kijken.md` (on the tv). Phase 2d "bladeren" (release build with R8,
-Films/Series as list + grid with Diensten/Genres, series genre chips, calmer channel rows) is built
-and emulator-tested: `docs/plans/2026-10-28-phase-2d-bladeren.md`. 2d is on the tv (release); janky
-frames went from 20% to 5%. Phase 2e "verfijnen" (quiet focus, one step smaller, Home channel
-cards, avatar top left, "Profiel bewerken" in Instellingen, film genres via background
-`get_vod_info`) is built and emulator-tested: `docs/plans/2026-10-28-phase-2e-verfijnen.md`.
-2e is on the tv. Phase 2f "eigen gezicht" (logo, icon and banner, five drawn avatars, one tile per
-film with a version choice, text one step smaller, screen kept on while playing) is built and
-emulator-tested: `docs/plans/2026-10-28-phase-2f-eigen-gezicht.md`. 2f is on the tv. Phase 2g "volgen" is
-planned in four parts (`docs/plans/2026-10-29-phase-2g-volgen.md`); part 1 (neutral palette with logo
-blue/amber/red, light-bar focus, Left = vorige zender) is built and on the tv (2026-10-29); part 2 (next episode by itself, sleep timer per profile) and a polish round (subtle focus, smaller avatars, clearer Instellingen, pinned services, schema 9) are built and on the tv (2026-10-29, schema 7 → 9 migrated with profile, favourites and positions intact). Part 3 (vanaf begin via timeshift, schema 10) and the Vastgezet panel are built and installed on the tv (2026-10-29; the app process started, the screen itself not seen: the tv was in its idle screensaver). "Uit Verder kijken" is on the tv too (2026-10-29). Part 4 (volgen + reminders, schema 11), the version list and the held-key fix are installed on the tv (2026-10-29). Since then also on the tv: one block per term, description matching, corner reminder card, guide per channel (Right), pinned live categories, guide covering pins and favourites, and text one step smaller (kept). One-off reminders from the guide (schema 12) and the safer Uitloggen + Alles wissen are on the tv too.
+BUIS runs on the real tv (TCL Smart TV Pro, Android 14) with Jordy's subscription, as a release build.
+Everything through phase 2g is on the tv and Jordy is happy with it. The code is on GitHub:
+`git@github-personal:jordy-dam/buis.git` (private, personal account), `main` = current state (776e166).
+Plan and per-part notes: `docs/plans/2026-10-29-phase-2g-volgen.md`. Decisions: `.agents/decisions/product.md`.
 
-## Current phase
-Phase 1 — done and tested on the real tv. Phase 2a — built and installed on the tv (not started yet
- by Jordy); open: EPG check on the tv. Phase 2b to 2e — on the tv. Phase 2f — built, emulator-tested (debug and release), not on the tv.
+## State
+**Where we are:**
+- On the tv (schema 12): neutral palette (logo blue = selected/values, amber = live, red = heart), subtle grey
+  focus, text one step smaller (kept, 12sp floor — never smaller); Left = vorige zender; next episode by itself;
+  sleep timer per profile; vanaf begin via Xtream timeshift; pinned categories (Films, Series, Live TV) on a
+  light-blue "Vastgezet" panel; Uit Verder kijken (long-press); version list behind one button.
+- Volgen: terms per profile (Instellingen → Volgen, also from the reminder card), title + description match,
+  back-to-back matches folded into one block, "Straks voor jou" on Home (one tile per term + every one-off),
+  corner reminder card 5 min before and at the start. Guide per channel: Right on a channel row; OK on a later
+  programme = one-off reminder (table `reminder`), long-press = follow the title.
+- The stored guide covers preferred countries + every profile's pinned live categories + favourite channels.
+- Uitloggen keeps profiles, history, terms and film details (`SubscriptionData`); another server clears only
+  provider-id data. "Alles wissen" wipes everything behind a grown-up PIN.
 
-## What's working (emulator + mock server)
-- Login with validation and Dutch error states (wrong password, expired, unreachable, not Xtream)
-- Catalog sync into Room with progress (13.5k items in ~1s locally); daily re-sync on launch
-- Live TV: categories | channels with logo + now-playing (short EPG); zapping ↑/↓ with .m3u8 → .ts fallback
-- Films and Series: category rows, detail screen with hero, seasons/episodes, play
-- Player: Media3 + FFmpeg audio, resume for films and episodes (also after a force-stop)
-- Favourites: long-press OK or Menu on any tile; Favorieten tab; zapping inside favourite channels
-- Back chain player → detail → list → Live TV → "Afsluiten?" dialog; focus restored on return
-- Instellingen (bottom of the rail): "Voor <naam>" (countries, filter) and "Voor iedereen" (catalog, subscription, "Uitloggen" forgets the subscription and catalog but keeps profiles, history and film details; another server clears favourites, history and film details)
-- Profiles (2b): "Wie kijkt er?" on launch with 2+ profiles, avatar at the top of the rail, per-profile favourites/positions/countries, optional PIN, kids profile hiding adult categories
-- Home (2b): start tab with "Verder kijken", "Favoriete zenders", "Recent toegevoegd"
-- Guide (2c): full XMLTV in Room, refreshed on start (>20 h), after a sync and via "Gids vernieuwen"; `NU ·` + progress on every channel, "Straks" strip, aliases for channels without an EPG id
-- Layout (2c): one-line 48dp channel rows, rail collapses to icons in the content, Zoeken first in the rail, 104dp posters
-- Browsing (2d): Films/Series = category list (Diensten, Genres, Overig) + grid; series genre chips; channel rows with heart before the number and a fixed quality/catch-up slot
-- Look (2f): round logo as icon/banner/picker header (`docs/brand/make-logo.sh`), five drawn avatars ("Gezicht"), one tile per film with versions on the detail screen, screen kept on while playing
-- Look and zapping (2g part 1): neutral greys, `Brand`/`Live`/`Heart` colours, focus as a light bar with dark text (`Focus.bar()`, `onLight()`), Left in the live player flips to the previous channel across categories (`ChannelHistory`)
-- Refinements (2e): quiet focus on list rows, one step smaller type/tiles, 5-column grid, Home channel cards, avatar top of the rail, "Profiel bewerken" in Instellingen, film genre chips fed by `MovieEnricher` (status under Instellingen → "Filmgegevens")
+**Last completed step:** `main` created from feat/phase-2a and pushed.
 
-## What's not (yet)
-- EPG grid, hide/reorder categories, ratings, service rows (after measuring) and phase 3 (suggestions)
-- Sleep warning and stop not yet seen on a screen (unit-tested)
-- No themes (decided against, see `product.md`)
+**Mid-flight:** nothing — clean break. Jordy still has to set `main` as default branch on github.com.
 
-## Emulator gotchas
-- The emulator clock can drift hours behind after a suspend; the mock guide is generated around real
-  time, so "NU" disappears. Resync: `adb -s emulator-5554 shell cmd alarm set-time $(($(date +%s)*1000))`.
-- The Google TV system image ships with `hw.keyboard=no`: the Mac keyboard does nothing until it's
-  set to `yes` in `~/.android/avd/tv_1080p.avd/config.ini` (done on this machine).
-- After a cold boot Google TV may show "Choose an account" on top; press Back and relaunch the app.
-- Screenshots: `adb exec-out screencap -p` can hang; guard it with a timeout that returns as soon as the capture is done (a plain `sleep 12; kill` costs 12 s per shot).
-- The mock server serves `xmltv.php` too (2c); "NPO 2 HD" has no EPG id and borrows "NPO 2"'s after a catalog sync.
-- When restarting the mock server, kill only the listener (`lsof -ti tcp:8080 -sTCP:LISTEN`): the
-  emulator process also holds a connection on 8080 and dies with a plain `lsof -ti tcp:8080`.
-
-## Decisions made & why
-- `.agents/decisions/architecture.md`: Media3 pinned to 1.9.0 for FFmpeg, no Retrofit, Tink credentials, fail-fast 4xx, SDK 37
-- `.agents/decisions/product.md`: phase split 2a/2b, BUIS name, 2b profiles + Home + kids profile
-- `.agents/decisions/architecture.md` (2b): active profile = last used, settings on the profile row, PIN as household lock
-
-## How to run locally
-See `.agents/onboarding/new-dev.md` (mock server: `./mockserver/generate-media.sh`, then `./gradlew :mockserver:run`).
+## Next up
+1. Start new work from `main` on a fresh branch (not on feat/phase-2a).
+2. Wait for Jordy's report on vanaf begin on real channels (↺ on Viaplay F1/ESPN? seeking in timeshift?) — fix only if needed.
+3. Candidates when he asks: number-key zapping (parked), auto-play into a Home "Jouw diensten" row,
+   phase 3 suggestions (service suggestions belong there), a full EPG grid.
 
 ## Open questions
-- Does `xmltv.php` cover the Dutch channels? Only 45% of them have an EPG id (spike in 2a).
-- Does Jordy's panel allow seeking inside a timeshift stream, and do Viaplay/ESPN have `tv_archive`? (stored since part 3; check on the tv)
+- Does Jordy's panel allow seeking inside a timeshift stream?
+- Old guide-OK title follows (e.g. "De Bondgenoten") are Volgen terms Jordy may want to remove.
 
-## Real-tv notes
-- Install over Ethernet: USB debugging on, `adb connect 192.168.68.91:5555` (see onboarding).
-- Every `adb install` stops the running app on the tv ("package updated" in `dumpsys activity exit-info nl.jordy.iptv`); only install when Jordy says so, ideally while nobody watches.
-- The TCL starts Google TV's screensaver after 10 min without a key press (`screen_off_timeout` 600000); the player keeps the screen on while playing (2f).
-- The tv runs the **release** build (`assembleRelease`, signed with the debug key): `adb -s 192.168.68.91:5555 install -r app/build/outputs/apk/release/app-release.apk`. Release isn't debuggable, so `run-as` (reading its database) doesn't work there.
-- Frame times on the tv (`adb shell dumpsys gfxinfo nl.jordy.iptv`, `… reset` to start fresh): debug build 20% janky, p90 85 ms, p99 400 ms; release + R8 5.2% janky, p90 36 ms, p99 150 ms.
-- With the emulator also running, `./gradlew installDebug` installs on both: use `adb -s <device> install -r`.
-- The tv's default keyboard was the Google TV remote bridge (no on-screen keyboard); switch to the
-  TCL keyboard in the tv settings, or type via the Google TV app on a phone.
+## Don't forget
+- Every `adb install` stops the running app on the tv: only install when Jordy says so; always `install -r`
+  (an uninstall would wipe the household). Release build: `./gradlew :app:assembleRelease`, then
+  `adb -s 192.168.68.91:5555 install -r app/build/outputs/apk/release/app-release.apk`. adb lives in
+  `/opt/homebrew/share/android-commandlinetools/platform-tools/`. Release isn't debuggable (no `run-as`).
+- The tv often sits in its screensaver when installing: the app starts but the screen can't be checked.
+- Room schema JSON is written during the build; a new migration test may need a second test run.
+- gh CLI is logged into the work account; push to the personal repo via the `github-personal` SSH alias.
+
+## Emulator gotchas
+- Clock drifts after a suspend (mock guide then has no "NU"): `adb -s emulator-5554 shell cmd alarm set-time $(($(date +%s)*1000))`.
+  Setting it to e.g. hh:26 is how reminders were tested.
+- Google TV may show "Set up Google TV" on top: Back, relaunch. Profile picker first: OK on Bas before navigating.
+- Screenshots: `adb shell screencap -p /sdcard/s.png` + `adb pull` is reliable; `exec-out` can hang.
+- Mock server: `./gradlew :mockserver:run` (login demo/demo at 10.0.2.2:8080); has archive channels and
+  `/timeshift/`; restart by killing only the listener (`lsof -ti tcp:8080 -sTCP:LISTEN`).
+
+## How to run locally
+See `.agents/onboarding/new-dev.md` (mock media: `./mockserver/generate-media.sh`).
 
 ## Who to ask
-- Jordy: owner, tests on the real Google TV
+- Jordy: owner, tests on the real Google TV.
