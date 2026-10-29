@@ -33,9 +33,9 @@ New since: `docs/brainstorm.md` (open idea list) and **Pauzemoment** on branch `
 
 - Phase 2h on the same branch (schema 20): Opties in the player, Bedtijd, Kijkgeschiedenis + weekoverzicht,
   Zenderstatus, Intro overslaan, Stemming/lengte, instant replay, Testbeeld easter egg, round PIN keys,
-  screensaver. Plan: `docs/plans/2026-10-29-phase-2h-brainstorm.md`. Emulator-tested; on the tv since 15:47 (release, 779bdd9); screensaver not switched on there.
+  screensaver. Plan: `docs/plans/2026-10-29-phase-2h-brainstorm.md`. Emulator-tested; on the tv since 16:11 (release fee9212, incl. icons, shorter Instellingen, Opties fix, Versie row); screensaver not switched on there.
 
-**Last completed step:** phase 2h installed on the tv (release 779bdd9, schema 14 → 20); started fine.
+**Last completed step:** icons + Instellingen round installed on the tv (release fee9212); started fine.
 
 **Mid-flight:** nothing — clean break. Jordy still has to set `main` as default branch on github.com.
 
