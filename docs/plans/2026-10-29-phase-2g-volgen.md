@@ -191,3 +191,4 @@ only tile, row disappears and focus lands on the rail. Moving focus to a neighbo
   to 11:26 and 11:30: "Over 4 min · Sport 101 · NPO 1", Later, "Nu begonnen", Kijken plays NPO 1.
 - Not done: following a programme straight from the guide/player (terms are typed in Instellingen), and
   tying a term to one channel. Whether F1 shows up depends on how the Ziggo guide titles it.
+- Installed on the tv (release, 2026-10-29 11:23): install succeeded, app process started, no crash in the log; the screen was in the Google TV screensaver, so not seen.
