@@ -55,6 +55,7 @@ import androidx.tv.material3.Text
 import kotlinx.coroutines.delay
 import nl.jordy.iptv.player.PlayerViewModel
 import nl.jordy.iptv.player.PlayerUiState
+import nl.jordy.iptv.player.REPLAY_MS
 import nl.jordy.iptv.ui.settings.SettingRow
 import androidx.compose.runtime.produceState
 import androidx.compose.ui.platform.LocalContext
@@ -97,6 +98,8 @@ fun PlayerScreen(onExit: () -> Unit, vm: PlayerViewModel = hiltViewModel()) {
     var duration by remember { mutableLongStateOf(0L) }
     // Audio, subtitles and the clock: Down in a film or episode, Right in live (Down zaps there).
     var optionsOpen by remember { mutableStateOf(false) }
+    // Instant replay: this hold of Left already rewound, so its release isn't "vorige zender".
+    var leftHeld by remember { mutableStateOf(false) }
 
     LaunchedEffect(overlayTick) {
         overlayVisible = true
@@ -159,8 +162,26 @@ fun PlayerScreen(onExit: () -> Unit, vm: PlayerViewModel = hiltViewModel()) {
             .background(Color.Black)
             .focusRequester(focus)
             .onKeyEvent { e ->
-                if (e.type != KeyEventType.KeyDown) return@onKeyEvent false
                 val code = e.key.nativeKeyCode
+                // Live: Left is "vorige zender" when released; held, it rewinds (instant replay).
+                val liveLeft = vm.isLive && state.catchup == null && code == KeyEvent.KEYCODE_DPAD_LEFT && !optionsOpen &&
+                    state.sleepSecondsLeft == null && state.breakSecondsLeft == null
+                if (liveLeft) {
+                    vm.userActive()
+                    if (e.type == KeyEventType.KeyDown) {
+                        if (e.nativeKeyEvent.repeatCount > 0 && !leftHeld) {
+                            leftHeld = true
+                            vm.replay()
+                            overlayTick++
+                        }
+                    } else if (e.type == KeyEventType.KeyUp) {
+                        if (!leftHeld) vm.previousChannel()
+                        leftHeld = false
+                        overlayTick++
+                    }
+                    return@onKeyEvent true
+                }
+                if (e.type != KeyEventType.KeyDown) return@onKeyEvent false
                 // The sleep timer's "still watching?": the key that answers it does nothing else.
                 val wasAsking = state.sleepSecondsLeft != null
                 vm.userActive()
@@ -187,10 +208,13 @@ fun PlayerScreen(onExit: () -> Unit, vm: PlayerViewModel = hiltViewModel()) {
                 val handled = if (live) when (code) {
                     KeyEvent.KEYCODE_DPAD_UP, KeyEvent.KEYCODE_CHANNEL_UP -> { vm.zap(+1); true }
                     KeyEvent.KEYCODE_DPAD_DOWN, KeyEvent.KEYCODE_CHANNEL_DOWN -> { vm.zap(-1); true }
-                    KeyEvent.KEYCODE_DPAD_LEFT, KeyEvent.KEYCODE_LAST_CHANNEL -> { vm.previousChannel(); true }
+                    KeyEvent.KEYCODE_LAST_CHANNEL -> { vm.previousChannel(); true }
                     KeyEvent.KEYCODE_DPAD_RIGHT -> { optionsOpen = true; true }
                     // First OK shows the info with "OK · vanaf begin"; OK while it shows starts it.
-                    KeyEvent.KEYCODE_DPAD_CENTER, KeyEvent.KEYCODE_ENTER -> { if (overlayVisible && state.canRestart) vm.watchFromStart(); true }
+                    KeyEvent.KEYCODE_DPAD_CENTER, KeyEvent.KEYCODE_ENTER -> {
+                        if (state.replaying) vm.goLive() else if (overlayVisible && state.canRestart) vm.watchFromStart()
+                        true
+                    }
                     KeyEvent.KEYCODE_INFO -> true
                     else -> false
                 } else when (code) {
@@ -283,10 +307,15 @@ private fun LiveInfo(state: nl.jordy.iptv.player.PlayerUiState) {
     }
     state.next?.let { Text("Straks ${clock.format(Instant.ofEpochSecond(it.start))}  ${it.title}", style = MaterialTheme.typography.bodyLarge, color = TextSecondary) }
     Text(
-        "▲▼ andere zender" + (state.previous?.let { "   ◀ terug naar $it" } ?: "") + (if (state.canRestart) "   OK vanaf begin" else "") + "   ▶ opties",
+        when {
+            state.replaying -> "⟲ ${REPLAY_MS / 1000} s terug gespoeld   OK naar live   ◀ vasthouden: verder terug"
+            else -> "▲▼ andere zender   ◀ " + (state.previous?.let { "terug naar $it, " } ?: "") + "vasthouden: terugspoelen" +
+                (if (state.canRestart) "   OK vanaf begin" else "") + "   ▶ opties"
+        },
         style = MaterialTheme.typography.bodyMedium,
         color = TextSecondary,
     )
+    state.replayHint?.let { Text(it, style = MaterialTheme.typography.bodyMedium, color = Live) }
 }
 
 /** A live programme from its start: the channel, the programme, film-style position and keys. */

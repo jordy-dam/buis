@@ -85,12 +85,19 @@ data class PlayerUiState(
     val subtitles: List<TrackOption> = emptyList(),
     val subtitleSelected: Int? = null,
     val showClock: Boolean = true,
+    /** Live: watching a little behind live after holding Left; OK goes back to live. */
+    val replaying: Boolean = false,
+    /** Live: why holding Left did nothing, for the info bar. */
+    val replayHint: String? = null,
     /** Episodes: where "Intro overslaan" jumps to, while the card shows. */
     val skipIntroTo: Long? = null,
 )
 
 /** One audio or subtitle track: its name and where it sits in the player's track groups. */
 data class TrackOption(val label: String, val group: Int, val track: Int)
+
+/** Instant replay: how far one hold of Left goes back in live. */
+const val REPLAY_MS = 10_000L
 
 /** [secondsLeft] counts down to the next episode; null means it waits for OK ("Kijk je nog?"). */
 data class NextUpCard(val code: String, val title: String, val secondsLeft: Int?)
@@ -133,6 +140,8 @@ class PlayerViewModel @Inject constructor(
             DefaultLoadControl.Builder()
                 // Start rendering after 1s of buffer instead of the default 2.5s: the biggest single zap-time win.
                 .setBufferDurationsMs(15_000, 50_000, 1_000, 2_500)
+                // Keep the last minute: instant replay in live seeks back into it instead of refetching.
+                .setBackBuffer(60_000, true)
                 .build(),
         )
         .setMediaSourceFactory(
@@ -574,6 +583,23 @@ class PlayerViewModel @Inject constructor(
         val to = if (player.duration > 0) target.coerceAtMost(player.duration) else target
         if (route.kind == PlayerRoute.Kind.EPISODE) introLearner.seeked(from, to)
         player.seekTo(to)
+    }
+
+    // Instant replay (live)
+
+    /** Holding Left in live: 10 seconds back, as far as the stream lets you seek. */
+    fun replay() {
+        if (!player.isCurrentMediaItemSeekable) {
+            _state.update { it.copy(replayHint = "Terugspoelen kan niet op deze zender") }
+            return
+        }
+        player.seekTo((player.currentPosition - REPLAY_MS).coerceAtLeast(0))
+        _state.update { it.copy(replaying = true, replayHint = null) }
+    }
+
+    fun goLive() {
+        player.seekToDefaultPosition()
+        _state.update { it.copy(replaying = false) }
     }
 
     // Intro overslaan
