@@ -11,6 +11,7 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.focusGroup
 import androidx.compose.foundation.focusable
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -33,6 +34,7 @@ import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Forward30
 import androidx.compose.material.icons.filled.KeyboardArrowDown
 import androidx.compose.material.icons.filled.KeyboardArrowLeft
+import androidx.compose.material.icons.filled.KeyboardArrowRight
 import androidx.compose.material.icons.filled.KeyboardArrowUp
 import androidx.compose.material.icons.filled.LiveTv
 import androidx.compose.material.icons.filled.Pause
@@ -57,11 +59,13 @@ import androidx.compose.runtime.setValue
 import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.focus.FocusDirection
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusProperties
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.focus.focusRestorer
 import androidx.compose.ui.focus.onFocusChanged
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.ColorFilter
 import androidx.compose.ui.graphics.vector.ImageVector
@@ -147,6 +151,9 @@ private val clock = DateTimeFormatter.ofPattern("HH:mm").withZone(ZoneId.systemD
 /** How long the bar stays after the last key while something plays. Paused, it stays. */
 private const val BAR_MS = 5_000L
 
+/** How long the progress line waits after the last Left/Right before it seeks there. */
+private const val SCRUB_SETTLE_MS = 800L
+
 /** How long after a pop-up went an OK still counts as meant for it (and is dropped). */
 private const val CARD_GRACE_MS = 700L
 
@@ -155,11 +162,11 @@ private enum class Choice { AUDIO, SUBTITLES }
 
 /**
  * The player. Everything you steer sits in one bar at the bottom: title, clock, progress, and a row
- * of round controls. Plain playback keeps its keys (VOD: OK pause, Left/Right seek; live: Up/Down
- * zap, Left previous channel) while the bar only shows; the controls take focus when they're asked
- * for: Down in a film, Right in live, or a pause. Audio and subtitles open their choices in place,
- * above their button. Back closes the innermost layer first: the choices, then the controls; Up or
- * Down also leaves the controls.
+ * of round controls. Two modes, never mixed: without the buttons the arrows steer the picture (VOD:
+ * Left/Right seek; live: Up/Down zap, Left previous channel) and the bar says so; OK (or Down in a
+ * film, or a pause) brings the buttons, and from then on every arrow moves within the bar, Up to the
+ * progress line to scrub. Audio and subtitles open their choices in place, above their button. Only
+ * Back leaves, the innermost layer first: the choices, then the controls.
  */
 @OptIn(UnstableApi::class)
 @Composable
@@ -337,23 +344,14 @@ fun PlayerScreen(onExit: () -> Unit, vm: PlayerViewModel = hiltViewModel()) {
                     return@onKeyEvent true
                 }
                 if (controls || card != null) {
-                    // Media keys still work; d-pad and OK belong to the focused control.
+                    // Media keys still work; d-pad and OK belong to the focused control. The arrows
+                    // never leave the bar (an edge just stops, see [stayIn]): only Back does.
                     if (e.type != KeyEventType.KeyDown) return@onKeyEvent false
-                    // The row is flat: Up or Down leaves it, back to the picture (no zap yet), and so
-                    // does Left on the first button. Its release must not count as "vorige zender".
-                    val inRow = controls && card == null && choice == null && panel != Panel.CHANNELS
-                    val vertical = code == KeyEvent.KEYCODE_DPAD_UP || code == KeyEvent.KEYCODE_DPAD_DOWN
-                    val leftOut = inRow && code == KeyEvent.KEYCODE_DPAD_LEFT && buttons.onFirst
-                    return@onKeyEvent when {
-                        inRow && vertical -> { closeControls(); overlayTick++; true }
-                        leftOut -> { leftHeld = true; closeControls(); overlayTick++; true }
-                        else -> when (code) {
-                            KeyEvent.KEYCODE_MEDIA_PLAY_PAUSE -> { vm.togglePause(); true }
-                            KeyEvent.KEYCODE_MEDIA_PLAY -> { vm.player.play(); true }
-                            KeyEvent.KEYCODE_MEDIA_PAUSE -> { vm.player.pause(); true }
-                            // Left/Right move between the choices; a row's edges stop focus (see [stayIn]).
-                            else -> false
-                        }
+                    return@onKeyEvent when (code) {
+                        KeyEvent.KEYCODE_MEDIA_PLAY_PAUSE -> { vm.togglePause(); true }
+                        KeyEvent.KEYCODE_MEDIA_PLAY -> { vm.player.play(); true }
+                        KeyEvent.KEYCODE_MEDIA_PAUSE -> { vm.player.pause(); true }
+                        else -> false
                     }
                 }
                 // Live: Left is "vorige zender" when released; held, it rewinds (instant replay).
@@ -382,12 +380,11 @@ fun PlayerScreen(onExit: () -> Unit, vm: PlayerViewModel = hiltViewModel()) {
                     KeyEvent.KEYCODE_DPAD_UP, KeyEvent.KEYCODE_CHANNEL_UP -> { vm.zap(+1); true }
                     KeyEvent.KEYCODE_DPAD_DOWN, KeyEvent.KEYCODE_CHANNEL_DOWN -> { vm.zap(-1); true }
                     KeyEvent.KEYCODE_LAST_CHANNEL -> { vm.previousChannel(); true }
-                    // Down zaps in live, so Right opens the controls: on vanaf begin / terug naar live
-                    // when there is one, else on audio. Left from the first button goes back out.
-                    KeyEvent.KEYCODE_DPAD_RIGHT -> { openControls(if (state.replaying || state.canRestart) buttons.play else buttons.audio); true }
-                    // First OK shows the info with the restart button; OK while it shows starts it.
+                    // The arrows zap, so OK alone brings the controls: on vanaf begin / terug naar live
+                    // when there is one, else on the channel logo. Right only shows the bar.
+                    KeyEvent.KEYCODE_DPAD_RIGHT -> true
                     KeyEvent.KEYCODE_DPAD_CENTER, KeyEvent.KEYCODE_ENTER -> {
-                        if (state.replaying) vm.goLive() else if (overlayVisible && state.canRestart) vm.watchFromStart()
+                        openControls(if (state.replaying || state.canRestart) buttons.play else buttons.channels)
                         true
                     }
                     // The remote's info key: the programme info, in the controls so Back steps out as usual.
@@ -472,6 +469,7 @@ fun PlayerScreen(onExit: () -> Unit, vm: PlayerViewModel = hiltViewModel()) {
                     restart = vm::watchFromStart,
                     toLive = { if (state.catchup != null) vm.backToLive() else vm.goLive() },
                     clock = vm::toggleClock,
+                    seekTo = { to -> vm.seekBy(to - vm.player.currentPosition); position = to },
                     audio = { i -> vm.selectAudio(i); choice = null; focusTarget = buttons.audio },
                     subtitle = { i -> vm.selectSubtitle(i); choice = null; focusTarget = buttons.subtitles },
                 ),
@@ -518,6 +516,11 @@ private enum class Panel { INFO, CHANNELS }
 /** Focus can move inside this group but not out of it: a row of choices has edges, not exits. */
 private fun Modifier.stayIn() = focusProperties { onExit = { cancelFocusChange() } }.focusGroup()
 
+/** Like [stayIn], but only the row's ends stop: Up still reaches the progress line above it. */
+private fun Modifier.stopsSideways() = focusProperties {
+    onExit = { if (requestedFocusDirection == FocusDirection.Left || requestedFocusDirection == FocusDirection.Right) cancelFocusChange() }
+}.focusGroup()
+
 /** Focus handles of the bar's buttons, so a key can land on the right one. */
 private class ControlFocus {
     val play = FocusRequester()
@@ -529,8 +532,6 @@ private class ControlFocus {
     val channels = FocusRequester()
     /** The playing channel in the open channel list. */
     val firstChannel = FocusRequester()
-    /** Focus is on the row's first button, where Left leaves the controls. */
-    var onFirst = false
 }
 
 private class BarActions(
@@ -540,14 +541,16 @@ private class BarActions(
     val restart: () -> Unit,
     val toLive: () -> Unit,
     val clock: () -> Unit,
+    /** To a position picked on the progress line. */
+    val seekTo: (Long) -> Unit,
     val audio: (Int) -> Unit,
     val subtitle: (Int?) -> Unit,
 )
 
 /**
- * The one control surface: what's on (title, programme, progress), the clock top right, and a row
- * of round controls in remote order (back left, play/pause in the middle, forward right), then
- * audio, subtitles and the clock switch. A track list opens above its own button, in the same bar.
+ * The one control surface, slim over a fade: what's on, start and end over a thin progress line, the
+ * clock top right, and a row of round controls in remote order (back left, play/pause in the middle,
+ * forward right), then audio, subtitles and the clock switch. A track list opens above its own button, in the same bar.
  */
 @Composable
 private fun PlayerBar(
@@ -573,35 +576,57 @@ private fun PlayerBar(
     // The focused control's name: icons alone don't say what OK will do.
     var focused by remember { mutableStateOf<String?>(null) }
     val named: (String, Boolean) -> Unit = { label, has -> if (has) focused = label else if (focused == label) focused = null }
+    // A position picked on the progress line, not yet sought to: the bar shows it instead.
+    var scrub by remember { mutableStateOf<Long?>(null) }
+    LaunchedEffect(scrub) {
+        val to = scrub ?: return@LaunchedEffect
+        delay(SCRUB_SETTLE_MS)
+        actions.seekTo(to)
+        scrub = null
+    }
+    val shown = scrub ?: position
     Column(
         Modifier
-            .padding(start = SafeArea, end = SafeArea, bottom = 32.dp)
             .fillMaxWidth()
-            // The pop-up surface, as a panel: the bar, its track lists and the cards are one family.
-            .background(PopupSurface, RoundedCornerShape(16.dp))
-            .padding(horizontal = 24.dp, vertical = 18.dp)
+            // No panel: a fade over the bottom of the picture, so the bar is text and a line on the image.
+            .background(Brush.verticalGradient(0f to Color.Transparent, 1f to Color.Black.copy(alpha = 0.8f)))
+            .padding(start = SafeArea, end = SafeArea, top = SafeArea, bottom = 28.dp)
             .onGloballyPositioned { barX = it.positionInRoot().x; barWidth = it.size.width },
-        verticalArrangement = Arrangement.spacedBy(10.dp),
+        verticalArrangement = Arrangement.spacedBy(8.dp),
     ) {
+        // One title: the programme when the guide knows it (the logo button already names the channel).
+        val programme = catchup ?: state.now?.takeIf { live }
         Row(verticalAlignment = Alignment.Bottom) {
             if (catchup != null || live) state.channelNumber?.let { Text("$it  ", style = MaterialTheme.typography.displaySmall, color = Live) }
-            Text(state.title, style = MaterialTheme.typography.displaySmall, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f))
+            Text(programme?.title ?: state.title, style = MaterialTheme.typography.displaySmall, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f))
             // Subtle, level with the title: a glance at the time without a second bar.
             if (state.showClock) ClockText(Modifier.padding(start = 24.dp))
         }
-        when {
-            catchup != null -> Text("Vanaf begin · ${clock.format(Instant.ofEpochSecond(catchup.start))}  ${catchup.title}", style = MaterialTheme.typography.titleLarge)
-            live -> state.now?.let { now ->
-                Text("${clock.format(Instant.ofEpochSecond(now.start))}–${clock.format(Instant.ofEpochSecond(now.stop))}  ${now.title}", style = MaterialTheme.typography.titleLarge)
-            }
+        // Start and end over the ends of the line: guide times, or position and length.
+        val (from, to) = when {
+            programme != null -> (if (catchup != null) "Vanaf begin · " else "") + clock.format(Instant.ofEpochSecond(programme.start)) to clock.format(Instant.ofEpochSecond(programme.stop))
+            !live && duration > 0 -> formatTime(shown) to formatTime(duration)
+            else -> null to null
+        }
+        if (from != null) Row {
+            Text(from, style = MaterialTheme.typography.bodyLarge, color = TextSecondary, modifier = Modifier.weight(1f))
+            to?.let { Text(it, style = MaterialTheme.typography.bodyLarge, color = TextSecondary) }
         }
         val fraction = when {
             live -> state.now?.let { (System.currentTimeMillis() / 1000 - it.start).toFloat() / (it.stop - it.start).coerceAtLeast(1) }
-            duration > 0 -> position.toFloat() / duration
+            duration > 0 -> shown.toFloat() / duration
             else -> null
         }
-        fraction?.let { ProgressBar(it, thickness = 6.dp) }
-        if (live) state.next?.let { Text("Straks ${clock.format(Instant.ofEpochSecond(it.start))}  ${it.title}", style = MaterialTheme.typography.bodyLarge, color = TextSecondary) }
+        // A film or a programme from the start can be scrubbed: Up from the buttons lands on the line.
+        if (!live && duration > 0) ScrubLine(
+            fraction = fraction ?: 0f,
+            enabled = controls,
+            onStep = { forward, held ->
+                val step = when { held < 8 -> 10_000L; held < 24 -> 30_000L; else -> 120_000L }
+                scrub = ((scrub ?: position) + if (forward) step else -step).coerceIn(0, duration)
+            },
+            onPick = { scrub?.let(actions.seekTo); scrub = null },
+        ) else fraction?.let { ProgressBar(it, thickness = 3.dp) }
 
         // The open track list, above its button.
         choice?.let { c ->
@@ -619,23 +644,19 @@ private fun PlayerBar(
             )
         }
 
-        Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-            // Left: where you are (or, in live, the keys that zap; in the controls those keys
-            // leave the row, so it names the focused button instead).
-            Box(Modifier.weight(1f)) {
-                if (live && controls) {
-                    focused?.let { Text(it, style = MaterialTheme.typography.titleLarge) }
-                } else if (live) {
-                    Hints(
-                        Hint(Icons.Filled.KeyboardArrowUp, Icons.Filled.KeyboardArrowDown),
-                        Hint(Icons.Filled.KeyboardArrowLeft, text = state.previous),
-                    )
-                } else {
-                    Text(formatTime(position), style = MaterialTheme.typography.titleLarge)
-                }
-            }
+        // Without the controls the arrows steer the picture, so no buttons show: just what they do.
+        if (!controls) Hints(
+            *if (live) listOfNotNull(
+                Hint(Icons.Filled.KeyboardArrowUp, Icons.Filled.KeyboardArrowDown, text = "Zappen"),
+                state.previous?.let { Hint(Icons.Filled.KeyboardArrowLeft, text = it) },
+                Hint(text = "OK  Bediening"),
+            ).toTypedArray() else arrayOf(
+                Hint(Icons.Filled.KeyboardArrowLeft, Icons.Filled.KeyboardArrowRight, text = "Spoelen"),
+                Hint(text = "OK  Pauze en bediening"),
+            ),
+        ) else Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
             Row(
-                Modifier.focusRestorer(buttons.play).stayIn(),
+                Modifier.focusRestorer(buttons.play).stopsSideways(),
                 horizontalArrangement = Arrangement.spacedBy(12.dp),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
@@ -643,13 +664,13 @@ private fun PlayerBar(
                     // The channel's logo opens the channel list, like NLZiet's.
                     ChannelButton(
                         state.logoUrl, state.title, controls, named, { onPanel(Panel.CHANNELS) },
-                        Modifier.focusRequester(buttons.channels).onFocusChanged { buttons.onFirst = it.isFocused },
+                        Modifier.focusRequester(buttons.channels),
                     )
                     ControlButton(Icons.Filled.Replay10, "10 seconden terug", controls, named, actions.replay)
                     if (state.replaying) ControlButton(Icons.Filled.LiveTv, "Terug naar live", controls, named, actions.toLive, Modifier.focusRequester(buttons.play))
                     else if (state.canRestart) ControlButton(Icons.Filled.RestartAlt, "Vanaf begin", controls, named, actions.restart, Modifier.focusRequester(buttons.play))
                 } else {
-                    ControlButton(Icons.Filled.Replay10, "10 seconden terug", controls, named, actions.replay, Modifier.onFocusChanged { buttons.onFirst = it.isFocused })
+                    ControlButton(Icons.Filled.Replay10, "10 seconden terug", controls, named, actions.replay)
                     ControlButton(if (playing) Icons.Filled.Pause else Icons.Filled.PlayArrow, if (playing) "Pauze" else "Afspelen", controls, named, actions.playPause, Modifier.focusRequester(buttons.play))
                     ControlButton(Icons.Filled.Forward30, "30 seconden vooruit", controls, named, actions.forward)
                     if (catchup != null) ControlButton(Icons.Filled.LiveTv, "Terug naar live", controls, named, actions.toLive)
@@ -673,11 +694,44 @@ private fun PlayerBar(
                     )
                 }
             }
-            Box(Modifier.weight(1f), contentAlignment = Alignment.CenterEnd) {
-                if (!live && duration > 0) Text(formatTime(duration), style = MaterialTheme.typography.titleLarge, color = TextSecondary)
+            // Right of the buttons: the focused one's name.
+            Box(Modifier.weight(1f).padding(start = 24.dp)) {
+                focused?.let { Text(it, style = MaterialTheme.typography.titleLarge) }
             }
         }
         state.replayHint?.let { Text(it, style = MaterialTheme.typography.bodyMedium, color = Live) }
+    }
+}
+
+/**
+ * The progress line, focusable in the controls: Left/Right move a picked position (bigger steps the
+ * longer the key is held), which is sought to on OK or once the keys rest. Focused, it thickens and
+ * shows a knob, so it's clear the arrows now move the position.
+ */
+@Composable
+private fun ScrubLine(fraction: Float, enabled: Boolean, onStep: (forward: Boolean, held: Int) -> Unit, onPick: () -> Unit) {
+    var focused by remember { mutableStateOf(false) }
+    BoxWithConstraints(
+        Modifier
+            .fillMaxWidth()
+            .height(18.dp)
+            .focusProperties { canFocus = enabled }
+            .onFocusChanged { focused = it.isFocused }
+            .onKeyEvent { e ->
+                if (e.type != KeyEventType.KeyDown) return@onKeyEvent false
+                when (e.key.nativeKeyCode) {
+                    KeyEvent.KEYCODE_DPAD_LEFT -> { onStep(false, e.nativeKeyEvent.repeatCount); true }
+                    KeyEvent.KEYCODE_DPAD_RIGHT -> { onStep(true, e.nativeKeyEvent.repeatCount); true }
+                    KeyEvent.KEYCODE_DPAD_CENTER, KeyEvent.KEYCODE_ENTER -> { onPick(); true }
+                    else -> false
+                }
+            }
+            .focusable(),
+        contentAlignment = Alignment.CenterStart,
+    ) {
+        val f = fraction.coerceIn(0f, 1f)
+        ProgressBar(f, thickness = if (focused) 6.dp else 3.dp)
+        if (focused) Box(Modifier.offset(x = maxWidth * f - 9.dp).size(18.dp).background(TextPrimary, CircleShape))
     }
 }
 
@@ -876,8 +930,8 @@ private fun ChannelButton(
 }
 
 /**
- * NLZiet's "i": what the bar under it doesn't say. The bar already has the channel, the times, the
- * progress and what's next, so this is the time left and the description. Only to read; Back or the
+ * NLZiet's "i": what the bar under it doesn't say. The bar already has the programme, its times and
+ * the progress, so this is the time left, what's next and the description. Only to read; Back or the
  * button again closes it.
  */
 @Composable
@@ -893,6 +947,7 @@ private fun ProgrammeInfo(state: PlayerUiState, modifier: Modifier) {
         }
         val left = ((now.stop - System.currentTimeMillis() / 1000) / 60).coerceAtLeast(0)
         Text("Nog $left min · ${(now.stop - now.start) / 60} min in totaal", style = MaterialTheme.typography.labelLarge, color = Live)
+        state.next?.let { Text("Straks ${clock.format(Instant.ofEpochSecond(it.start))}  ${it.title}", style = MaterialTheme.typography.bodyLarge) }
         Text(
             now.description?.takeIf { it.isNotBlank() } ?: "Geen beschrijving in de gids.",
             style = MaterialTheme.typography.bodyLarge, color = TextSecondary, maxLines = 8, overflow = TextOverflow.Ellipsis,
