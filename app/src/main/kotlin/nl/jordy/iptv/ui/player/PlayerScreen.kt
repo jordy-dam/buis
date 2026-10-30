@@ -476,12 +476,6 @@ fun PlayerScreen(onExit: () -> Unit, vm: PlayerViewModel = hiltViewModel()) {
             )
         }
 
-        if (barShows && panel == Panel.INFO) {
-            ProgrammeInfo(
-                state,
-                Modifier.align(Alignment.BottomStart).padding(start = SafeArea, bottom = lift + 16.dp),
-            )
-        }
         if (panel == Panel.CHANNELS) {
             ChannelList(
                 channels = vm.zapChannels,
@@ -589,11 +583,13 @@ private fun PlayerBar(
         Modifier
             .fillMaxWidth()
             // No panel: a fade over the bottom of the picture, so the bar is text and a line on the image.
-            .background(Brush.verticalGradient(0f to Color.Transparent, 1f to Color.Black.copy(alpha = 0.8f)))
+            .background(Brush.verticalGradient(0f to Color.Transparent, 0.3f to Color.Black.copy(alpha = 0.55f), 1f to Color.Black.copy(alpha = 0.85f)))
             .padding(start = SafeArea, end = SafeArea, top = SafeArea, bottom = 28.dp)
             .onGloballyPositioned { barX = it.positionInRoot().x; barWidth = it.size.width },
         verticalArrangement = Arrangement.spacedBy(8.dp),
     ) {
+        // The programme info grows the bar upward, on the same fade, instead of a box over the picture.
+        if (panel == Panel.INFO) ProgrammeInfo(state, Modifier.padding(bottom = 12.dp))
         // One title: the programme when the guide knows it (the logo button already names the channel).
         val programme = catchup ?: state.now?.takeIf { live }
         Row(verticalAlignment = Alignment.Bottom) {
@@ -930,14 +926,14 @@ private fun ChannelButton(
 }
 
 /**
- * NLZiet's "i": what the bar under it doesn't say. The bar already has the programme, its times and
+ * NLZiet's "i", at the top of the bar: what the rest of the bar doesn't say. The bar already has the programme, its times and
  * the progress, so this is the time left, what's next and the description. Only to read; Back or the
  * button again closes it.
  */
 @Composable
 private fun ProgrammeInfo(state: PlayerUiState, modifier: Modifier) {
     Column(
-        modifier.width(720.dp).background(PopupSurface, RoundedCornerShape(16.dp)).border(1.dp, FocusFill, RoundedCornerShape(16.dp)).padding(24.dp),
+        modifier.width(720.dp),
         verticalArrangement = Arrangement.spacedBy(8.dp),
     ) {
         val now = state.now
@@ -946,7 +942,7 @@ private fun ProgrammeInfo(state: PlayerUiState, modifier: Modifier) {
             return@Column
         }
         val left = ((now.stop - System.currentTimeMillis() / 1000) / 60).coerceAtLeast(0)
-        Text("Nog $left min · ${(now.stop - now.start) / 60} min in totaal", style = MaterialTheme.typography.labelLarge, color = Live)
+        Text("Nog $left min · ${(now.stop - now.start) / 60} min in totaal", style = MaterialTheme.typography.bodyLarge, color = Live)
         state.next?.let { Text("Straks ${clock.format(Instant.ofEpochSecond(it.start))}  ${it.title}", style = MaterialTheme.typography.bodyLarge) }
         Text(
             now.description?.takeIf { it.isNotBlank() } ?: "Geen beschrijving in de gids.",
