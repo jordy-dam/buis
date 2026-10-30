@@ -40,6 +40,7 @@ import nl.jordy.iptv.data.db.SeriesIntroEntity
 import nl.jordy.iptv.data.db.LiveChannelEntity
 import nl.jordy.iptv.data.profile.ProfileRepository
 import nl.jordy.iptv.data.repo.EpgRepository
+import nl.jordy.iptv.data.repo.GuideRepository
 import nl.jordy.iptv.data.repo.MovieEnricher
 import nl.jordy.iptv.data.repo.LibraryRepository
 import nl.jordy.iptv.data.repo.ChannelHealthRepository
@@ -115,6 +116,7 @@ class PlayerViewModel @Inject constructor(
     private val credentialStore: CredentialStore,
     private val db: AppDatabase,
     private val library: LibraryRepository,
+    private val guides: GuideRepository,
     private val epg: EpgRepository,
     private val enricher: MovieEnricher,
     private val history: ChannelHistory,
@@ -236,13 +238,15 @@ class PlayerViewModel @Inject constructor(
 
     private suspend fun loadZapList(): List<LiveChannelEntity> {
         val dao = db.catalog()
-        return when (val cat = zapCategory) {
-            null -> emptyList()
-            PlayerRoute.FAVORITES_CATEGORY -> {
-                val favs = library.favorites().first().filter { it.type == ContentType.LIVE }
-                val byId = dao.liveByIds(favs.map { it.itemId }).associateBy { it.streamId }
-                favs.mapNotNull { byId[it.itemId] }
+        val cat = zapCategory
+        val guide = PlayerRoute.guideId(cat)
+        return when {
+            guide != null -> {
+                val ids = guides.channels(guide).map { it.streamId }
+                val byId = dao.liveByIds(ids).associateBy { it.streamId }
+                ids.mapNotNull { byId[it] }
             }
+            cat == null -> emptyList()
             else -> dao.liveInCategory(cat)
         }
     }

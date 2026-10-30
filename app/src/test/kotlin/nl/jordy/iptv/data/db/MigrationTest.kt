@@ -351,6 +351,33 @@ class MigrationTest {
         }
     }
 
+    @Test
+    fun `24 to 25 turns each profile's favourite channels into Mijn gids, in the order Favorieten showed`() {
+        helper.createDatabase(DB, 24).use { db ->
+            db.execSQL("INSERT INTO profile (id, name, avatar, face, pinHash, preferredCountries, onlyPreferred, kids, lastUsedAt, createdAt, pinnedCategories) VALUES (1, 'Anna', 3, 4, NULL, 'NL', 1, 0, 5, 1, '')")
+            db.execSQL("INSERT INTO profile (id, name, avatar, face, pinHash, preferredCountries, onlyPreferred, kids, lastUsedAt, createdAt, pinnedCategories) VALUES (2, 'Bas', 1, 0, NULL, 'NL', 1, 0, 4, 2, '')")
+            db.execSQL("INSERT INTO profile (id, name, avatar, face, pinHash, preferredCountries, onlyPreferred, kids, lastUsedAt, createdAt, pinnedCategories) VALUES (3, 'Cas', 1, 0, NULL, 'NL', 1, 0, 3, 3, '')")
+            db.execSQL("INSERT INTO favorite (profileId, type, itemId, name, imageUrl, addedAt) VALUES (1, 'LIVE', 101, 'NPO 1', 'npo1.png', 10)")
+            db.execSQL("INSERT INTO favorite (profileId, type, itemId, name, imageUrl, addedAt) VALUES (1, 'LIVE', 202, 'Ziggo Sport', NULL, 30)")
+            db.execSQL("INSERT INTO favorite (profileId, type, itemId, name, imageUrl, addedAt) VALUES (1, 'LIVE', 303, 'RTL 4', NULL, 20)")
+            db.execSQL("INSERT INTO favorite (profileId, type, itemId, name, imageUrl, addedAt) VALUES (1, 'MOVIE', 5001, 'Kill Bill', NULL, 40)")
+            db.execSQL("INSERT INTO favorite (profileId, type, itemId, name, imageUrl, addedAt) VALUES (2, 'LIVE', 101, 'NPO 1', NULL, 5)")
+            db.execSQL("INSERT INTO favorite (profileId, type, itemId, name, imageUrl, addedAt) VALUES (3, 'SERIES', 77, 'Baantjer', NULL, 5)")
+        }
+        helper.runMigrationsAndValidate(DB, 25, true, AppDatabase.MIGRATION_24_25).use { db ->
+            assertEquals("one guide per profile with channels, none for a profile without", 2, db.count("guide"))
+            assertEquals(1, db.count("guide WHERE profileId = 1 AND name = '${AppDatabase.FIRST_GUIDE_NAME}'"))
+            db.query("SELECT c.streamId, c.logoUrl FROM guide_channel c JOIN guide g ON g.id = c.guideId WHERE g.profileId = 1 ORDER BY c.position").use {
+                val order = generateSequence { if (it.moveToNext()) it.getInt(0) else null }.toList()
+                assertEquals("newest first, as Favorieten listed them", listOf(202, 303, 101), order)
+            }
+            assertEquals("the logo comes along", 1, db.count("guide_channel WHERE streamId = 101 AND logoUrl = 'npo1.png'"))
+            assertEquals("Bas keeps his own channel", 1, db.count("guide_channel c JOIN guide g ON g.id = c.guideId WHERE g.profileId = 2"))
+            assertEquals("channels aren't favourites twice", 0, db.count("favorite WHERE type = 'LIVE'"))
+            assertEquals("films and series stay favourites", 2, db.count("favorite"))
+        }
+    }
+
     private fun SupportSQLiteDatabase.insertPhase1Data() {
         execSQL("INSERT INTO favorite (type, itemId, name, imageUrl, addedAt) VALUES ('LIVE', 101, '┃NL┃ NPO 1 HD', NULL, 1)")
         execSQL("INSERT INTO playback_position (type, itemId, positionMs, durationMs, updatedAt) VALUES ('MOVIE', 5001, 62000, 180000, 2)")

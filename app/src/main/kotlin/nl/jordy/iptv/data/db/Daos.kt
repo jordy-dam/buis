@@ -193,13 +193,39 @@ interface FavoriteDao {
     suspend fun isFavorite(profileId: Long, type: ContentType, itemId: Int): Boolean
     @Query("SELECT EXISTS (SELECT 1 FROM favorite WHERE profileId = :profileId AND type = :type AND itemId = :itemId)")
     fun observeIsFavorite(profileId: Long, type: ContentType, itemId: Int): Flow<Boolean>
-    /** Favourite channels of every profile: the guide covers them for the whole household. */
-    @Query("SELECT DISTINCT itemId FROM favorite WHERE type = 'LIVE'")
-    suspend fun allLiveIds(): List<Int>
     @Query("SELECT * FROM favorite WHERE profileId = :profileId ORDER BY addedAt DESC")
     fun all(profileId: Long): Flow<List<FavoriteEntity>>
     @Query("SELECT itemId FROM favorite WHERE profileId = :profileId AND type = :type")
     fun ids(profileId: Long, type: ContentType): Flow<List<Int>>
+}
+
+/** A profile's guides and their channels, see [GuideEntity]. */
+@Dao
+interface GuideDao {
+    @Insert suspend fun insert(guide: GuideEntity): Long
+    @Query("UPDATE guide SET name = :name WHERE id = :id")
+    suspend fun rename(id: Long, name: String)
+    @Query("DELETE FROM guide WHERE id = :id")
+    suspend fun delete(id: Long)
+    @Query("SELECT * FROM guide WHERE profileId = :profileId ORDER BY position, id")
+    fun guides(profileId: Long): Flow<List<GuideEntity>>
+    @Query("SELECT * FROM guide WHERE profileId = :profileId ORDER BY position, id")
+    suspend fun guidesNow(profileId: Long): List<GuideEntity>
+
+    @Upsert suspend fun upsertChannels(channels: List<GuideChannelEntity>)
+    @Query("DELETE FROM guide_channel WHERE guideId = :guideId AND streamId = :streamId")
+    suspend fun removeChannel(guideId: Long, streamId: Int)
+    @Query("SELECT * FROM guide_channel WHERE guideId = :guideId ORDER BY position, name")
+    suspend fun channels(guideId: Long): List<GuideChannelEntity>
+    /** Every channel in the profile's guides, each guide in its own order. */
+    @Query(
+        "SELECT c.* FROM guide_channel c JOIN guide g ON g.id = c.guideId WHERE g.profileId = :profileId " +
+            "ORDER BY g.position, g.id, c.position, c.name",
+    )
+    fun channelsOf(profileId: Long): Flow<List<GuideChannelEntity>>
+    /** Channels in any profile's guide: the programme guide covers them for the whole household. */
+    @Query("SELECT DISTINCT streamId FROM guide_channel")
+    suspend fun allChannelIds(): List<Int>
 }
 
 @Dao

@@ -32,11 +32,12 @@ import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import nl.jordy.iptv.data.db.AppDatabase
-import nl.jordy.iptv.data.db.FavoriteEntity
 import nl.jordy.iptv.data.db.MovieEntity
 import nl.jordy.iptv.data.db.PlaybackPositionEntity
 import nl.jordy.iptv.data.profile.ProfileRepository
 import nl.jordy.iptv.data.repo.EpgRepository
+import nl.jordy.iptv.data.repo.Guide
+import nl.jordy.iptv.data.repo.GuideRepository
 import nl.jordy.iptv.data.repo.LibraryRepository
 import nl.jordy.iptv.ui.components.rememberNowAndNext
 import nl.jordy.iptv.data.xtream.ContentType
@@ -97,16 +98,18 @@ data class ContinueItem(
 
 data class HomeState(
     val continueWatching: List<ContinueItem> = emptyList(),
-    val channels: List<FavoriteEntity> = emptyList(),
+    /** The profile's guides that have channels, one row each. */
+    val guides: List<Guide> = emptyList(),
     val recent: List<MovieEntity> = emptyList(),
 ) {
-    val isEmpty get() = continueWatching.isEmpty() && channels.isEmpty() && recent.isEmpty()
+    val isEmpty get() = continueWatching.isEmpty() && guides.isEmpty() && recent.isEmpty()
 }
 
 @HiltViewModel
 class HomeViewModel @Inject constructor(
     private val db: AppDatabase,
     private val library: LibraryRepository,
+    guides: GuideRepository,
     profiles: ProfileRepository,
     private val epg: EpgRepository,
     follows: FollowRepository,
@@ -133,8 +136,8 @@ class HomeViewModel @Inject constructor(
         db.catalog().recentMovies(p.preferredCountries.toList(), p.hideAdult, ROW_SIZE)
     }
 
-    val state = combine(continueWatching, library.favorites(), recent) { cw, favs, rec ->
-        HomeState(cw, favs.filter { it.type == ContentType.LIVE }, rec)
+    val state = combine(continueWatching, guides.guides, recent) { cw, g, rec ->
+        HomeState(cw, g.filter { it.channels.isNotEmpty() }, rec)
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), null)
 
     /** Null when the item is gone from the catalog, or an episode whose series was never opened here. */
@@ -160,7 +163,7 @@ class HomeViewModel @Inject constructor(
     }
 }
 
-/** The watching profile's start screen: where they left off, their channels, and what's new. */
+/** The watching profile's start screen: where they left off, a row per guide, and what's new. */
 @OptIn(ExperimentalComposeUiApi::class)
 @Composable
 fun HomeScreen(onPlay: (PlayerRoute) -> Unit, onOpenMovie: (Int) -> Unit, vm: HomeViewModel = hiltViewModel()) {
@@ -195,7 +198,7 @@ fun HomeScreen(onPlay: (PlayerRoute) -> Unit, onOpenMovie: (Int) -> Unit, vm: Ho
         if (s.isEmpty) {
             item {
                 Text(
-                    "Hier komt te staan waar je gebleven was en je favoriete zenders. Begin bij Live TV of Films.",
+                    "Hier komt te staan waar je gebleven was en de zenders uit je gids. Begin bij Live TV of Films.",
                     style = MaterialTheme.typography.bodyLarge,
                     color = TextSecondary,
                 )
@@ -249,22 +252,22 @@ fun HomeScreen(onPlay: (PlayerRoute) -> Unit, onOpenMovie: (Int) -> Unit, vm: Ho
                 }
             }
         }
-        if (s.channels.isNotEmpty()) {
-            item(key = "channels") {
-                Text("Favoriete zenders", style = MaterialTheme.typography.titleLarge)
+        s.guides.forEach { guide ->
+            item(key = "guide/${guide.id}") {
+                Text(guide.name, style = MaterialTheme.typography.titleLarge)
                 LazyRow(
                     contentPadding = Rows.tilePadding,
                     horizontalArrangement = Arrangement.spacedBy(16.dp),
                     modifier = Modifier.focusRestorer(),
                 ) {
-                    items(s.channels, key = { it.itemId }) { f ->
+                    items(guide.channels, key = { it.streamId }) { c ->
                         ChannelCard(
-                            name = NameParser.parse(f.name).title,
-                            logoUrl = f.imageUrl,
-                            now = rememberNowAndNext(f.itemId, vm::nowAndNext).first,
-                            // Zapping from here goes through the favourite channels, as on Favorieten.
-                            onClick = { onPlay(PlayerRoute(PlayerRoute.Kind.LIVE, f.itemId, f.name, categoryId = PlayerRoute.FAVORITES_CATEGORY)) },
-                            modifier = Modifier.lastInRow(f == s.channels.last()),
+                            name = NameParser.parse(c.name).title,
+                            logoUrl = c.logoUrl,
+                            now = rememberNowAndNext(c.streamId, vm::nowAndNext).first,
+                            // Zapping from here goes through this guide, as on Favorieten.
+                            onClick = { onPlay(PlayerRoute(PlayerRoute.Kind.LIVE, c.streamId, c.name, categoryId = PlayerRoute.guideCategory(guide.id))) },
+                            modifier = Modifier.lastInRow(c == guide.channels.last()),
                         )
                     }
                 }

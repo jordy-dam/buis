@@ -28,13 +28,18 @@ data class PlayerRoute(
     val id: Int,
     val title: String,
     val containerExtension: String = "",
-    /** Live: category to zap through ([FAVORITES_CATEGORY] = favourite channels). */
+    /** Live: category to zap through, or a profile's guide ([guideCategory]). */
     val categoryId: String? = null,
     val fromStart: Boolean = false,
 ) {
     enum class Kind { LIVE, MOVIE, EPISODE }
 
     companion object {
-        const val FAVORITES_CATEGORY = "\u0000favorites"
+        private const val GUIDE_PREFIX = "\u0000guide:"
+
+        /** Zapping through one of the profile's guides instead of a provider category. */
+        fun guideCategory(guideId: Long) = "$GUIDE_PREFIX$guideId"
+
+        fun guideId(categoryId: String?): Long? = categoryId?.removePrefix(GUIDE_PREFIX)?.takeIf { it != categoryId }?.toLongOrNull()
     }
 }

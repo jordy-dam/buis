@@ -64,10 +64,11 @@ import nl.jordy.iptv.data.db.AppDatabase
 import nl.jordy.iptv.data.db.CategoryEntity
 import nl.jordy.iptv.data.db.LiveChannelEntity
 import nl.jordy.iptv.data.repo.EpgRepository
-import nl.jordy.iptv.data.repo.LibraryRepository
+import nl.jordy.iptv.data.repo.Guide
+import nl.jordy.iptv.data.repo.GuideRepository
+import nl.jordy.iptv.ui.favorites.GuidePickDialog
 import nl.jordy.iptv.data.profile.ProfileRepository
 import nl.jordy.iptv.data.settings.filteredBy
-import nl.jordy.iptv.data.xtream.ContentType
 import nl.jordy.iptv.ui.PlayerRoute
 import nl.jordy.iptv.ui.components.ChannelTile
 import nl.jordy.iptv.ui.components.ListItemSurface
@@ -124,7 +125,7 @@ class LiveViewModel @Inject constructor(
     private val db: AppDatabase,
     private val profiles: ProfileRepository,
     private val epg: EpgRepository,
-    private val library: LibraryRepository,
+    private val guides: GuideRepository,
     private val follows: FollowRepository,
     private val guideStore: EpgGuide,
 ) : ViewModel() {
@@ -189,8 +190,10 @@ class LiveViewModel @Inject constructor(
         Pager(PagingConfig(pageSize = 40, prefetchDistance = 20)) { dao.livePaged(id) }.flow
     }.cachedIn(viewModelScope)
 
-    val favorites = library.favoriteIds(ContentType.LIVE).map { it.toSet() }
-        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptySet())
+    /** Channels in any of the profile's guides: they get the heart. */
+    val favorites = guides.channelIds.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptySet())
+
+    val guideList = guides.guides.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
 
     /** Last focused channel, so coming back from the player lands on it. */
     var lastChannel: Int? = null
@@ -199,9 +202,10 @@ class LiveViewModel @Inject constructor(
 
     suspend fun nowAndNext(streamId: Int) = epg.nowAndNext(streamId)
 
-    fun toggleFavorite(c: LiveChannelEntity) = viewModelScope.launch {
-        library.toggleFavorite(ContentType.LIVE, c.streamId, c.name, c.logoUrl)
-    }
+    /** Long-press with one guide (or none yet): straight in or out of it. With more, the screen asks which. */
+    fun toggleInOnlyGuide(c: LiveChannelEntity) = viewModelScope.launch { guides.toggleInOnlyGuide(c.streamId, c.name, c.logoUrl) }
+
+    fun toggleIn(g: Guide, c: LiveChannelEntity) = viewModelScope.launch { guides.toggle(g.id, c.streamId, c.name, c.logoUrl) }
 }
 
 /**
@@ -214,6 +218,8 @@ fun LiveScreen(onPlay: (PlayerRoute) -> Unit, vm: LiveViewModel = hiltViewModel(
     val categories by vm.categories.collectAsStateWithLifecycle()
     val sections by vm.sections.collectAsStateWithLifecycle()
     var guideFor by remember { mutableStateOf<LiveChannelEntity?>(null) }
+    var pickGuideFor by remember { mutableStateOf<LiveChannelEntity?>(null) }
+    val guides by vm.guideList.collectAsStateWithLifecycle()
     val filtered by vm.filtered.collectAsStateWithLifecycle()
     val selected by vm.selected.collectAsStateWithLifecycle()
     val favorites by vm.favorites.collectAsStateWithLifecycle()
@@ -279,7 +285,7 @@ fun LiveScreen(onPlay: (PlayerRoute) -> Unit, vm: LiveViewModel = hiltViewModel(
                         vm.lastChannel = channel.streamId
                         onPlay(PlayerRoute(PlayerRoute.Kind.LIVE, channel.streamId, channel.name, categoryId = channel.categoryId))
                     },
-                    onLongClick = { vm.toggleFavorite(channel) },
+                    onLongClick = { if (guides.size > 1) pickGuideFor = channel else vm.toggleInOnlyGuide(channel) },
                     modifier = Modifier.focusRequester(itemFocus).onFocusChanged { if (it.isFocused) focusedChannel = channel }
                         // Right on a channel: its guide, to scroll through what's on later.
                         .onPreviewKeyEvent { e ->
@@ -292,6 +298,9 @@ fun LiveScreen(onPlay: (PlayerRoute) -> Unit, vm: LiveViewModel = hiltViewModel(
             }
         }
         }
+    }
+    pickGuideFor?.let { ch ->
+        GuidePickDialog(ch.name, guides, ch.streamId, onToggle = { vm.toggleIn(it, ch) }, onDismiss = { pickGuideFor = null })
     }
     guideFor?.let { ch ->
         val terms by vm.followTerms.collectAsStateWithLifecycle()

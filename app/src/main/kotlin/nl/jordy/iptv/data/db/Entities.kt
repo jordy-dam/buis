@@ -143,7 +143,34 @@ data class ProfileEntity(
     val createdAt: Long = 0,
 )
 
-/** Name and image are a snapshot, so a favourite still renders if a re-sync drops or renames the item. */
+/** A profile's own channel list ("Mijn gids", "Sport"), mixing channels from any category of the subscription. */
+@Entity(
+    tableName = "guide",
+    foreignKeys = [ForeignKey(ProfileEntity::class, ["id"], ["profileId"], onDelete = ForeignKey.CASCADE)],
+    indices = [Index("profileId")],
+)
+data class GuideEntity(
+    @PrimaryKey(autoGenerate = true) val id: Long = 0,
+    val profileId: Long,
+    val name: String,
+    val position: Int,
+)
+
+/** A channel in a guide, in the order the profile put it. Name and logo are a snapshot, as with favourites. */
+@Entity(
+    tableName = "guide_channel",
+    primaryKeys = ["guideId", "streamId"],
+    foreignKeys = [ForeignKey(GuideEntity::class, ["id"], ["guideId"], onDelete = ForeignKey.CASCADE)],
+)
+data class GuideChannelEntity(
+    val guideId: Long,
+    val streamId: Int,
+    val name: String,
+    val logoUrl: String?,
+    val position: Int,
+)
+
+/** Films and series; channels live in guides ([GuideChannelEntity]) since schema 25. */
 @Entity(
     tableName = "favorite",
     primaryKeys = ["profileId", "type", "itemId"],

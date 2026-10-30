@@ -29,8 +29,10 @@ import androidx.sqlite.db.SupportSQLiteDatabase
         ChannelCheckEntity::class,
         ChannelSwapEntity::class,
         SeriesIntroEntity::class,
+        GuideEntity::class,
+        GuideChannelEntity::class,
     ],
-    version = 24,
+    version = 25,
     exportSchema = true,
     autoMigrations = [
         AutoMigration(from = 1, to = 2, spec = AppDatabase.CatalogResync::class),
@@ -81,6 +83,7 @@ abstract class AppDatabase : RoomDatabase() {
     abstract fun episodes(): EpisodeDao
     abstract fun profiles(): ProfileDao
     abstract fun favorites(): FavoriteDao
+    abstract fun guides(): GuideDao
     abstract fun playback(): PlaybackDao
     abstract fun syncInfo(): SyncInfoDao
     abstract fun search(): SearchDao
@@ -128,6 +131,40 @@ abstract class AppDatabase : RoomDatabase() {
          */
         val MIGRATION_20_21 = object : Migration(20, 21) {
             override fun migrate(db: SupportSQLiteDatabase) = CatalogResync().onPostMigrate(db)
+        }
+
+        /** What a profile's favourite channels become: its first guide. */
+        const val FIRST_GUIDE_NAME = "Mijn gids"
+
+        /**
+         * Guides: every profile with favourite channels gets "Mijn gids" holding them, newest first as
+         * Favorieten showed them. Films and series stay favourites.
+         */
+        val MIGRATION_24_25 = object : Migration(24, 25) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL(
+                    "CREATE TABLE IF NOT EXISTS `guide` (`id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, `profileId` INTEGER NOT NULL, " +
+                        "`name` TEXT NOT NULL, `position` INTEGER NOT NULL, " +
+                        "FOREIGN KEY(`profileId`) REFERENCES `profile`(`id`) ON UPDATE NO ACTION ON DELETE CASCADE )",
+                )
+                db.execSQL("CREATE INDEX IF NOT EXISTS `index_guide_profileId` ON `guide` (`profileId`)")
+                db.execSQL(
+                    "CREATE TABLE IF NOT EXISTS `guide_channel` (`guideId` INTEGER NOT NULL, `streamId` INTEGER NOT NULL, " +
+                        "`name` TEXT NOT NULL, `logoUrl` TEXT, `position` INTEGER NOT NULL, PRIMARY KEY(`guideId`, `streamId`), " +
+                        "FOREIGN KEY(`guideId`) REFERENCES `guide`(`id`) ON UPDATE NO ACTION ON DELETE CASCADE )",
+                )
+                db.execSQL(
+                    "INSERT INTO guide (profileId, name, position) " +
+                        "SELECT DISTINCT profileId, '$FIRST_GUIDE_NAME', 0 FROM favorite WHERE type = 'LIVE'",
+                )
+                db.execSQL(
+                    "INSERT INTO guide_channel (guideId, streamId, name, logoUrl, position) " +
+                        "SELECT g.id, f.itemId, f.name, f.imageUrl, " +
+                        "(SELECT COUNT(*) FROM favorite n WHERE n.profileId = f.profileId AND n.type = 'LIVE' AND n.addedAt > f.addedAt) " +
+                        "FROM favorite f JOIN guide g ON g.profileId = f.profileId WHERE f.type = 'LIVE'",
+                )
+                db.execSQL("DELETE FROM favorite WHERE type = 'LIVE'")
+            }
         }
 
         /** The profile that takes over everything saved before profiles existed. */

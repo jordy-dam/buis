@@ -154,9 +154,9 @@ class EpgGuide @Inject constructor(
         // Union over profiles: one guide serves the whole household.
         val all = profiles.all()
         val countries = all.flatMap { p -> p.preferredCountries.split(',') }.filter { it.isNotBlank() }.toSet()
-        // Pinned live categories and favourite channels too, so reminders can find what's on them.
+        // Pinned live categories and the channels in everyone's guides too, so reminders can find what's on them.
         val pinned = all.flatMap { p -> p.pinnedCategories.split(',') }.filter { it.startsWith("LIVE:") }.map { it.removePrefix("LIVE:") }.distinct()
-        val favourites = db.favorites().allLiveIds()
+        val favourites = db.guides().allChannelIds()
         val rows = db.catalog().liveForGuide(countries.toList(), pinned, favourites)
         val providerIds = XmltvGuide.channels(rows).associate { it.streamId to it.channelId }
         val wanted = providerIds.values.toSet()
