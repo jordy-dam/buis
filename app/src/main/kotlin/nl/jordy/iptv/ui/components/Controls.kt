@@ -46,7 +46,6 @@ import androidx.tv.material3.Text
 import androidx.compose.ui.input.key.KeyEventType
 import androidx.compose.ui.input.key.onPreviewKeyEvent
 import androidx.compose.ui.input.key.type
-import nl.jordy.iptv.ui.theme.Brand
 import nl.jordy.iptv.ui.theme.FocusBar
 import nl.jordy.iptv.ui.theme.FocusFill
 import nl.jordy.iptv.ui.theme.SurfaceColor
@@ -130,9 +129,6 @@ fun TvTextField(
     }
 }
 
-/** The primary button one step lighter when focused, like every other focus. */
-private val BrandFocus = androidx.compose.ui.graphics.Color(0xFF3F7FC2)
-
 /**
  * The choices of a pop-up and the player bar are one size bigger than buttons on a screen: they're
  * read from the couch over a picture. [PrimaryButton] and [IconButton] take `large` for them.
@@ -152,34 +148,27 @@ private val LargeLabel
 /** 14 + the 20dp [LargeLabel] line + 14 = [ChoiceSize]. */
 private val LargePadding = androidx.compose.foundation.layout.PaddingValues(horizontal = 20.dp, vertical = 14.dp)
 
+/**
+ * Looks the same as [SecondaryButton]: a coloured button next to the focused one read as a second
+ * focus, so only focus (the light fill) says where you are. Primary is where focus starts.
+ */
 @Composable
-fun PrimaryButton(text: String, onClick: () -> Unit, modifier: Modifier = Modifier, enabled: Boolean = true, large: Boolean = false) {
-    Button(
-        onClick = onClick,
-        enabled = enabled,
-        modifier = modifier,
-        // Taller by padding, not by height(): the button lays its content row at the top, so a
-        // fixed height would leave the label sitting high.
-        contentPadding = if (large) LargePadding else ButtonDefaults.ContentPadding,
-        scale = ButtonDefaults.scale(focusedScale = Focus.SCALE),
-        colors = ButtonDefaults.colors(
-            containerColor = Brand,
-            contentColor = TextPrimary,
-            // Over the picture (pop-ups, player) focus is the light fill, unmistakable on any video.
-            focusedContainerColor = if (large) FocusBar else BrandFocus,
-            focusedContentColor = if (large) TextOnLight else TextPrimary,
-        ),
-    ) { Text(text, style = if (large) LargeLabel else LocalTextStyle.current) }
-}
+fun PrimaryButton(text: String, onClick: () -> Unit, modifier: Modifier = Modifier, enabled: Boolean = true, large: Boolean = false) =
+    OutlineButton(text, onClick, modifier, enabled, large)
+
+@Composable
+fun SecondaryButton(text: String, onClick: () -> Unit, modifier: Modifier = Modifier, large: Boolean = false) =
+    OutlineButton(text, onClick, modifier, enabled = true, large = large)
 
 /**
- * Same base as [PrimaryButton] so both have identical height: with mismatched heights the taller
+ * One base for both buttons so they have identical height: with mismatched heights the taller
  * button counts as "below" the other, and d-pad Down jumps sideways to it.
  */
 @Composable
-fun SecondaryButton(text: String, onClick: () -> Unit, modifier: Modifier = Modifier, large: Boolean = false) {
+private fun OutlineButton(text: String, onClick: () -> Unit, modifier: Modifier, enabled: Boolean, large: Boolean) {
     Button(
         onClick = onClick,
+        enabled = enabled,
         modifier = modifier,
         // Taller by padding, not by height(): the button lays its content row at the top, so a
         // fixed height would leave the label sitting high.
@@ -192,8 +181,11 @@ fun SecondaryButton(text: String, onClick: () -> Unit, modifier: Modifier = Modi
         colors = ButtonDefaults.colors(
             containerColor = androidx.compose.ui.graphics.Color.Transparent,
             contentColor = TextPrimary,
-            focusedContainerColor = if (large) FocusBar else FocusFill,
-            focusedContentColor = if (large) TextOnLight else TextPrimary,
+            // Buttons always focus light, on a screen and over the picture; rows keep [FocusFill].
+            focusedContainerColor = FocusBar,
+            focusedContentColor = TextOnLight,
+            disabledContainerColor = androidx.compose.ui.graphics.Color.Transparent,
+            disabledContentColor = TextSecondary,
         ),
     ) { Text(text, style = if (large) LargeLabel else LocalTextStyle.current) }
 }
@@ -229,8 +221,8 @@ fun IconButton(
         colors = ButtonDefaults.colors(
             containerColor = androidx.compose.ui.graphics.Color.Transparent,
             contentColor = TextPrimary,
-            focusedContainerColor = if (large) FocusBar else FocusFill,
-            focusedContentColor = if (large) TextOnLight else TextPrimary,
+            focusedContainerColor = FocusBar,
+            focusedContentColor = TextOnLight,
         ),
     ) {
         // Centred in the whole circle (the button's content row would put it at the start).

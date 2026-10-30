@@ -40,9 +40,10 @@ import androidx.tv.material3.Border
 import androidx.tv.material3.ClickableSurfaceDefaults
 import androidx.tv.material3.Surface
 import nl.jordy.iptv.ui.components.Focus
-import nl.jordy.iptv.ui.theme.FocusFill
+import nl.jordy.iptv.ui.theme.FocusBar
 import nl.jordy.iptv.ui.theme.SurfaceColor
 import nl.jordy.iptv.ui.theme.SurfaceRaised
+import nl.jordy.iptv.ui.theme.TextOnLight
 import nl.jordy.iptv.ui.theme.TextPrimary
 import nl.jordy.iptv.ui.theme.TextSecondary
 
@@ -127,8 +128,8 @@ private fun PadKey(label: String, onClick: () -> Unit, modifier: Modifier = Modi
         colors = ClickableSurfaceDefaults.colors(
             containerColor = Color.Transparent,
             contentColor = TextPrimary,
-            focusedContainerColor = FocusFill,
-            focusedContentColor = TextPrimary,
+            focusedContainerColor = FocusBar,
+            focusedContentColor = TextOnLight,
         ),
     ) {
         Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
