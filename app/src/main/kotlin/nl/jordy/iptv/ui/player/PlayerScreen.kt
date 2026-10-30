@@ -31,17 +31,11 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Audiotrack
 import androidx.compose.material.icons.filled.Check
-import androidx.compose.material.icons.filled.Forward30
-import androidx.compose.material.icons.filled.KeyboardArrowDown
-import androidx.compose.material.icons.filled.KeyboardArrowLeft
-import androidx.compose.material.icons.filled.KeyboardArrowRight
-import androidx.compose.material.icons.filled.KeyboardArrowUp
 import androidx.compose.material.icons.filled.LiveTv
 import androidx.compose.material.icons.filled.Pause
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Replay10
 import androidx.compose.material.icons.filled.RestartAlt
-import androidx.compose.material.icons.filled.Schedule
 import androidx.compose.material.icons.filled.SkipNext
 import androidx.compose.material.icons.filled.Stop
 import androidx.compose.material.icons.filled.Subtitles
@@ -53,17 +47,16 @@ import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.focus.FocusDirection
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusProperties
 import androidx.compose.ui.focus.focusRequester
-import androidx.compose.ui.focus.focusRestorer
 import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
@@ -124,9 +117,9 @@ import nl.jordy.iptv.ui.components.rememberNowAndNext
 import nl.jordy.iptv.ui.components.progress
 import nl.jordy.iptv.ui.theme.SurfaceRaised
 import nl.jordy.iptv.ui.theme.SurfaceColor
+import androidx.compose.material.icons.filled.Forward10
 import androidx.compose.material.icons.filled.Info
 import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.itemsIndexed
@@ -161,12 +154,12 @@ private const val CARD_GRACE_MS = 700L
 private enum class Choice { AUDIO, SUBTITLES }
 
 /**
- * The player. Everything you steer sits in one bar at the bottom: title, clock, progress, and a row
- * of round controls. Two modes, never mixed: without the buttons the arrows steer the picture (VOD:
- * Left/Right seek; live: Up/Down zap, Left previous channel) and the bar says so; OK (or Down in a
- * film, or a pause) brings the buttons, and from then on every arrow moves within the bar, Up to the
- * progress line to scrub. Audio and subtitles open their choices in place, above their button. Only
- * Back leaves, the innermost layer first: the choices, then the controls.
+ * The player. Everything you steer sits in one bar at the bottom: title, progress, and a row of round
+ * controls that never move. Two modes, never mixed: without the buttons Up/Down zap (live), Left/Right
+ * open the bar on the progress line with the first step taken (a film) or on −10/+10 (live), and OK
+ * opens it on play/pause, pausing a film at once; a long OK in live opens the channel list. From then
+ * on every arrow moves within the bar, Up to the progress line to scrub. Audio and subtitles open
+ * their choices in place, above their button. Only Back leaves, the innermost layer first.
  */
 @OptIn(UnstableApi::class)
 @Composable
@@ -185,8 +178,11 @@ fun PlayerScreen(onExit: () -> Unit, vm: PlayerViewModel = hiltViewModel()) {
     var panel by remember { mutableStateOf<Panel?>(null) }
     var focusTarget by remember { mutableStateOf<FocusRequester?>(null) }
     val buttons = remember { ControlFocus() }
-    // Instant replay: this hold of Left already rewound, so its release isn't "vorige zender".
-    var leftHeld by remember { mutableStateOf(false) }
+    // Live OK acts on release: held, it opened the channel list instead. Only a press seen going down counts.
+    var okDown by remember { mutableStateOf(false) }
+    var okHeld by remember { mutableStateOf(false) }
+    // A position picked on the progress line, not yet sought to: the bar shows it instead.
+    var scrub by remember { mutableStateOf<Long?>(null) }
     var playing by remember { mutableStateOf(vm.player.isPlaying) }
     var playWhenReady by remember { mutableStateOf(vm.player.playWhenReady) }
     // The bar's height, so subtitles and corner cards sit above it instead of under it.
@@ -228,6 +224,13 @@ fun PlayerScreen(onExit: () -> Unit, vm: PlayerViewModel = hiltViewModel()) {
         focusTarget = null
     }
     LaunchedEffect(Unit) { focus.requestFocus() }
+    LaunchedEffect(scrub) {
+        val to = scrub ?: return@LaunchedEffect
+        delay(SCRUB_SETTLE_MS)
+        vm.seekBy(to - vm.player.currentPosition)
+        position = to
+        scrub = null
+    }
     // A pop-up asks with buttons: while it shows its main choice has focus (one OK = that choice,
     // Back = no), and when it goes, focus goes back to the picture. The sleep timer wins: it stops playback.
     val card = when {
@@ -351,42 +354,43 @@ fun PlayerScreen(onExit: () -> Unit, vm: PlayerViewModel = hiltViewModel()) {
                         KeyEvent.KEYCODE_MEDIA_PLAY_PAUSE -> { vm.togglePause(); true }
                         KeyEvent.KEYCODE_MEDIA_PLAY -> { vm.player.play(); true }
                         KeyEvent.KEYCODE_MEDIA_PAUSE -> { vm.player.pause(); true }
+                        // The repeats of the arrow that opened the bar, before its target has focus.
+                        KeyEvent.KEYCODE_DPAD_LEFT, KeyEvent.KEYCODE_DPAD_RIGHT, KeyEvent.KEYCODE_DPAD_UP, KeyEvent.KEYCODE_DPAD_DOWN -> focusTarget != null
                         else -> false
                     }
                 }
-                // Live: Left is "vorige zender" when released; held, it rewinds (instant replay).
-                val liveLeft = live && code == KeyEvent.KEYCODE_DPAD_LEFT && state.sleepSecondsLeft == null && state.breakSecondsLeft == null
-                if (liveLeft) {
+                val ok = code == KeyEvent.KEYCODE_DPAD_CENTER || code == KeyEvent.KEYCODE_ENTER
+                // Live: OK on release opens the controls; held, the channel list.
+                if (live && ok) {
                     vm.userActive()
                     if (e.type == KeyEventType.KeyDown) {
-                        if (e.nativeKeyEvent.repeatCount > 0 && !leftHeld) {
-                            leftHeld = true
-                            vm.replay()
-                            overlayTick++
+                        if (e.nativeKeyEvent.repeatCount == 0) {
+                            okDown = android.os.SystemClock.uptimeMillis() - cardGoneAt >= CARD_GRACE_MS
+                            okHeld = false
+                        } else if (okDown && !okHeld) {
+                            okHeld = true
+                            panel = Panel.CHANNELS
+                            openControls(buttons.firstChannel)
                         }
                     } else if (e.type == KeyEventType.KeyUp) {
-                        if (!leftHeld) vm.previousChannel()
-                        leftHeld = false
-                        overlayTick++
+                        if (okDown && !okHeld) openControls(buttons.play)
+                        okDown = false
                     }
                     return@onKeyEvent true
                 }
                 if (e.type != KeyEventType.KeyDown) return@onKeyEvent false
                 vm.userActive()
-                val ok = code == KeyEvent.KEYCODE_DPAD_CENTER || code == KeyEvent.KEYCODE_ENTER
                 if (ok && android.os.SystemClock.uptimeMillis() - cardGoneAt < CARD_GRACE_MS) return@onKeyEvent true
-                // Live from the start behaves like a film: pause and seek.
+                val first = e.nativeKeyEvent.repeatCount == 0
+                // Live from the start behaves like a film: pause and scrub.
                 val handled = if (live) when (code) {
-                    KeyEvent.KEYCODE_DPAD_UP, KeyEvent.KEYCODE_CHANNEL_UP -> { vm.zap(+1); true }
-                    KeyEvent.KEYCODE_DPAD_DOWN, KeyEvent.KEYCODE_CHANNEL_DOWN -> { vm.zap(-1); true }
+                    // One zap per press: held, the repeats would flash past half-loaded channels.
+                    KeyEvent.KEYCODE_DPAD_UP, KeyEvent.KEYCODE_CHANNEL_UP -> { if (first) vm.zap(+1); true }
+                    KeyEvent.KEYCODE_DPAD_DOWN, KeyEvent.KEYCODE_CHANNEL_DOWN -> { if (first) vm.zap(-1); true }
                     KeyEvent.KEYCODE_LAST_CHANNEL -> { vm.previousChannel(); true }
-                    // The arrows zap, so OK alone brings the controls: on vanaf begin / terug naar live
-                    // when there is one, else on the channel logo. Right only shows the bar.
-                    KeyEvent.KEYCODE_DPAD_RIGHT -> true
-                    KeyEvent.KEYCODE_DPAD_CENTER, KeyEvent.KEYCODE_ENTER -> {
-                        openControls(if (state.replaying || state.canRestart) buttons.play else buttons.channels)
-                        true
-                    }
+                    // Sideways lands next to play: on −10, or on +10 when behind live (else there's no forward).
+                    KeyEvent.KEYCODE_DPAD_LEFT -> { openControls(buttons.back); true }
+                    KeyEvent.KEYCODE_DPAD_RIGHT -> { openControls(if (state.replaying) buttons.forward else buttons.play); true }
                     // The remote's info key: the programme info, in the controls so Back steps out as usual.
                     KeyEvent.KEYCODE_INFO -> { panel = Panel.INFO; openControls(buttons.info); true }
                     else -> false
@@ -400,10 +404,21 @@ fun PlayerScreen(onExit: () -> Unit, vm: PlayerViewModel = hiltViewModel()) {
                     }
                     KeyEvent.KEYCODE_MEDIA_PLAY -> { vm.player.play(); true }
                     KeyEvent.KEYCODE_MEDIA_PAUSE -> { vm.player.pause(); openControls(buttons.play); true }
-                    KeyEvent.KEYCODE_DPAD_LEFT, KeyEvent.KEYCODE_MEDIA_REWIND -> { vm.seekBy(-10_000); true }
-                    KeyEvent.KEYCODE_DPAD_RIGHT, KeyEvent.KEYCODE_MEDIA_FAST_FORWARD -> { vm.seekBy(30_000); true }
-                    KeyEvent.KEYCODE_DPAD_DOWN -> { openControls(buttons.play); true }
-                    KeyEvent.KEYCODE_DPAD_UP, KeyEvent.KEYCODE_INFO -> true
+                    KeyEvent.KEYCODE_MEDIA_REWIND -> { vm.seekBy(-10_000); true }
+                    KeyEvent.KEYCODE_MEDIA_FAST_FORWARD -> { vm.seekBy(30_000); true }
+                    // The bar opens on the progress line with the first step already taken; held, the
+                    // line takes the repeats and steps faster.
+                    KeyEvent.KEYCODE_DPAD_LEFT, KeyEvent.KEYCODE_DPAD_RIGHT -> {
+                        val length = vm.player.duration
+                        if (length > 0) {
+                            val step = if (code == KeyEvent.KEYCODE_DPAD_RIGHT) 10_000L else -10_000L
+                            scrub = (vm.player.currentPosition + step).coerceIn(0, length)
+                            openControls(buttons.scrub)
+                        } else openControls(buttons.play)
+                        true
+                    }
+                    KeyEvent.KEYCODE_DPAD_UP, KeyEvent.KEYCODE_DPAD_DOWN -> { openControls(buttons.play); true }
+                    KeyEvent.KEYCODE_INFO -> true
                     else -> false
                 }
                 if (handled) overlayTick++
@@ -451,6 +466,8 @@ fun PlayerScreen(onExit: () -> Unit, vm: PlayerViewModel = hiltViewModel()) {
                 playing = playWhenReady,
                 controls = controls,
                 choice = choice,
+                scrub = scrub,
+                onScrub = { scrub = it },
                 buttons = buttons,
                 onChoice = { c ->
                     choice = c
@@ -463,12 +480,11 @@ fun PlayerScreen(onExit: () -> Unit, vm: PlayerViewModel = hiltViewModel()) {
                     if (p == Panel.CHANNELS) focusTarget = buttons.firstChannel
                 },
                 actions = BarActions(
-                    replay = { if (live) vm.replay() else vm.seekBy(-10_000) },
+                    back = { if (live) vm.replay() else vm.seekBy(-10_000) },
                     playPause = vm::togglePause,
-                    forward = { vm.seekBy(30_000) },
-                    restart = vm::watchFromStart,
+                    forward = { vm.seekBy(10_000) },
+                    restart = { if (live) vm.watchFromStart() else { vm.seekBy(-vm.player.currentPosition); position = 0 } },
                     toLive = { if (state.catchup != null) vm.backToLive() else vm.goLive() },
-                    clock = vm::toggleClock,
                     seekTo = { to -> vm.seekBy(to - vm.player.currentPosition); position = to },
                     audio = { i -> vm.selectAudio(i); choice = null; focusTarget = buttons.audio },
                     subtitle = { i -> vm.selectSubtitle(i); choice = null; focusTarget = buttons.subtitles },
@@ -483,7 +499,8 @@ fun PlayerScreen(onExit: () -> Unit, vm: PlayerViewModel = hiltViewModel()) {
                 first = buttons.firstChannel,
                 load = vm::nowAndNext,
                 onPick = { i -> vm.tune(i); closeControls(); overlayTick++ },
-                modifier = Modifier.align(Alignment.CenterStart),
+                // A long OK opened it: that OK's repeats and release must not tune in at once.
+                modifier = Modifier.align(Alignment.Center).ignoreHeldKey(),
             )
         }
 
@@ -518,6 +535,10 @@ private fun Modifier.stopsSideways() = focusProperties {
 /** Focus handles of the bar's buttons, so a key can land on the right one. */
 private class ControlFocus {
     val play = FocusRequester()
+    val back = FocusRequester()
+    val forward = FocusRequester()
+    /** The progress line, where Left/Right in a film land. */
+    val scrub = FocusRequester()
     val audio = FocusRequester()
     val subtitles = FocusRequester()
     /** The selected entry of the open track list. */
@@ -529,12 +550,11 @@ private class ControlFocus {
 }
 
 private class BarActions(
-    val replay: () -> Unit,
+    val back: () -> Unit,
     val playPause: () -> Unit,
     val forward: () -> Unit,
     val restart: () -> Unit,
     val toLive: () -> Unit,
-    val clock: () -> Unit,
     /** To a position picked on the progress line. */
     val seekTo: (Long) -> Unit,
     val audio: (Int) -> Unit,
@@ -542,9 +562,10 @@ private class BarActions(
 )
 
 /**
- * The one control surface, slim over a fade: what's on, start and end over a thin progress line, the
- * clock top right, and a row of round controls in remote order (back left, play/pause in the middle,
- * forward right), then audio, subtitles and the clock switch. A track list opens above its own button, in the same bar.
+ * The one control surface, slim over a fade: what's on, start and end over a thin progress line, and
+ * one row of round controls whose places never change: vanaf begin (or terug naar live) at the far
+ * left, −10 / play-pause / +10 in the middle, info, audio and subtitles, and the channel's logo at the
+ * far right. What can't be used now dims and is skipped by focus. A track list opens above its own button.
  */
 @Composable
 private fun PlayerBar(
@@ -556,6 +577,8 @@ private fun PlayerBar(
     playing: Boolean,
     controls: Boolean,
     choice: Choice?,
+    scrub: Long?,
+    onScrub: (Long?) -> Unit,
     buttons: ControlFocus,
     onChoice: (Choice) -> Unit,
     panel: Panel?,
@@ -567,17 +590,6 @@ private fun PlayerBar(
     var subtitlesX by remember { mutableFloatStateOf(0f) }
     var barX by remember { mutableFloatStateOf(0f) }
     var barWidth by remember { mutableIntStateOf(0) }
-    // The focused control's name: icons alone don't say what OK will do.
-    var focused by remember { mutableStateOf<String?>(null) }
-    val named: (String, Boolean) -> Unit = { label, has -> if (has) focused = label else if (focused == label) focused = null }
-    // A position picked on the progress line, not yet sought to: the bar shows it instead.
-    var scrub by remember { mutableStateOf<Long?>(null) }
-    LaunchedEffect(scrub) {
-        val to = scrub ?: return@LaunchedEffect
-        delay(SCRUB_SETTLE_MS)
-        actions.seekTo(to)
-        scrub = null
-    }
     val shown = scrub ?: position
     Column(
         Modifier
@@ -595,8 +607,6 @@ private fun PlayerBar(
         Row(verticalAlignment = Alignment.Bottom) {
             if (catchup != null || live) state.channelNumber?.let { Text("$it  ", style = MaterialTheme.typography.displaySmall, color = Live) }
             Text(programme?.title ?: state.title, style = MaterialTheme.typography.displaySmall, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f))
-            // Subtle, level with the title: a glance at the time without a second bar.
-            if (state.showClock) ClockText(Modifier.padding(start = 24.dp))
         }
         // Start and end over the ends of the line: guide times, or position and length.
         val (from, to) = when {
@@ -619,9 +629,10 @@ private fun PlayerBar(
             enabled = controls,
             onStep = { forward, held ->
                 val step = when { held < 8 -> 10_000L; held < 24 -> 30_000L; else -> 120_000L }
-                scrub = ((scrub ?: position) + if (forward) step else -step).coerceIn(0, duration)
+                onScrub(((scrub ?: position) + if (forward) step else -step).coerceIn(0, duration))
             },
-            onPick = { scrub?.let(actions.seekTo); scrub = null },
+            onPick = { scrub?.let(actions.seekTo); onScrub(null) },
+            modifier = Modifier.focusRequester(buttons.scrub),
         ) else fraction?.let { ProgressBar(it, thickness = 3.dp) }
 
         // The open track list, above its button.
@@ -640,64 +651,60 @@ private fun PlayerBar(
             )
         }
 
-        // Without the controls the arrows steer the picture, so no buttons show: just what they do.
-        if (!controls) Hints(
-            *if (live) listOfNotNull(
-                Hint(Icons.Filled.KeyboardArrowUp, Icons.Filled.KeyboardArrowDown, text = "Zappen"),
-                state.previous?.let { Hint(Icons.Filled.KeyboardArrowLeft, text = it) },
-                Hint(text = "OK  Bediening"),
-            ).toTypedArray() else arrayOf(
-                Hint(Icons.Filled.KeyboardArrowLeft, Icons.Filled.KeyboardArrowRight, text = "Spoelen"),
-                Hint(text = "OK  Pauze en bediening"),
-            ),
-        ) else Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-            Row(
-                Modifier.focusRestorer(buttons.play).stopsSideways(),
-                horizontalArrangement = Arrangement.spacedBy(12.dp),
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                if (live) {
-                    // The channel's logo opens the channel list, like NLZiet's.
-                    ChannelButton(
-                        state.logoUrl, state.title, controls, named, { onPanel(Panel.CHANNELS) },
-                        Modifier.focusRequester(buttons.channels),
-                    )
-                    ControlButton(Icons.Filled.Replay10, "10 seconden terug", controls, named, actions.replay)
-                    if (state.replaying) ControlButton(Icons.Filled.LiveTv, "Terug naar live", controls, named, actions.toLive, Modifier.focusRequester(buttons.play))
-                    else if (state.canRestart) ControlButton(Icons.Filled.RestartAlt, "Vanaf begin", controls, named, actions.restart, Modifier.focusRequester(buttons.play))
-                } else {
-                    ControlButton(Icons.Filled.Replay10, "10 seconden terug", controls, named, actions.replay)
-                    ControlButton(if (playing) Icons.Filled.Pause else Icons.Filled.PlayArrow, if (playing) "Pauze" else "Afspelen", controls, named, actions.playPause, Modifier.focusRequester(buttons.play))
-                    ControlButton(Icons.Filled.Forward30, "30 seconden vooruit", controls, named, actions.forward)
-                    if (catchup != null) ControlButton(Icons.Filled.LiveTv, "Terug naar live", controls, named, actions.toLive)
-                }
-                Spacer(Modifier.width(20.dp))
+        // Without the controls the arrows steer the picture, so no buttons show. The icons speak for
+        // themselves; only the long OK can't be seen, so live says it, buttons or not.
+        if (controls) Row(
+            Modifier.fillMaxWidth().stopsSideways().ignoreHeldKey(),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            // The far left: back to live when behind it, else from the start (a film always can).
+            Box(Modifier.weight(1f)) {
+                if (state.replaying || catchup != null) ControlButton(Icons.Filled.LiveTv, "Terug naar live", actions.toLive)
+                else ControlButton(Icons.Filled.RestartAlt, "Vanaf begin", actions.restart, available = !live || state.canRestart)
+            }
+            // The middle: back, play/pause, forward, with play/pause bigger and in the centre of the screen.
+            Row(horizontalArrangement = Arrangement.spacedBy(GroupGap), verticalAlignment = Alignment.CenterVertically) {
+                ControlButton(Icons.Filled.Replay10, "10 seconden terug", actions.back, Modifier.focusRequester(buttons.back))
                 ControlButton(
-                    Icons.Filled.Audiotrack, "Geluid", controls, named, { onChoice(Choice.AUDIO) },
+                    if (playing) Icons.Filled.Pause else Icons.Filled.PlayArrow, if (playing) "Pauze" else "Afspelen", actions.playPause,
+                    Modifier.focusRequester(buttons.play).size(PlaySize),
+                )
+                // Live, forward only exists behind live.
+                ControlButton(Icons.Filled.Forward10, "10 seconden vooruit", actions.forward, Modifier.focusRequester(buttons.forward), available = !live || state.replaying)
+            }
+            // The right: what's on, how it sounds, the text, and the channel's logo at the far end.
+            Row(Modifier.weight(1f), horizontalArrangement = Arrangement.spacedBy(GroupGap, Alignment.End), verticalAlignment = Alignment.CenterVertically) {
+                ControlButton(
+                    Icons.Filled.Info, "Programma-info", { onPanel(Panel.INFO) },
+                    Modifier.focusRequester(buttons.info), active = panel == Panel.INFO, available = live,
+                )
+                ControlButton(
+                    Icons.Filled.Audiotrack, "Geluid", { onChoice(Choice.AUDIO) },
                     Modifier.focusRequester(buttons.audio).onGloballyPositioned { audioX = it.positionInRoot().x + it.size.width / 2f },
                     active = choice == Choice.AUDIO,
                 )
                 ControlButton(
-                    Icons.Filled.Subtitles, "Ondertitels", controls, named, { onChoice(Choice.SUBTITLES) },
+                    Icons.Filled.Subtitles, "Ondertitels", { onChoice(Choice.SUBTITLES) },
                     Modifier.focusRequester(buttons.subtitles).onGloballyPositioned { subtitlesX = it.positionInRoot().x + it.size.width / 2f },
                     active = choice == Choice.SUBTITLES || state.subtitleSelected != null,
                 )
-                ControlButton(Icons.Filled.Schedule, "Klok", controls, named, actions.clock, active = state.showClock)
-                if (live) {
-                    ControlButton(
-                        Icons.Filled.Info, "Programma-info", controls, named, { onPanel(Panel.INFO) },
-                        Modifier.focusRequester(buttons.info), active = panel == Panel.INFO,
-                    )
-                }
-            }
-            // Right of the buttons: the focused one's name.
-            Box(Modifier.weight(1f).padding(start = 24.dp)) {
-                focused?.let { Text(it, style = MaterialTheme.typography.titleLarge) }
+                Spacer(Modifier.width(GroupsGap - GroupGap * 2))
+                // The channel's logo opens the channel list, like NLZiet's. A film has no channel: its place stays empty.
+                if (live) ChannelButton(state.logoUrl, state.title, { onPanel(Panel.CHANNELS) }, Modifier.focusRequester(buttons.channels))
+                else Spacer(Modifier.width(ChoiceSize * 16 / 9))
             }
         }
+        if (live) Hints(Hint(text = "Lang OK  Zenderlijst"))
         state.replayHint?.let { Text(it, style = MaterialTheme.typography.bodyMedium, color = Live) }
     }
 }
+
+/** Space between buttons of one group, and between the groups, so the row reads as its groups. */
+private val GroupGap = 12.dp
+private val GroupsGap = 48.dp
+
+/** Play/pause, bigger than the rest: where the eye and the focus start. */
+private val PlaySize = 64.dp
 
 /**
  * The progress line, focusable in the controls: Left/Right move a picked position (bigger steps the
@@ -705,10 +712,10 @@ private fun PlayerBar(
  * shows a knob, so it's clear the arrows now move the position.
  */
 @Composable
-private fun ScrubLine(fraction: Float, enabled: Boolean, onStep: (forward: Boolean, held: Int) -> Unit, onPick: () -> Unit) {
+private fun ScrubLine(fraction: Float, enabled: Boolean, onStep: (forward: Boolean, held: Int) -> Unit, onPick: () -> Unit, modifier: Modifier = Modifier) {
     var focused by remember { mutableStateOf(false) }
     BoxWithConstraints(
-        Modifier
+        modifier
             .fillMaxWidth()
             .height(18.dp)
             .focusProperties { canFocus = enabled }
@@ -731,21 +738,19 @@ private fun ScrubLine(fraction: Float, enabled: Boolean, onStep: (forward: Boole
     }
 }
 
-/** A control in the bar: the round icon button of every pop-up, not focusable until the controls are. */
+/** A control in the bar: the round icon button of every pop-up. Not available now, it stays in its place, dimmed, and focus skips it. */
 @Composable
 private fun ControlButton(
     icon: ImageVector,
     label: String,
-    enabled: Boolean,
-    /** Tells the bar this button's name while it has focus. */
-    named: (String, Boolean) -> Unit,
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
-    /** On (clock, subtitles) or open: the icon turns the "selected" blue. */
+    /** On (subtitles) or open: the icon turns the "selected" blue. */
     active: Boolean = false,
+    available: Boolean = true,
 ) = IconButton(
     icon, label, onClick,
-    modifier.focusProperties { canFocus = enabled }.onFocusChanged { named(label, it.isFocused) },
+    modifier.focusProperties { canFocus = available }.alpha(if (available) 1f else 0.35f),
     tint = if (active) BrandText else null, large = true,
 )
 
@@ -811,17 +816,6 @@ private fun TrackList(
             }
         }
     }
-}
-
-@Composable
-private fun ClockText(modifier: Modifier) {
-    val now by produceState(System.currentTimeMillis()) {
-        while (true) {
-            value = System.currentTimeMillis()
-            delay(10_000)
-        }
-    }
-    Text(clock.format(Instant.ofEpochMilli(now)), style = MaterialTheme.typography.headlineMedium, color = TextSecondary, modifier = modifier)
 }
 
 /** A key hint that isn't a control: icons, sometimes a word (a channel name). */
@@ -893,20 +887,17 @@ private fun Subtitles(player: Player, lift: androidx.compose.ui.unit.Dp, modifie
     AndroidView({ view }, modifier.padding(bottom = lift))
 }
 
-/** The channel's logo as the bar's first button: a wide rounded plate, so a logo fits, focusable like the round ones. */
+/** The channel's logo as the bar's last button: a wide rounded plate, so a logo fits, focusable like the round ones. */
 @Composable
 private fun ChannelButton(
     logoUrl: String?,
     name: String,
-    enabled: Boolean,
-    named: (String, Boolean) -> Unit,
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     Surface(
         onClick = onClick,
-        modifier = modifier.height(ChoiceSize).width(ChoiceSize * 16 / 9)
-            .focusProperties { canFocus = enabled }.onFocusChanged { named("Zenders", it.isFocused) },
+        modifier = modifier.height(ChoiceSize).width(ChoiceSize * 16 / 9),
         shape = ClickableSurfaceDefaults.shape(RoundedCornerShape(10.dp)),
         scale = ClickableSurfaceDefaults.scale(focusedScale = Focus.SCALE),
         colors = ClickableSurfaceDefaults.colors(
@@ -951,6 +942,13 @@ private fun ProgrammeInfo(state: PlayerUiState, modifier: Modifier) {
     }
 }
 
+/** How many channels the list shows at once; Up/Down scroll through the rest. */
+private const val CHANNEL_ROWS = 10
+
+/** [ChannelTile]'s height, and the space between two of them. */
+private val ChannelRow = 42.dp
+private val ChannelRowGap = 4.dp
+
 /**
  * The short channel list over the picture: the channels Up/Down zap through, with what's on, the
  * playing one focused. OK tunes in and closes it; Back closes it.
@@ -964,13 +962,16 @@ private fun ChannelList(
     onPick: (Int) -> Unit,
     modifier: Modifier,
 ) {
-    val listState = rememberLazyListState(initialFirstVisibleItemIndex = (current - 3).coerceAtLeast(0))
+    // The playing channel in the middle of the box, so there's as much to see above it as below.
+    val listState = rememberLazyListState(initialFirstVisibleItemIndex = (current - CHANNEL_ROWS / 2 + 1).coerceAtLeast(0))
     LazyColumn(
         state = listState,
-        modifier = modifier.fillMaxHeight().width(720.dp).background(SurfaceColor.copy(alpha = 0.94f))
-            .padding(horizontal = 16.dp).stayIn(),
-        verticalArrangement = Arrangement.spacedBy(4.dp),
-        contentPadding = PaddingValues(vertical = SafeArea),
+        // A box of ten rows in the middle of the picture, see-through enough to keep watching behind it.
+        modifier = modifier.width(600.dp).height(ChannelRow * CHANNEL_ROWS + ChannelRowGap * (CHANNEL_ROWS - 1) + 16.dp)
+            .background(SurfaceColor.copy(alpha = 0.8f), RoundedCornerShape(16.dp))
+            .padding(horizontal = 8.dp).stayIn(),
+        verticalArrangement = Arrangement.spacedBy(ChannelRowGap),
+        contentPadding = PaddingValues(vertical = 8.dp),
     ) {
         itemsIndexed(channels, key = { _, c -> c.streamId }) { i, c ->
             val (now, _) = rememberNowAndNext(c.streamId, load)
@@ -982,6 +983,7 @@ private fun ChannelList(
                 modifier = if (i == current) Modifier.focusRequester(first) else Modifier,
                 number = i + 1,
                 now = now,
+                container = Color.Transparent,
             )
         }
     }

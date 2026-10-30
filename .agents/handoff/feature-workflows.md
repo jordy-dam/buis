@@ -58,6 +58,14 @@ spec's design principles. On the tv since 16:47 (release f8f255f).
   change), and refreshes in quiet moments (`MainActivity.onStart`, screensaver start) when over 20 h old or
   older than today's 18:30. Unit tests green, emulator-tested; **not on the tv, not committed**.
 
+- Fixed player row (2026-10-30 evening, UX-reviewed first, branch `feat/player-controls`): buttons never move —
+  vanaf begin / terug naar live far left, −10 · play/pause (bigger, screen centre) · +10, info · audio ·
+  subtitles, channel logo far right; unavailable ones dim and focus skips them; no button names, no clock.
+  Keys: live OK opens the bar on pause (no pause), long OK = channel list, ◀ lands on −10, ▶ on +10 (behind
+  live) else pause, ▲▼ one zap per press; film OK pauses, ◀▶ open the progress line with the first 10 s step
+  taken. "Vorige zender" only on the remote's last-channel key now. Channel list: centred see-through box of
+  10 rows. Emulator-tested; on the tv since ~22:00 (release); not yet tried with the real remote.
+
 **Mid-flight:** player-controls round and the merged guide not committed yet (Jordy hasn't asked). `Daos.kt` REPLACE fix and
 `docs/plans/2026-10-30-sync-names-speed.md` not committed either. Jordy still has to set `main` as default branch on github.com.
 

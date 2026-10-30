@@ -86,10 +86,9 @@ data class PlayerUiState(
     /** Subtitle tracks the stream offers; [subtitleSelected] null = off. */
     val subtitles: List<TrackOption> = emptyList(),
     val subtitleSelected: Int? = null,
-    val showClock: Boolean = true,
-    /** Live: watching a little behind live after holding Left; OK goes back to live. */
+    /** Live: watching a little behind live after −10; "Terug naar live" goes back. */
     val replaying: Boolean = false,
-    /** Live: why holding Left did nothing, for the info bar. */
+    /** Live: why −10 did nothing, for the info bar. */
     val replayHint: String? = null,
     /** Episodes: where "Intro overslaan" jumps to, while the card shows. */
     val skipIntroTo: Long? = null,
@@ -212,7 +211,6 @@ class PlayerViewModel @Inject constructor(
         if (!isLive) breakTimer = BreakTimer(prefs.breakMinutes, prefs.breakLength)
         profilePrefs = prefs
         applyProfileTracks()
-        _state.update { it.copy(showClock = prefs.showClock) }
         when (route.kind) {
             PlayerRoute.Kind.LIVE -> {
                 liveSources = LiveSources(base, c)
@@ -299,7 +297,7 @@ class PlayerViewModel @Inject constructor(
             PlayerUiState(
                 title = name, channelNumber = channelIndex.takeIf { it >= 0 }?.plus(1),
                 logoUrl = channels.firstOrNull { c -> c.streamId == streamId }?.logoUrl,
-                previous = history.previous?.name, showClock = it.showClock,
+                previous = history.previous?.name,
             )
         }
         zapStartedAt = SystemClock.elapsedRealtime()
@@ -598,7 +596,7 @@ class PlayerViewModel @Inject constructor(
         cardShownAt = null
         asking = false
         nextEpisode = Autoplay.next(episodes, e.episodeId)
-        _state.update { PlayerUiState(title = "$seriesName – ${e.title}", showClock = it.showClock) }
+        _state.update { PlayerUiState(title = "$seriesName – ${e.title}") }
         // A track picked in the player was for that episode; the next one starts from the profile's languages.
         applyProfileTracks()
         viewModelScope.launch { playVod(StreamUrls.episode(base, c, e.episodeId, e.containerExtension), ContentType.SERIES, fromStart = false) }
@@ -614,7 +612,7 @@ class PlayerViewModel @Inject constructor(
 
     // Instant replay (live)
 
-    /** Holding Left in live: 10 seconds back, as far as the stream lets you seek. */
+    /** −10 in live: 10 seconds back, as far as the stream lets you seek. */
     fun replay() {
         if (!player.isCurrentMediaItemSeekable) {
             _state.update { it.copy(replayHint = "Terugspoelen kan niet op deze zender") }
@@ -769,12 +767,6 @@ class PlayerViewModel @Inject constructor(
             builder.setTrackTypeDisabled(C.TRACK_TYPE_TEXT, false).setOverrideForType(o)
         }
         player.trackSelectionParameters = builder.build()
-    }
-
-    fun toggleClock() {
-        val on = !_state.value.showClock
-        _state.update { it.copy(showClock = on) }
-        viewModelScope.launch { profiles.setShowClock(on) }
     }
 
     fun togglePause() {

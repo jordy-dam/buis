@@ -176,6 +176,8 @@ fun ChannelTile(
     /** Best picture quality ("4K", "FHD"…), see [bestQuality]. */
     quality: String? = null,
     catchup: Boolean = false,
+    /** The row's own background; over the picture it's see-through, so only its box shades it. */
+    container: Color = SurfaceColor,
 ) {
     Surface(
         onClick = onClick,
@@ -183,7 +185,7 @@ fun ChannelTile(
         modifier = modifier.fillMaxWidth().height(42.dp).onMenuKey(onLongClick),
         shape = ClickableSurfaceDefaults.shape(RoundedCornerShape(8.dp)),
         scale = ClickableSurfaceDefaults.scale(focusedScale = 1.02f),
-        colors = Focus.bar(),
+        colors = Focus.bar(container),
     ) {
         Box(Modifier.fillMaxSize()) {
             Row(Modifier.fillMaxSize().padding(horizontal = 8.dp), verticalAlignment = Alignment.CenterVertically) {

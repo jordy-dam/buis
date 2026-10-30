@@ -129,7 +129,6 @@ class ProfileRepository @Inject constructor(
     suspend fun setBreakLength(minutes: Int) = updateCurrent { it.copy(breakLength = minutes) }
     suspend fun setAudioLang(code: String) = updateCurrent { it.copy(audioLang = code) }
     suspend fun setSubtitleLang(code: String) = updateCurrent { it.copy(subtitleLang = code) }
-    suspend fun setShowClock(on: Boolean) = updateCurrent { it.copy(showClock = on) }
     suspend fun setBedtime(minutes: Int) = updateCurrent { it.copy(bedtime = minutes) }
     suspend fun setBedtimeDays(mask: Int) = updateCurrent { it.copy(bedtimeDays = mask) }
     suspend fun setAutoSwitch(on: Boolean) = updateCurrent { it.copy(autoSwitch = on) }
