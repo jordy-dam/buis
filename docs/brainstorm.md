@@ -28,6 +28,11 @@ profile, ratings, voice search, Google TV "Watch Next".
   stream has (a panel in the player). Next to that a default per profile ("Nederlands, ondertitels uit"),
   which the player picks by itself when the stream has it; a choice in the player only counts for that
   title. Nothing exists yet: the player takes the stream's default today. `S`–`M`
+- ~~**Slanke spelerbalk**~~ → built 2026-10-30 (5e6fa8d), outside this list: no panel but a fade, one
+  title line, times above a thin line. One key model: without buttons the arrows steer the picture,
+  OK brings the buttons and then only Back leaves. Films scrub on the progress line.
+- ~~**Automatisch overschakelen**~~ → built 2026-10-30 (508a8eb): per profile, a followed programme that
+  starts counts down 10 s on its reminder and tunes in by itself; Later or Back stops it.
 - **Night mode**: dynamic range compression on the audio after 22:00 or per profile. `S`
 - **Stream health overlay** (long-press Info): bitrate, resolution, codec, buffer, dropped frames. `S`
 - ~~✓ **Zenderstatus: log hiccups, suggest a fix**~~ → built (2h; step 3, switching by itself, not). Today a live channel tries HLS, then raw TS once,
@@ -76,6 +81,9 @@ profile, ratings, voice search, Google TV "Watch Next".
   films finished, longest binge, "je meest gekeken avond". Needs the watch log from the history idea
   above (time per title and channel). Maybe a Home tile on Monday. `S`–`M`
 - **Guest mode**: no history, no Verder kijken, for visitors. `S`
+- ~~**Profielpagina met gadgets**~~ → built 2026-10-30 (5bb9b2b): face, colour and gadget each from a
+  button in the name row (pop-up on black); 12 faces, 12 colours, 16 gadgets (wrench, football,
+  doctor, mouse…). PIN/kids mark upper left, gadget lower right, also in "Wie kijkt er?".
 
 ## Integraties
 
@@ -113,7 +121,7 @@ profile, ratings, voice search, Google TV "Watch Next".
   ranked on the tv by the profile's genres (phase 3 weights). Only the region query goes out, never
   the profile or history. OK on a title adds it to the Wachtlijst, so you get it once it streams. `M` ⚠️
 - ~~✓ **Tweede gidsbron**~~ → built (7776bf5, 2026-10-30: open-epg → epgshare01 → provider, merged per
-  time slot; the per-channel conflict list in Instellingen not yet): a public XMLTV for Dutch channels next to the provider's. BUIS compares
+  time slot): a public XMLTV for Dutch channels next to the provider's. BUIS compares
   the two per channel and shows conflicts in Instellingen ("SBS6: provider zegt De Bondgenoten,
   bron 2 zegt True Crime"); when one source keeps being right for a channel, OK swaps which one
   leads there. Prompted by SBS6 on 2026-10-30, where the provider missed a late-night schedule
@@ -138,6 +146,8 @@ profile, ratings, voice search, Google TV "Watch Next".
     per channel and time slot the first source that has data wins, the others fill gaps. Default
     order open-epg → epgshare01 → provider; a channel can get its own order from the conflict list.
     Display-name matching (not just ids) is what brings in the new channels.
+- **Gidsconflicten per zender** (the rest of the Tweede gidsbron): Instellingen → Catalogus en gids lists
+  channels where the sources keep disagreeing, and OK picks which source leads there. `S`–`M`
 
 ### Own media
 - **Jellyfin/Plex/SMB source** next to Xtream: your own films in the same Films grid. `L`
@@ -158,6 +168,9 @@ profile, ratings, voice search, Google TV "Watch Next".
 - ~~✓ **Screensaver of your own**~~ → built (2h): posters from Verder kijken and favourites, slowly drifting, with the
   clock. Android TV lets an app offer a screensaver ("dream") that you pick in the tv's settings. `M`
 - **Seasonal theming**: Sinterklaas/kerst touch on the logo, opt-in. `S`
+- ~~**Instellingen in secties**~~ → built 2026-10-30 (8fa782a): two panes like the tv's own settings,
+  each section with a one-line summary of how it's set. Pop-ups (cards, programme info) lost their
+  boxes for the bar's soft fade (cfb7791).
 - ~~✓ **Easter egg: Testbeeld**~~ → built (2h). On "Wie kijkt er?", the classic code on the remote
   (↑ ↑ ↓ ↓ ← → ← → OK) switches the screen off like an old tube tv (the picture collapses into a white
   line, then a dot), and on again into a testbeeld: colour bars with a circle, "BUIS" in the middle,
@@ -174,7 +187,14 @@ profile, ratings, voice search, Google TV "Watch Next".
   WebView, which the spec rules out). Deep-linking to the YouTube app was the only clean option.
 
 ## If I had to pick
-All ✓ ideas are built (phase 2h, `plans/2026-10-29-phase-2h-brainstorm.md`); next is testing them on the tv.
+*2026-10-30:* all ✓ ideas are built, plus the player, settings and profile rounds above (on main,
+emulator only). First: everything on the tv and an evening's use. After that, the cheapest wins:
+1. **Gidsconflicten per zender**: finishes the second guide source; the data is already there.
+2. **"Wat is er nu op?"**: one screen, all data already on the tv.
+3. **Sleep timer from anywhere** and **night mode**: small, every evening.
+Then Home Assistant (bioscoopmodus) as the first integration.
+
+*Earlier (2026-10-29):* all ✓ ideas built (phase 2h, `plans/2026-10-29-phase-2h-brainstorm.md`).
 Earlier note:
 Pauzemoment is done (on the tv, waiting for an evening's test). Of the ✓ ideas, next:
 1. **Geluid en ondertitels + klok** as one player panel: something you miss every film, and it gives
