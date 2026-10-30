@@ -4,6 +4,7 @@ import androidx.paging.PagingSource
 import androidx.room.Dao
 import androidx.room.Embedded
 import androidx.room.Insert
+import androidx.room.OnConflictStrategy
 import androidx.room.Query
 import androidx.room.Update
 import androidx.room.Upsert
@@ -13,9 +14,11 @@ import nl.jordy.iptv.data.xtream.ContentType
 @Dao
 interface CatalogDao {
     @Upsert suspend fun upsertCategories(items: List<CategoryEntity>)
-    @Upsert suspend fun upsertLive(items: List<LiveChannelEntity>)
-    @Upsert suspend fun upsertMovies(items: List<MovieEntity>)
-    @Upsert suspend fun upsertSeries(items: List<SeriesEntity>)
+    // REPLACE, not @Upsert: on a filled table @Upsert throws and catches a constraint error per row (50 s of a
+    // 109 s daily sync on the tv). Nothing references these rows by foreign key, so delete-and-insert is safe.
+    @Insert(onConflict = OnConflictStrategy.REPLACE) suspend fun upsertLive(items: List<LiveChannelEntity>)
+    @Insert(onConflict = OnConflictStrategy.REPLACE) suspend fun upsertMovies(items: List<MovieEntity>)
+    @Insert(onConflict = OnConflictStrategy.REPLACE) suspend fun upsertSeries(items: List<SeriesEntity>)
 
     @Query("DELETE FROM category WHERE type = :type AND generation < :generation")
     suspend fun deleteOldCategories(type: ContentType, generation: Long)
