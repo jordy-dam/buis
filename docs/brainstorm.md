@@ -112,6 +112,31 @@ profile, ratings, voice search, Google TV "Watch Next".
 - **Bioscoopreleases**: a "Binnenkort in de bios" row from TMDB's NL now-playing/upcoming lists,
   ranked on the tv by the profile's genres (phase 3 weights). Only the region query goes out, never
   the profile or history. OK on a title adds it to the Wachtlijst, so you get it once it streams. `M` ⚠️
+- ✓ **Tweede gidsbron**: a public XMLTV for Dutch channels next to the provider's. BUIS compares
+  the two per channel and shows conflicts in Instellingen ("SBS6: provider zegt De Bondgenoten,
+  bron 2 zegt True Crime"); when one source keeps being right for a channel, OK swaps which one
+  leads there. Prompted by SBS6 on 2026-10-30, where the provider missed a late-night schedule
+  change even after a refresh. Only the guide download goes out, no viewing data. `M` ⚠️
+  *Checked 2026-10-30, against the emulator's guide:*
+  - **Source:** open-epg.com `files/netherlands.xml` (4 MB, 292 channels, ~2 days ahead). It had
+    SBS6 right (True Crime Today 23:56, De Bondgenoten 00:29). Free, donation-backed, updated once
+    a day around 18:00 CET, max 20 downloads a day: so one download a day, after 18:00. epgshare01
+    `epg_ripper_NL1.xml.gz` (18 MB, 4 days) was just as right and is the backup; globetvapp is stale.
+  - **Matching:** open-epg uses the same ids as the provider, differently cased (`SBS6.nl` vs
+    `sbs6.nl`): lowercased, 75 of the 102 Dutch provider ids match, all big channels included.
+    epgshare01 adds 7 more after stripping punctuation/HD. Missing: mostly Ziggo Sport sub-channels,
+    regional channels, BBC/Fox/NatGeo.
+  - **Conflicts:** over the next 24 h the two disagree on ~11% of time slots, nearly all on sports
+    (Eurosport, Ziggo Sport, ESPN) and music channels, where both look plausible. So report
+    conflicts per channel only when they repeat, not every time slot, or Instellingen fills up.
+  - **New channels:** of the 651 Dutch streams without any guide today, the three sources together
+    know 32 names (63 streams) by display name, among them Viaplay TV (7 streams, the old Viaplay F1
+    gap), FilmBox, Love Nature, DreamWorks, Moonbug, BVN, ZDF/WDR/NDR, Arte and some regionals.
+    Most of the rest are divider rows, ESPN Watch event feeds and Rakuten channels no source has.
+  - **Shape (Jordy, 2026-10-30):** merge all sources into one guide with a preference order:
+    per channel and time slot the first source that has data wins, the others fill gaps. Default
+    order open-epg → epgshare01 → provider; a channel can get its own order from the conflict list.
+    Display-name matching (not just ids) is what brings in the new channels.
 
 ### Own media
 - **Jellyfin/Plex/SMB source** next to Xtream: your own films in the same Films grid. `L`

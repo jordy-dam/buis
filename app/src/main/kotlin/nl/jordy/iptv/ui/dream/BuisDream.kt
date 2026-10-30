@@ -43,6 +43,7 @@ import dagger.hilt.android.AndroidEntryPoint
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.first
 import nl.jordy.iptv.data.db.AppDatabase
+import nl.jordy.iptv.data.epg.EpgGuide
 import nl.jordy.iptv.data.profile.ProfileRepository
 import nl.jordy.iptv.data.xtream.ContentType
 import nl.jordy.iptv.ui.theme.Background
@@ -63,6 +64,7 @@ import javax.inject.Singleton
 @AndroidEntryPoint
 class BuisDream : DreamService(), LifecycleOwner, SavedStateRegistryOwner {
     @Inject lateinit var posters: DreamPosters
+    @Inject lateinit var guide: EpgGuide
 
     // A DreamService is no LifecycleOwner, but Compose needs one (and a saved-state owner) on its view.
     private val registry = LifecycleRegistry(this)
@@ -92,6 +94,8 @@ class BuisDream : DreamService(), LifecycleOwner, SavedStateRegistryOwner {
     override fun onDreamingStarted() {
         super.onDreamingStarted()
         registry.currentState = Lifecycle.State.RESUMED
+        // Nobody is watching: a good moment for the guide.
+        guide.refreshIfStale()
     }
 
     override fun onDreamingStopped() {

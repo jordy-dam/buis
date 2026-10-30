@@ -19,6 +19,7 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 import nl.jordy.iptv.data.auth.CredentialStore
 import nl.jordy.iptv.data.db.AppDatabase
+import nl.jordy.iptv.data.epg.EpgGuide
 import nl.jordy.iptv.ui.AppNavHost
 import nl.jordy.iptv.data.profile.ProfileRepository
 import nl.jordy.iptv.ui.LoginRoute
@@ -33,6 +34,7 @@ import javax.inject.Inject
 @AndroidEntryPoint
 class MainActivity : ComponentActivity() {
     private val vm: StartViewModel by viewModels()
+    @Inject lateinit var guide: EpgGuide
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -45,6 +47,12 @@ class MainActivity : ComponentActivity() {
                 }
             }
         }
+    }
+
+    // Every return to the app is a chance to pick up a newer guide, in the background.
+    override fun onStart() {
+        super.onStart()
+        guide.refreshIfStale()
     }
 }
 
