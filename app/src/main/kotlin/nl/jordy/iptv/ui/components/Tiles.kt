@@ -228,9 +228,11 @@ fun ChannelTile(
                 }
             }
             if (now != null) {
+                // A hint of how far the programme is, not a second highlight: a list of full amber
+                // lines outshouts the names.
                 Box(
-                    Modifier.align(Alignment.BottomStart).fillMaxWidth(now.progress()).height(2.dp)
-                        .background(Live),
+                    Modifier.align(Alignment.BottomStart).fillMaxWidth(now.progress()).height(1.dp)
+                        .background(Live.copy(alpha = 0.45f)),
                 )
             }
         }
@@ -263,7 +265,7 @@ fun ChannelCard(name: String, logoUrl: String?, now: EpgEntry?, onClick: () -> U
                 }
             }
             if (now != null) {
-                Box(Modifier.align(Alignment.BottomStart).fillMaxWidth(now.progress()).height(2.dp).background(Live))
+                Box(Modifier.align(Alignment.BottomStart).fillMaxWidth(now.progress()).height(1.dp).background(Live.copy(alpha = 0.45f)))
             }
         }
     }

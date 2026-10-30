@@ -24,11 +24,11 @@ val SurfaceColor = Color(0xFF1C1D21)
 val SurfaceRaised = Color(0xFF26282D)
 /**
  * Everything that floats over the picture or a screen: the player bar, its track lists and every
- * pop-up (corner card). One surface, see-through so the picture shows a little; at 82 % text and
+ * pop-up (corner card). One surface, see-through so the picture shows a little; at 60 % text and
  * icons stay readable over the brightest colour bars. Focus on it is the light [FocusBar] fill, not
  * [FocusFill]: a grey step disappears into a translucent grey surface.
  */
-val PopupSurface = SurfaceRaised.copy(alpha = 0.82f)
+val PopupSurface = SurfaceRaised.copy(alpha = 0.60f)
 /** The logo's blue, a touch lighter so it holds up on the dark background. */
 val Brand = Color(0xFF2D6AA8)
 val Heart = Color(0xFFE5484D)

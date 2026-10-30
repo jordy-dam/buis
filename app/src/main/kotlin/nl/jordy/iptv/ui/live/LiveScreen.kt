@@ -451,14 +451,23 @@ private fun GuideRow(
     ) {
         Column(Modifier.padding(horizontal = 12.dp, vertical = 10.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
+                // Times in the amber of "NU", a step lighter, so the column reads at a glance.
                 Text(
                     if (running) "NU" else time.format(Instant.ofEpochSecond(p.start)),
                     style = MaterialTheme.typography.titleMedium,
-                    fontWeight = if (running) FontWeight.Bold else null,
-                    color = if (running) Live else LocalContentColor.current.copy(alpha = 0.7f),
+                    fontWeight = if (running) FontWeight.Bold else FontWeight.SemiBold,
+                    color = Live,
                     modifier = Modifier.width(64.dp),
                 )
                 Text(p.title, style = MaterialTheme.typography.titleMedium, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f))
+                // The focused row says when it runs, in the time column's amber, at the end of the title line.
+                if (focused) {
+                    Text(
+                        "${time.format(Instant.ofEpochSecond(p.start))}–${time.format(Instant.ofEpochSecond(p.stop))} · ${(p.stop - p.start) / 60} min",
+                        style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.SemiBold, color = Live,
+                        modifier = Modifier.padding(start = 12.dp),
+                    )
+                }
                 // A bell for a reminder on this programme, an eye when its title is followed.
                 when {
                     reminded -> androidx.tv.material3.Icon(Icons.Filled.NotificationsActive, contentDescription = "Herinnering", tint = Live, modifier = Modifier.padding(start = 8.dp).size(18.dp))
@@ -466,17 +475,14 @@ private fun GuideRow(
                 }
             }
             if (running) {
-                Box(Modifier.padding(start = 64.dp, top = 6.dp).fillMaxWidth().height(3.dp).background(FocusFill, RoundedCornerShape(2.dp))) {
-                    Box(Modifier.fillMaxWidth(p.progress(nowSec)).fillMaxHeight().background(Live, RoundedCornerShape(2.dp)))
+                // Quiet, like the channel rows: a hint of how far it is.
+                Box(Modifier.padding(start = 64.dp, top = 6.dp).fillMaxWidth().height(1.dp).background(FocusFill)) {
+                    Box(Modifier.fillMaxWidth(p.progress(nowSec)).fillMaxHeight().background(Live.copy(alpha = 0.45f)))
                 }
             }
             if (focused) {
-                Column(Modifier.padding(start = 64.dp, top = 6.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                    val minutes = (p.stop - p.start) / 60
-                    Text("${time.format(Instant.ofEpochSecond(p.start))}–${time.format(Instant.ofEpochSecond(p.stop))} · $minutes min", style = MaterialTheme.typography.bodyMedium, color = LocalContentColor.current.copy(alpha = 0.7f))
-                    p.description?.takeIf { it.isNotBlank() }?.let {
-                        Text(it, style = MaterialTheme.typography.bodyMedium, color = LocalContentColor.current.copy(alpha = 0.7f), maxLines = 3, overflow = TextOverflow.Ellipsis)
-                    }
+                p.description?.takeIf { it.isNotBlank() }?.let {
+                    Text(it, style = MaterialTheme.typography.bodyMedium, color = LocalContentColor.current.copy(alpha = 0.7f), maxLines = 3, overflow = TextOverflow.Ellipsis, modifier = Modifier.padding(start = 64.dp, top = 6.dp))
                 }
             }
         }

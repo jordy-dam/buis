@@ -60,6 +60,8 @@ import javax.inject.Inject
 data class PlayerUiState(
     val title: String = "",
     val channelNumber: Int? = null,
+    /** Live: the channel's logo, the bar's button to the channel list. */
+    val logoUrl: String? = null,
     val now: EpgEntry? = null,
     val next: EpgEntry? = null,
     /** Live: the channel Left goes back to. */
@@ -257,6 +259,20 @@ class PlayerViewModel @Inject constructor(
         playLive(ch.streamId, ch.name)
     }
 
+    /** The channels Up/Down zap through, for the player's channel list. */
+    val zapChannels: List<LiveChannelEntity> get() = channels
+    val currentChannelIndex: Int get() = channelIndex
+
+    /** A channel picked in the player's channel list. */
+    fun tune(index: Int) {
+        val ch = channels.getOrNull(index) ?: return
+        if (index == channelIndex) return
+        channelIndex = index
+        playLive(ch.streamId, ch.name)
+    }
+
+    suspend fun nowAndNext(streamId: Int) = epg.nowAndNext(streamId)
+
     /** Left: back to the channel watched before this one, with its own zap list. Left again flips back. */
     fun previousChannel() {
         val prev = history.previous ?: return
@@ -280,7 +296,11 @@ class PlayerViewModel @Inject constructor(
         history.watched(ChannelHistory.Entry(streamId, name, zapCategory))
         watching(WatchItem(ContentType.LIVE, streamId, name, categoryId = zapCategory))
         _state.update {
-            PlayerUiState(title = name, channelNumber = channelIndex.takeIf { it >= 0 }?.plus(1), previous = history.previous?.name, showClock = it.showClock)
+            PlayerUiState(
+                title = name, channelNumber = channelIndex.takeIf { it >= 0 }?.plus(1),
+                logoUrl = channels.firstOrNull { c -> c.streamId == streamId }?.logoUrl,
+                previous = history.previous?.name, showClock = it.showClock,
+            )
         }
         zapStartedAt = SystemClock.elapsedRealtime()
         // Subtitles per channel: a track picked on the previous channel was for that one only.

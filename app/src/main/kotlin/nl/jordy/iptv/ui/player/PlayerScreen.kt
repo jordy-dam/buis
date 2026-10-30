@@ -61,6 +61,7 @@ import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusProperties
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.focus.focusRestorer
+import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.ColorFilter
 import androidx.compose.ui.graphics.vector.ImageVector
@@ -113,6 +114,20 @@ import nl.jordy.iptv.ui.components.IconButton
 import nl.jordy.iptv.ui.components.Focus
 import nl.jordy.iptv.ui.components.ignoreHeldKey
 import nl.jordy.iptv.ui.components.ProgressBar
+import nl.jordy.iptv.ui.components.ChannelTile
+import nl.jordy.iptv.ui.components.ChoiceSize
+import nl.jordy.iptv.ui.components.rememberNowAndNext
+import nl.jordy.iptv.ui.components.progress
+import nl.jordy.iptv.ui.theme.SurfaceRaised
+import nl.jordy.iptv.ui.theme.SurfaceColor
+import androidx.compose.material.icons.filled.Info
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.fillMaxHeight
+import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.itemsIndexed
+import androidx.compose.foundation.lazy.rememberLazyListState
+import coil3.compose.AsyncImage
 import nl.jordy.iptv.ui.theme.BrandText
 import nl.jordy.iptv.ui.theme.Live
 import nl.jordy.iptv.ui.theme.SafeArea
@@ -143,7 +158,8 @@ private enum class Choice { AUDIO, SUBTITLES }
  * of round controls. Plain playback keeps its keys (VOD: OK pause, Left/Right seek; live: Up/Down
  * zap, Left previous channel) while the bar only shows; the controls take focus when they're asked
  * for: Down in a film, Right in live, or a pause. Audio and subtitles open their choices in place,
- * above their button. Back closes the innermost layer first: the choices, then the controls.
+ * above their button. Back closes the innermost layer first: the choices, then the controls; Up or
+ * Down also leaves the controls.
  */
 @OptIn(UnstableApi::class)
 @Composable
@@ -158,6 +174,8 @@ fun PlayerScreen(onExit: () -> Unit, vm: PlayerViewModel = hiltViewModel()) {
     // Focus is in the bar's controls (not on the picture), and maybe in a track list above them.
     var controls by remember { mutableStateOf(false) }
     var choice by remember { mutableStateOf<Choice?>(null) }
+    // Live: the programme info or the channel list, opened from the bar.
+    var panel by remember { mutableStateOf<Panel?>(null) }
     var focusTarget by remember { mutableStateOf<FocusRequester?>(null) }
     val buttons = remember { ControlFocus() }
     // Instant replay: this hold of Left already rewound, so its release isn't "vorige zender".
@@ -178,13 +196,14 @@ fun PlayerScreen(onExit: () -> Unit, vm: PlayerViewModel = hiltViewModel()) {
     }
     fun closeControls() {
         choice = null
+        panel = null
         controls = false
         runCatching { focus.requestFocus() }
     }
 
-    LaunchedEffect(overlayTick, paused, choice) {
+    LaunchedEffect(overlayTick, paused, choice, panel) {
         overlayVisible = true
-        if (paused || choice != null) return@LaunchedEffect
+        if (paused || choice != null || panel != null) return@LaunchedEffect
         delay(BAR_MS)
         overlayVisible = false
         if (controls) closeControls()
@@ -220,6 +239,7 @@ fun PlayerScreen(onExit: () -> Unit, vm: PlayerViewModel = hiltViewModel()) {
     LaunchedEffect(card) {
         if (card != null) {
             choice = null
+            panel = null
             controls = false
             hadCard = true
             focusTarget = cardFocus
@@ -288,6 +308,11 @@ fun PlayerScreen(onExit: () -> Unit, vm: PlayerViewModel = hiltViewModel()) {
         choice = null
         focusTarget = if (from == Choice.AUDIO) buttons.audio else buttons.subtitles
     }
+    BackHandler(enabled = panel != null) {
+        val from = panel
+        panel = null
+        focusTarget = if (from == Panel.CHANNELS) buttons.channels else buttons.info
+    }
     LaunchedEffect(state.finished) { if (state.finished) onExit() }
 
     val live = vm.isLive && state.catchup == null
@@ -314,12 +339,21 @@ fun PlayerScreen(onExit: () -> Unit, vm: PlayerViewModel = hiltViewModel()) {
                 if (controls || card != null) {
                     // Media keys still work; d-pad and OK belong to the focused control.
                     if (e.type != KeyEventType.KeyDown) return@onKeyEvent false
-                    return@onKeyEvent when (code) {
-                        KeyEvent.KEYCODE_MEDIA_PLAY_PAUSE -> { vm.togglePause(); true }
-                        KeyEvent.KEYCODE_MEDIA_PLAY -> { vm.player.play(); true }
-                        KeyEvent.KEYCODE_MEDIA_PAUSE -> { vm.player.pause(); true }
-                        // Left/Right move between the choices; a row's edges stop focus (see [stayIn]).
-                        else -> false
+                    // The row is flat: Up or Down leaves it, back to the picture (no zap yet), and so
+                    // does Left on the first button. Its release must not count as "vorige zender".
+                    val inRow = controls && card == null && choice == null && panel != Panel.CHANNELS
+                    val vertical = code == KeyEvent.KEYCODE_DPAD_UP || code == KeyEvent.KEYCODE_DPAD_DOWN
+                    val leftOut = inRow && code == KeyEvent.KEYCODE_DPAD_LEFT && buttons.onFirst
+                    return@onKeyEvent when {
+                        inRow && vertical -> { closeControls(); overlayTick++; true }
+                        leftOut -> { leftHeld = true; closeControls(); overlayTick++; true }
+                        else -> when (code) {
+                            KeyEvent.KEYCODE_MEDIA_PLAY_PAUSE -> { vm.togglePause(); true }
+                            KeyEvent.KEYCODE_MEDIA_PLAY -> { vm.player.play(); true }
+                            KeyEvent.KEYCODE_MEDIA_PAUSE -> { vm.player.pause(); true }
+                            // Left/Right move between the choices; a row's edges stop focus (see [stayIn]).
+                            else -> false
+                        }
                     }
                 }
                 // Live: Left is "vorige zender" when released; held, it rewinds (instant replay).
@@ -348,14 +382,16 @@ fun PlayerScreen(onExit: () -> Unit, vm: PlayerViewModel = hiltViewModel()) {
                     KeyEvent.KEYCODE_DPAD_UP, KeyEvent.KEYCODE_CHANNEL_UP -> { vm.zap(+1); true }
                     KeyEvent.KEYCODE_DPAD_DOWN, KeyEvent.KEYCODE_CHANNEL_DOWN -> { vm.zap(-1); true }
                     KeyEvent.KEYCODE_LAST_CHANNEL -> { vm.previousChannel(); true }
-                    // Down zaps in live, so Right opens the controls, on the audio button.
-                    KeyEvent.KEYCODE_DPAD_RIGHT -> { openControls(buttons.audio); true }
+                    // Down zaps in live, so Right opens the controls: on vanaf begin / terug naar live
+                    // when there is one, else on audio. Left from the first button goes back out.
+                    KeyEvent.KEYCODE_DPAD_RIGHT -> { openControls(if (state.replaying || state.canRestart) buttons.play else buttons.audio); true }
                     // First OK shows the info with the restart button; OK while it shows starts it.
                     KeyEvent.KEYCODE_DPAD_CENTER, KeyEvent.KEYCODE_ENTER -> {
                         if (state.replaying) vm.goLive() else if (overlayVisible && state.canRestart) vm.watchFromStart()
                         true
                     }
-                    KeyEvent.KEYCODE_INFO -> true
+                    // The remote's info key: the programme info, in the controls so Back steps out as usual.
+                    KeyEvent.KEYCODE_INFO -> { panel = Panel.INFO; openControls(buttons.info); true }
                     else -> false
                 } else when (code) {
                     // Pausing hands the keys to the controls, on play: OK again plays on.
@@ -384,7 +420,8 @@ fun PlayerScreen(onExit: () -> Unit, vm: PlayerViewModel = hiltViewModel()) {
             surfaceType = SURFACE_TYPE_SURFACE_VIEW,
             modifier = Modifier.fillMaxSize().resizeWithContentScale(ContentScale.Fit, presentation.videoSizeDp),
         )
-        val barShows = overlayVisible && state.error == null
+        // The channel list stands on its own: the bar would peek out beside it.
+        val barShows = overlayVisible && state.error == null && panel != Panel.CHANNELS
         val lift = with(density) { if (barShows) barHeight.toDp() else 0.dp }
         Subtitles(vm.player, lift, Modifier.fillMaxSize())
 
@@ -422,6 +459,12 @@ fun PlayerScreen(onExit: () -> Unit, vm: PlayerViewModel = hiltViewModel()) {
                     choice = c
                     focusTarget = buttons.firstChoice
                 },
+                panel = panel,
+                // The info toggles in place; the channel list takes focus, on the channel playing.
+                onPanel = { p ->
+                    panel = if (panel == p) null else p
+                    if (p == Panel.CHANNELS) focusTarget = buttons.firstChannel
+                },
                 actions = BarActions(
                     replay = { if (live) vm.replay() else vm.seekBy(-10_000) },
                     playPause = vm::togglePause,
@@ -432,6 +475,23 @@ fun PlayerScreen(onExit: () -> Unit, vm: PlayerViewModel = hiltViewModel()) {
                     audio = { i -> vm.selectAudio(i); choice = null; focusTarget = buttons.audio },
                     subtitle = { i -> vm.selectSubtitle(i); choice = null; focusTarget = buttons.subtitles },
                 ),
+            )
+        }
+
+        if (barShows && panel == Panel.INFO) {
+            ProgrammeInfo(
+                state,
+                Modifier.align(Alignment.BottomStart).padding(start = SafeArea, bottom = lift + 16.dp),
+            )
+        }
+        if (panel == Panel.CHANNELS) {
+            ChannelList(
+                channels = vm.zapChannels,
+                current = vm.currentChannelIndex,
+                first = buttons.firstChannel,
+                load = vm::nowAndNext,
+                onPick = { i -> vm.tune(i); closeControls(); overlayTick++ },
+                modifier = Modifier.align(Alignment.CenterStart),
             )
         }
 
@@ -453,6 +513,8 @@ fun PlayerScreen(onExit: () -> Unit, vm: PlayerViewModel = hiltViewModel()) {
 
 private enum class Card { SLEEP, BREAK, NEXT, INTRO }
 
+private enum class Panel { INFO, CHANNELS }
+
 /** Focus can move inside this group but not out of it: a row of choices has edges, not exits. */
 private fun Modifier.stayIn() = focusProperties { onExit = { cancelFocusChange() } }.focusGroup()
 
@@ -463,6 +525,12 @@ private class ControlFocus {
     val subtitles = FocusRequester()
     /** The selected entry of the open track list. */
     val firstChoice = FocusRequester()
+    val info = FocusRequester()
+    val channels = FocusRequester()
+    /** The playing channel in the open channel list. */
+    val firstChannel = FocusRequester()
+    /** Focus is on the row's first button, where Left leaves the controls. */
+    var onFirst = false
 }
 
 private class BarActions(
@@ -493,6 +561,8 @@ private fun PlayerBar(
     choice: Choice?,
     buttons: ControlFocus,
     onChoice: (Choice) -> Unit,
+    panel: Panel?,
+    onPanel: (Panel) -> Unit,
     actions: BarActions,
 ) {
     // Where the open list's button sits, to put the list right above it.
@@ -500,6 +570,9 @@ private fun PlayerBar(
     var subtitlesX by remember { mutableFloatStateOf(0f) }
     var barX by remember { mutableFloatStateOf(0f) }
     var barWidth by remember { mutableIntStateOf(0) }
+    // The focused control's name: icons alone don't say what OK will do.
+    var focused by remember { mutableStateOf<String?>(null) }
+    val named: (String, Boolean) -> Unit = { label, has -> if (has) focused = label else if (focused == label) focused = null }
     Column(
         Modifier
             .padding(start = SafeArea, end = SafeArea, bottom = 32.dp)
@@ -547,9 +620,12 @@ private fun PlayerBar(
         }
 
         Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-            // Left: where you are (or, in live, the keys that zap).
+            // Left: where you are (or, in live, the keys that zap; in the controls those keys
+            // leave the row, so it names the focused button instead).
             Box(Modifier.weight(1f)) {
-                if (live) {
+                if (live && controls) {
+                    focused?.let { Text(it, style = MaterialTheme.typography.titleLarge) }
+                } else if (live) {
                     Hints(
                         Hint(Icons.Filled.KeyboardArrowUp, Icons.Filled.KeyboardArrowDown),
                         Hint(Icons.Filled.KeyboardArrowLeft, text = state.previous),
@@ -564,27 +640,38 @@ private fun PlayerBar(
                 verticalAlignment = Alignment.CenterVertically,
             ) {
                 if (live) {
-                    ControlButton(Icons.Filled.Replay10, "10 seconden terug", controls, actions.replay)
-                    if (state.replaying) ControlButton(Icons.Filled.LiveTv, "Terug naar live", controls, actions.toLive, Modifier.focusRequester(buttons.play))
-                    else if (state.canRestart) ControlButton(Icons.Filled.RestartAlt, "Vanaf begin", controls, actions.restart, Modifier.focusRequester(buttons.play))
+                    // The channel's logo opens the channel list, like NLZiet's.
+                    ChannelButton(
+                        state.logoUrl, state.title, controls, named, { onPanel(Panel.CHANNELS) },
+                        Modifier.focusRequester(buttons.channels).onFocusChanged { buttons.onFirst = it.isFocused },
+                    )
+                    ControlButton(Icons.Filled.Replay10, "10 seconden terug", controls, named, actions.replay)
+                    if (state.replaying) ControlButton(Icons.Filled.LiveTv, "Terug naar live", controls, named, actions.toLive, Modifier.focusRequester(buttons.play))
+                    else if (state.canRestart) ControlButton(Icons.Filled.RestartAlt, "Vanaf begin", controls, named, actions.restart, Modifier.focusRequester(buttons.play))
                 } else {
-                    ControlButton(Icons.Filled.Replay10, "10 seconden terug", controls, actions.replay)
-                    ControlButton(if (playing) Icons.Filled.Pause else Icons.Filled.PlayArrow, if (playing) "Pauze" else "Afspelen", controls, actions.playPause, Modifier.focusRequester(buttons.play))
-                    ControlButton(Icons.Filled.Forward30, "30 seconden vooruit", controls, actions.forward)
-                    if (catchup != null) ControlButton(Icons.Filled.LiveTv, "Terug naar live", controls, actions.toLive)
+                    ControlButton(Icons.Filled.Replay10, "10 seconden terug", controls, named, actions.replay, Modifier.onFocusChanged { buttons.onFirst = it.isFocused })
+                    ControlButton(if (playing) Icons.Filled.Pause else Icons.Filled.PlayArrow, if (playing) "Pauze" else "Afspelen", controls, named, actions.playPause, Modifier.focusRequester(buttons.play))
+                    ControlButton(Icons.Filled.Forward30, "30 seconden vooruit", controls, named, actions.forward)
+                    if (catchup != null) ControlButton(Icons.Filled.LiveTv, "Terug naar live", controls, named, actions.toLive)
                 }
                 Spacer(Modifier.width(20.dp))
                 ControlButton(
-                    Icons.Filled.Audiotrack, "Geluid", controls, { onChoice(Choice.AUDIO) },
+                    Icons.Filled.Audiotrack, "Geluid", controls, named, { onChoice(Choice.AUDIO) },
                     Modifier.focusRequester(buttons.audio).onGloballyPositioned { audioX = it.positionInRoot().x + it.size.width / 2f },
                     active = choice == Choice.AUDIO,
                 )
                 ControlButton(
-                    Icons.Filled.Subtitles, "Ondertitels", controls, { onChoice(Choice.SUBTITLES) },
+                    Icons.Filled.Subtitles, "Ondertitels", controls, named, { onChoice(Choice.SUBTITLES) },
                     Modifier.focusRequester(buttons.subtitles).onGloballyPositioned { subtitlesX = it.positionInRoot().x + it.size.width / 2f },
                     active = choice == Choice.SUBTITLES || state.subtitleSelected != null,
                 )
-                ControlButton(Icons.Filled.Schedule, "Klok", controls, actions.clock, active = state.showClock)
+                ControlButton(Icons.Filled.Schedule, "Klok", controls, named, actions.clock, active = state.showClock)
+                if (live) {
+                    ControlButton(
+                        Icons.Filled.Info, "Programma-info", controls, named, { onPanel(Panel.INFO) },
+                        Modifier.focusRequester(buttons.info), active = panel == Panel.INFO,
+                    )
+                }
             }
             Box(Modifier.weight(1f), contentAlignment = Alignment.CenterEnd) {
                 if (!live && duration > 0) Text(formatTime(duration), style = MaterialTheme.typography.titleLarge, color = TextSecondary)
@@ -600,11 +687,17 @@ private fun ControlButton(
     icon: ImageVector,
     label: String,
     enabled: Boolean,
+    /** Tells the bar this button's name while it has focus. */
+    named: (String, Boolean) -> Unit,
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
     /** On (clock, subtitles) or open: the icon turns the "selected" blue. */
     active: Boolean = false,
-) = IconButton(icon, label, onClick, modifier.focusProperties { canFocus = enabled }, tint = if (active) BrandText else null, large = true)
+) = IconButton(
+    icon, label, onClick,
+    modifier.focusProperties { canFocus = enabled }.onFocusChanged { named(label, it.isFocused) },
+    tint = if (active) BrandText else null, large = true,
+)
 
 /**
  * Audio or subtitle tracks, in the bar right above the button that opened it: the pop-up surface
@@ -748,6 +841,99 @@ private fun Subtitles(player: Player, lift: androidx.compose.ui.unit.Dp, modifie
         onDispose { player.removeListener(listener) }
     }
     AndroidView({ view }, modifier.padding(bottom = lift))
+}
+
+/** The channel's logo as the bar's first button: a wide rounded plate, so a logo fits, focusable like the round ones. */
+@Composable
+private fun ChannelButton(
+    logoUrl: String?,
+    name: String,
+    enabled: Boolean,
+    named: (String, Boolean) -> Unit,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    Surface(
+        onClick = onClick,
+        modifier = modifier.height(ChoiceSize).width(ChoiceSize * 16 / 9)
+            .focusProperties { canFocus = enabled }.onFocusChanged { named("Zenders", it.isFocused) },
+        shape = ClickableSurfaceDefaults.shape(RoundedCornerShape(10.dp)),
+        scale = ClickableSurfaceDefaults.scale(focusedScale = Focus.SCALE),
+        colors = ClickableSurfaceDefaults.colors(
+            containerColor = SurfaceRaised,
+            contentColor = TextSecondary,
+            focusedContainerColor = FocusBar,
+            focusedContentColor = TextOnLight,
+        ),
+    ) {
+        Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+            Text(name.take(2).uppercase(), style = MaterialTheme.typography.labelLarge)
+            if (logoUrl != null) {
+                AsyncImage(model = logoUrl, contentDescription = "Zenders", contentScale = ContentScale.Fit, modifier = Modifier.fillMaxSize().padding(6.dp))
+            }
+        }
+    }
+}
+
+/**
+ * NLZiet's "i": what the bar under it doesn't say. The bar already has the channel, the times, the
+ * progress and what's next, so this is the time left and the description. Only to read; Back or the
+ * button again closes it.
+ */
+@Composable
+private fun ProgrammeInfo(state: PlayerUiState, modifier: Modifier) {
+    Column(
+        modifier.width(720.dp).background(PopupSurface, RoundedCornerShape(16.dp)).border(1.dp, FocusFill, RoundedCornerShape(16.dp)).padding(24.dp),
+        verticalArrangement = Arrangement.spacedBy(8.dp),
+    ) {
+        val now = state.now
+        if (now == null) {
+            Text("Geen gids voor deze zender.", style = MaterialTheme.typography.bodyLarge, color = TextSecondary)
+            return@Column
+        }
+        val left = ((now.stop - System.currentTimeMillis() / 1000) / 60).coerceAtLeast(0)
+        Text("Nog $left min · ${(now.stop - now.start) / 60} min in totaal", style = MaterialTheme.typography.labelLarge, color = Live)
+        Text(
+            now.description?.takeIf { it.isNotBlank() } ?: "Geen beschrijving in de gids.",
+            style = MaterialTheme.typography.bodyLarge, color = TextSecondary, maxLines = 8, overflow = TextOverflow.Ellipsis,
+        )
+    }
+}
+
+/**
+ * The short channel list over the picture: the channels Up/Down zap through, with what's on, the
+ * playing one focused. OK tunes in and closes it; Back closes it.
+ */
+@Composable
+private fun ChannelList(
+    channels: List<nl.jordy.iptv.data.db.LiveChannelEntity>,
+    current: Int,
+    first: FocusRequester,
+    load: suspend (Int) -> Pair<EpgEntry?, EpgEntry?>,
+    onPick: (Int) -> Unit,
+    modifier: Modifier,
+) {
+    val listState = rememberLazyListState(initialFirstVisibleItemIndex = (current - 3).coerceAtLeast(0))
+    LazyColumn(
+        state = listState,
+        modifier = modifier.fillMaxHeight().width(720.dp).background(SurfaceColor.copy(alpha = 0.94f))
+            .padding(horizontal = 16.dp).stayIn(),
+        verticalArrangement = Arrangement.spacedBy(4.dp),
+        contentPadding = PaddingValues(vertical = SafeArea),
+    ) {
+        itemsIndexed(channels, key = { _, c -> c.streamId }) { i, c ->
+            val (now, _) = rememberNowAndNext(c.streamId, load)
+            ChannelTile(
+                name = c.name,
+                logoUrl = c.logoUrl,
+                onClick = { onPick(i) },
+                onLongClick = {},
+                modifier = if (i == current) Modifier.focusRequester(first) else Modifier,
+                number = i + 1,
+                now = now,
+            )
+        }
+    }
 }
 
 /** Early in an episode of a series whose intro BUIS learned: one OK jumps past it. */
