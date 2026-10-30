@@ -32,6 +32,7 @@ import androidx.compose.material.icons.filled.Bedtime
 import androidx.compose.material.icons.filled.EventRepeat
 import androidx.compose.material.icons.filled.LocalCafe
 import androidx.compose.material.icons.filled.HourglassEmpty
+import androidx.compose.material.icons.filled.SwitchVideo
 import androidx.compose.material.icons.filled.Visibility
 import androidx.compose.material.icons.filled.History
 import androidx.compose.material.icons.filled.Refresh
@@ -216,6 +217,7 @@ class SettingsViewModel @Inject constructor(
     }
 
     fun toggleOnlyPreferred() = viewModelScope.launch { profiles.setOnlyPreferred(!prefs.value.onlyPreferred) }
+    fun toggleAutoSwitch() = viewModelScope.launch { profiles.setAutoSwitch(!prefs.value.autoSwitch) }
     fun cycleSleepTimer() = viewModelScope.launch { profiles.setSleepMinutes(SleepTimer.nextChoice(prefs.value.sleepMinutes)) }
     fun cycleBreak() = viewModelScope.launch {
         // Debug builds add a 1-minute choice, to see the break without watching for an hour.
@@ -385,6 +387,13 @@ fun SettingsScreen(onRefreshCatalog: () -> Unit, onLoggedOut: () -> Unit, onEdit
             leading = Icons.Filled.Visibility,
             value = followTerms.joinToString(", ").ifEmpty { "Niets" },
             onClick = { editFollows = true },
+        )
+        SettingRow(
+            "Automatisch overschakelen",
+            "Begint iets dat je volgt, dan schakelt BUIS na 10 seconden over.",
+            leading = Icons.Filled.SwitchVideo,
+            toggle = prefs.autoSwitch,
+            onClick = vm::toggleAutoSwitch,
         )
         SettingRow(
             "Kijkgeschiedenis",

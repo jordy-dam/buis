@@ -31,6 +31,8 @@ data class UserPrefs(
     /** Bedtijd in minutes after midnight, -1 = off. */
     val bedtime: Int = -1,
     val bedtimeDays: Int = 79,
+    /** A followed programme that starts switches over by itself after a short countdown. */
+    val autoSwitch: Boolean = false,
 )
 
 private val Context.settings by preferencesDataStore("settings")

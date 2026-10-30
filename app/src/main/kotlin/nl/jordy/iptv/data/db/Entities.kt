@@ -132,6 +132,8 @@ data class ProfileEntity(
     @ColumnInfo(defaultValue = "-1") val bedtime: Int = -1,
     /** The evenings Bedtijd is on, Monday = bit 0; Sunday to Thursday at first. */
     @ColumnInfo(defaultValue = "79") val bedtimeDays: Int = 79,
+    /** When something the profile follows starts, the reminder counts down and tunes in by itself. */
+    @ColumnInfo(defaultValue = "0") val autoSwitch: Boolean = false,
     /** Categories pinned to the top of Films/Series, as [nl.jordy.iptv.data.settings.CategoryGroups.pinKey]s, comma-separated. */
     @ColumnInfo(defaultValue = "") val pinnedCategories: String = "",
     /** The profile with the highest value is the active one; picking a profile bumps it. */

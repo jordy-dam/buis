@@ -323,6 +323,20 @@ class MigrationTest {
         }
     }
 
+    @Test
+    fun `22 to 23 adds Automatisch overschakelen, off, and keeps the profile's settings`() {
+        helper.createDatabase(DB, 22).use { db ->
+            db.execSQL("INSERT INTO profile (id, name, avatar, face, pinHash, preferredCountries, onlyPreferred, kids, lastUsedAt, createdAt, bedtime, pinnedCategories) VALUES (1, 'Anna', 3, 2, NULL, 'NL', 1, 0, 5, 1, 1290, '')")
+        }
+        helper.runMigrationsAndValidate(DB, 23, true).use { db ->
+            db.query("SELECT autoSwitch, bedtime FROM profile").use {
+                it.moveToFirst()
+                assertEquals("nobody is switched over by surprise", 0, it.getInt(0))
+                assertEquals(1290, it.getInt(1))
+            }
+        }
+    }
+
     private fun SupportSQLiteDatabase.insertPhase1Data() {
         execSQL("INSERT INTO favorite (type, itemId, name, imageUrl, addedAt) VALUES ('LIVE', 101, '┃NL┃ NPO 1 HD', NULL, 1)")
         execSQL("INSERT INTO playback_position (type, itemId, positionMs, durationMs, updatedAt) VALUES ('MOVIE', 5001, 62000, 180000, 2)")

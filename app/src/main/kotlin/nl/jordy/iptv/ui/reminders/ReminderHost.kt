@@ -27,14 +27,17 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.SharingStarted
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.mapLatest
 import kotlinx.coroutines.flow.stateIn
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import nl.jordy.iptv.data.repo.FollowMatches
 import nl.jordy.iptv.data.repo.FollowRepository
+import nl.jordy.iptv.data.profile.ProfileRepository
 import nl.jordy.iptv.ui.PlayerRoute
 import nl.jordy.iptv.ui.components.CornerCard
 import nl.jordy.iptv.ui.components.PrimaryButton
@@ -64,15 +67,21 @@ import java.time.ZoneId
 import java.time.format.DateTimeFormatter
 import javax.inject.Inject
 
+/** How long a started programme counts down before Automatisch overschakelen tunes in. */
+private const val AUTO_SWITCH_SEC = 10
+
 private val clock = DateTimeFormatter.ofPattern("HH:mm").withZone(ZoneId.systemDefault())
 
 /** Looks in the guide every 20 seconds for something the profile follows that's about to start. */
 @HiltViewModel
-class ReminderViewModel @Inject constructor(private val follows: FollowRepository) : ViewModel() {
+class ReminderViewModel @Inject constructor(private val follows: FollowRepository, profiles: ProfileRepository) : ViewModel() {
 
     /** What was dealt with this app run ("<key>:soon", "<key>:now"), so nothing nags twice. */
     private val shown = mutableSetOf<String>()
     val due = MutableStateFlow<FollowMatches.Due?>(null)
+
+    /** Automatisch overschakelen: a programme that started counts down and tunes in by itself. */
+    val autoSwitch = profiles.prefs.map { it.autoSwitch }.stateIn(viewModelScope, SharingStarted.Eagerly, false)
 
     /** For "Volgen aanpassen" straight from a reminder. */
     // Kept up to date all along, so the dialog opens with its terms already there.
@@ -115,6 +124,7 @@ class ReminderViewModel @Inject constructor(private val follows: FollowRepositor
 @Composable
 fun ReminderHost(active: Boolean, onWatch: (PlayerRoute) -> Unit, vm: ReminderViewModel = hiltViewModel()) {
     val due by vm.due.collectAsStateWithLifecycle()
+    val autoSwitch by vm.autoSwitch.collectAsStateWithLifecycle()
     // Outlives the reminder: "Volgen aanpassen" puts the reminder away and opens the terms in its place.
     var editFollows by remember { mutableStateOf(false) }
     if (editFollows) {
@@ -129,6 +139,17 @@ fun ReminderHost(active: Boolean, onWatch: (PlayerRoute) -> Unit, vm: ReminderVi
     val started = d.moment == FollowMatches.Moment.STARTED
     val live = PlayerRoute(PlayerRoute.Kind.LIVE, m.streamId, m.channelName, categoryId = m.categoryId)
     val watch = remember { FocusRequester() }
+    // Started, with Automatisch overschakelen on: seconds until it tunes in by itself. Later or Back stops it.
+    var left by remember(m.key, d.moment) { mutableIntStateOf(AUTO_SWITCH_SEC) }
+    val counting = started && autoSwitch
+    if (counting) LaunchedEffect(m.key, d.moment) {
+        while (left > 0) {
+            delay(1_000)
+            left--
+        }
+        vm.dismiss(watched = true)
+        onWatch(live)
+    }
     // A card in the corner over a lightly dimmed screen, like a tv notification, not a dialog in the middle.
     Dialog(onDismissRequest = { vm.dismiss(watched = false) }, properties = DialogProperties(usePlatformDefaultWidth = false)) {
         (LocalView.current.parent as? DialogWindowProvider)?.window?.setDimAmount(0.25f)
@@ -136,7 +157,11 @@ fun ReminderHost(active: Boolean, onWatch: (PlayerRoute) -> Unit, vm: ReminderVi
         val minutes = ((m.start - System.currentTimeMillis() / 1000 + 59) / 60).coerceAtLeast(1)
         val at = clock.format(Instant.ofEpochSecond(m.start))
         CornerCard(
-            label = if (started) "Nu begonnen · $at" else "Over $minutes min · $at",
+            label = when {
+                counting -> "Nu begonnen · kijken over $left s"
+                started -> "Nu begonnen · $at"
+                else -> "Over $minutes min · $at"
+            },
             title = m.title,
             subtitle = m.channelName,
             modifier = Modifier.ignoreHeldKey(),

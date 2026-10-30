@@ -30,7 +30,7 @@ import androidx.sqlite.db.SupportSQLiteDatabase
         ChannelSwapEntity::class,
         SeriesIntroEntity::class,
     ],
-    version = 22,
+    version = 23,
     exportSchema = true,
     autoMigrations = [
         AutoMigration(from = 1, to = 2, spec = AppDatabase.CatalogResync::class),
@@ -70,6 +70,8 @@ import androidx.sqlite.db.SupportSQLiteDatabase
         AutoMigration(from = 19, to = 20, spec = AppDatabase.DurationRefetch::class),
         // Category labels ("PPV", "FHD") apart from the name, and cleaner channel names: catalog re-syncs.
         AutoMigration(from = 21, to = 22, spec = AppDatabase.CatalogResync::class),
+        // Automatisch overschakelen per profile, off for everyone at first.
+        AutoMigration(from = 22, to = 23),
     ],
 )
 abstract class AppDatabase : RoomDatabase() {
