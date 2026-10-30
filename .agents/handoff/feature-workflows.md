@@ -64,8 +64,8 @@ spec's design principles. On the tv since 16:47 (release f8f255f).
 ## Next up
 0. Merged guide is on the tv (release APK installed 2026-10-30 08:00, one "Gids vernieuwen" at 08:02):
    547 → 609 zenders met gids, same as the emulator, refresh took < 90 s. Still open: Jordy checks
-   Viaplay TV / FilmBox now have a guide, and SBS6 late in the evening against NLZIET. Not committed yet
-   (it sits next to other uncommitted work on `feat/pauzemoment`): ask Jordy.
+   Viaplay TV / FilmBox now have a guide, and SBS6 late in the evening against NLZIET. Committed on its
+   own as 7776bf5; everything since is on main and pushed (2026-10-30).
    Later, once conflicts are measured over a few days: a per-channel source choice.
 1. Jordy tests 2h on the tv. The screensaver needs his OK for `adb shell settings put secure screensaver_components nl.jordy.iptv/.ui.dream.BuisDream`. Then, then merge `feat/pauzemoment` to `main` and push. Ask Jordy: does a mid-film pause annoy, is the corner card style right for all four cards?
 2. Sync speed next: `NameParser` costs 25 s of the 67 s on the tv (Android regex ~240 µs/name). Plan:
