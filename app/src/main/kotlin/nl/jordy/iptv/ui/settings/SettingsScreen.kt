@@ -1,6 +1,11 @@
 package nl.jordy.iptv.ui.settings
 
 import androidx.compose.material.icons.filled.Check
+import androidx.compose.ui.focus.onFocusChanged
+import androidx.compose.ui.focus.FocusDirection
+import androidx.compose.ui.platform.LocalFocusManager
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.material.icons.filled.Tv
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.foundation.background
 import androidx.compose.foundation.focusGroup
@@ -83,7 +88,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.ExperimentalComposeUiApi
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.focus.focusRestorer
+import androidx.compose.ui.focus.focusProperties
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.unit.dp
@@ -278,8 +283,9 @@ class SettingsViewModel @Inject constructor(
 }
 
 /**
- * Settings, split by whom they affect: the watching profile's countries, and the household's
- * catalog and subscription. Profiles themselves are managed from "Wie kijkt er?".
+ * Settings in sections, split by whom they affect: the watching profile's (Profiel, Kijken, Volgen,
+ * Pauze en bedtijd) and the household's (Catalogus en gids, Abonnement). Profiles themselves are
+ * managed from "Wie kijkt er?".
  */
 @OptIn(ExperimentalComposeUiApi::class)
 @Composable
@@ -308,137 +314,128 @@ fun SettingsScreen(onRefreshCatalog: () -> Unit, onLoggedOut: () -> Unit, onEdit
     val followTerms by vm.followTerms.collectAsStateWithLifecycle()
     val followNext by vm.followNext.collectAsStateWithLifecycle()
 
-    // Entering from the rail (whose Instellingen item sits at the bottom) must land on the first
-    // setting, not on whatever row is nearest: that would be Uitloggen.
-    val first = remember { FocusRequester() }
-    Column(
-        Modifier.width(780.dp).focusRestorer(first).focusGroup().verticalScroll(rememberScrollState()).padding(bottom = 48.dp),
-        verticalArrangement = Arrangement.spacedBy(6.dp),
-    ) {
-        Text("Instellingen", style = MaterialTheme.typography.headlineMedium, modifier = Modifier.padding(bottom = 8.dp))
-
-        Header("Voor $profileName") { profile?.let { AvatarCircle(it.name, it.avatar, 28.dp, face = it.face) } }
-        SettingRow(
-            "Profiel bewerken",
-            leading = Icons.Filled.Person,
-            onClick = { openEdit() },
-            modifier = Modifier.focusRequester(first),
-        )
-        SettingRow(
-            "Voorkeurslanden",
-            leading = Icons.Filled.Public,
-            value = prefs.preferredCountries.sorted().joinToString(", ") { NameParser.countryName(it) },
-            onClick = { pickCountries = true },
-        )
-        SettingRow(
-            "Alleen voorkeurslanden",
-            leading = Icons.Filled.FilterAlt,
-            toggle = prefs.onlyPreferred,
-            onClick = vm::toggleOnlyPreferred,
-        )
-        SettingRow(
-            "Geluid",
-            leading = Icons.Filled.Audiotrack,
-            value = TrackLabels.name(prefs.audioLang, TrackLabels.AUDIO_CHOICES),
-            onClick = vm::cycleAudioLang,
-        )
-        SettingRow(
-            "Ondertitels",
-            leading = Icons.Filled.Subtitles,
-            value = TrackLabels.name(prefs.subtitleLang, TrackLabels.SUBTITLE_CHOICES),
-            onClick = vm::cycleSubtitleLang,
-        )
-        SettingRow(
-            "Slaaptimer",
-            leading = Icons.Filled.Snooze,
-            value = if (prefs.sleepMinutes == 0) "Uit" else "${prefs.sleepMinutes} min",
-            onClick = vm::cycleSleepTimer,
-        )
-        SettingRow(
-            "Bedtijd",
-            leading = Icons.Filled.Bedtime,
-            value = Bedtime.timeName(prefs.bedtime),
-            onClick = vm::cycleBedtime,
-        )
-        if (prefs.bedtime >= 0) {
-            SettingRow(
-                "Bedtijd op",
-                leading = Icons.Filled.EventRepeat,
-                value = Bedtime.daysName(prefs.bedtimeDays),
-                onClick = vm::cycleBedtimeDays,
-            )
-        }
-        SettingRow(
-            "Pauzemoment",
-            leading = Icons.Filled.LocalCafe,
-            value = if (prefs.breakMinutes == 0) "Uit" else "${prefs.breakMinutes} min",
-            onClick = vm::cycleBreak,
-        )
-        if (prefs.breakMinutes > 0) {
-            SettingRow(
-                "Pauzeduur",
-                leading = Icons.Filled.HourglassEmpty,
-                value = "${prefs.breakLength} min",
-                onClick = vm::cycleBreakLength,
-            )
-        }
-        SettingRow(
-            "Volgen",
-            leading = Icons.Filled.Visibility,
-            value = followTerms.joinToString(", ").ifEmpty { "Niets" },
-            onClick = { editFollows = true },
-        )
-        SettingRow(
-            "Automatisch overschakelen",
-            "Begint iets dat je volgt, dan schakelt BUIS na 10 seconden over.",
-            leading = Icons.Filled.SwitchVideo,
-            toggle = prefs.autoSwitch,
-            onClick = vm::toggleAutoSwitch,
-        )
-        SettingRow(
-            "Kijkgeschiedenis",
-            leading = Icons.Filled.History,
-            onClick = onOpenHistory,
-        )
-
-        Header("Voor iedereen") {
-            Image(painterResource(R.drawable.ic_buis), contentDescription = null, modifier = Modifier.size(28.dp))
-        }
-        SettingRow(
-            "Catalogus vernieuwen",
-            state.lastSync?.let { "Bijgewerkt $it · ${state.counts}" } ?: "Nog nooit opgehaald.",
-            leading = Icons.Filled.Refresh,
-            onClick = onRefreshCatalog,
-        )
-        SettingRow("Gids vernieuwen", guideStatus, onClick = vm::refreshGuide, leading = Icons.Filled.EventNote)
-        SettingRow("Filmgegevens", value = filmInfo, leading = Icons.Filled.Movie)
-        SettingRow("Zenderstatus", onClick = onOpenChannelHealth, leading = Icons.Filled.NetworkCheck)
-
-        SettingRow("Versie", value = "${BuildConfig.VERSION_NAME} · ${BuildConfig.GIT_SHA} · ${BuildConfig.BUILD_DATE}", leading = Icons.Filled.Info)
-        SettingRow("Server", value = state.server, leading = Icons.Filled.Dns)
-        SettingRow("Gebruiker", value = state.username, leading = Icons.Filled.AccountCircle)
-        SettingRow(
-            "Uitloggen",
-            leading = Icons.Filled.Logout,
-            onClick = { confirmLogout = true },
-            destructive = true,
-        )
-        SettingRow(
-            "Alles wissen",
-            leading = Icons.Filled.DeleteForever,
-            onClick = {
-                scope.launch {
-                    val lock = vm.wipeLock()
-                    if (lock.isEmpty()) confirmWipe = true else wipePin = lock
+    // Two panes, like the tv's own settings: the sections on the left, each with a line saying how
+    // it's set, and the focused section's settings on the right. Entering from the rail lands on
+    // the section last used (the first one at the start), never on whatever row is nearest.
+    var section by rememberSaveable { mutableStateOf(Section.PROFILE) }
+    // Back into the list (from the rail or from a section's settings) lands on the section shown.
+    val sectionFocus = remember { Section.entries.associateWith { FocusRequester() } }
+    // Into a section always lands on its first setting, not on the row that happens to be level.
+    val firstRow = remember { FocusRequester() }
+    val top = Modifier.focusRequester(firstRow)
+    val summary = mapOf(
+        Section.PROFILE to "Profiel en kijkgeschiedenis",
+        Section.WATCHING to "Geluid ${TrackLabels.name(prefs.audioLang, TrackLabels.AUDIO_CHOICES)} · ondertitels ${TrackLabels.name(prefs.subtitleLang, TrackLabels.SUBTITLE_CHOICES)}",
+        Section.FOLLOWING to followTerms.joinToString(", ").ifEmpty { "Niets" } + if (prefs.autoSwitch) " · overschakelen aan" else "",
+        Section.REST to listOfNotNull(
+            prefs.sleepMinutes.takeIf { it > 0 }?.let { "Slaaptimer $it min" },
+            prefs.bedtime.takeIf { it >= 0 }?.let { "Bedtijd ${Bedtime.timeName(it)}" },
+            prefs.breakMinutes.takeIf { it > 0 }?.let { "Pauze na $it min" },
+        ).joinToString(" · ").ifEmpty { "Alles uit" },
+        Section.CATALOG to (state.lastSync?.let { "Bijgewerkt $it" } ?: "Nog nooit opgehaald"),
+        Section.ACCOUNT to "Versie ${BuildConfig.VERSION_NAME} · uitloggen",
+        Section.DEV to "EPG en screensaver",
+    )
+    Row(horizontalArrangement = Arrangement.spacedBy(28.dp)) {
+        Column(
+            Modifier.width(280.dp)
+                .focusProperties { onEnter = { sectionFocus.getValue(section).requestFocus() } }
+                .focusGroup().verticalScroll(rememberScrollState()).padding(bottom = 48.dp),
+            verticalArrangement = Arrangement.spacedBy(4.dp),
+        ) {
+            Text("Instellingen", style = MaterialTheme.typography.headlineMedium, modifier = Modifier.padding(bottom = 8.dp))
+            Section.entries.filter { it != Section.DEV || BuildConfig.DEBUG }.forEach { s ->
+                when (s) {
+                    Section.PROFILE -> Header("Voor $profileName") { profile?.let { AvatarCircle(it.name, it.avatar, 24.dp, face = it.face) } }
+                    Section.CATALOG -> Header("Voor iedereen") {
+                        Image(painterResource(R.drawable.ic_buis), contentDescription = null, modifier = Modifier.size(24.dp))
+                    }
+                    else -> Unit
                 }
-            },
-            destructive = true,
-        )
-
-        if (BuildConfig.DEBUG) {
-            Header("Ontwikkeling")
-            SettingRow("EPG controleren", epgCheck, onClick = vm::checkEpg, leading = Icons.Filled.BugReport)
-            SettingRow("Screensaver bekijken", onClick = { dreamPreview = true }, leading = Icons.Filled.Wallpaper)
+                SectionItem(
+                    s, summary.getValue(s), selected = section == s,
+                    onFocus = { section = s },
+                    modifier = Modifier.focusRequester(sectionFocus.getValue(s)),
+                )
+            }
+        }
+        Column(
+            Modifier.width(520.dp)
+                .focusProperties { onEnter = { firstRow.requestFocus() } }
+                .focusGroup().verticalScroll(rememberScrollState()).padding(top = 52.dp, bottom = 48.dp),
+            verticalArrangement = Arrangement.spacedBy(4.dp),
+        ) {
+            when (section) {
+                Section.PROFILE -> {
+                    SettingRow("Profiel bewerken", "Naam, avatar, pincode en kinderprofiel.", leading = Icons.Filled.Person, onClick = { openEdit() }, modifier = top)
+                    SettingRow("Kijkgeschiedenis", "Wat er op dit profiel is gekeken, en het weekoverzicht.", leading = Icons.Filled.History, onClick = onOpenHistory)
+                }
+                Section.WATCHING -> {
+                    SettingRow("Geluid", leading = Icons.Filled.Audiotrack, value = TrackLabels.name(prefs.audioLang, TrackLabels.AUDIO_CHOICES), onClick = vm::cycleAudioLang, modifier = top)
+                    SettingRow("Ondertitels", leading = Icons.Filled.Subtitles, value = TrackLabels.name(prefs.subtitleLang, TrackLabels.SUBTITLE_CHOICES), onClick = vm::cycleSubtitleLang)
+                    SettingRow(
+                        "Voorkeurslanden",
+                        leading = Icons.Filled.Public,
+                        value = prefs.preferredCountries.sorted().joinToString(", ") { NameParser.countryName(it) },
+                        onClick = { pickCountries = true },
+                    )
+                    SettingRow("Alleen voorkeurslanden", leading = Icons.Filled.FilterAlt, toggle = prefs.onlyPreferred, onClick = vm::toggleOnlyPreferred)
+                }
+                Section.FOLLOWING -> {
+                    SettingRow("Volgen", "Zoektermen voor de gids; BUIS meldt het als iets bijna begint.", leading = Icons.Filled.Visibility, value = followTerms.joinToString(", ").ifEmpty { "Niets" }, onClick = { editFollows = true }, modifier = top)
+                    SettingRow(
+                        "Automatisch overschakelen",
+                        "Begint iets dat je volgt, dan schakelt BUIS na 10 seconden over.",
+                        leading = Icons.Filled.SwitchVideo,
+                        toggle = prefs.autoSwitch,
+                        onClick = vm::toggleAutoSwitch,
+                    )
+                }
+                Section.REST -> {
+                    SettingRow("Slaaptimer", leading = Icons.Filled.Snooze, value = if (prefs.sleepMinutes == 0) "Uit" else "${prefs.sleepMinutes} min", onClick = vm::cycleSleepTimer, modifier = top)
+                    SettingRow("Bedtijd", leading = Icons.Filled.Bedtime, value = Bedtime.timeName(prefs.bedtime), onClick = vm::cycleBedtime)
+                    if (prefs.bedtime >= 0) {
+                        SettingRow("Bedtijd op", leading = Icons.Filled.EventRepeat, value = Bedtime.daysName(prefs.bedtimeDays), onClick = vm::cycleBedtimeDays)
+                    }
+                    SettingRow("Pauzemoment", leading = Icons.Filled.LocalCafe, value = if (prefs.breakMinutes == 0) "Uit" else "${prefs.breakMinutes} min", onClick = vm::cycleBreak)
+                    if (prefs.breakMinutes > 0) {
+                        SettingRow("Pauzeduur", leading = Icons.Filled.HourglassEmpty, value = "${prefs.breakLength} min", onClick = vm::cycleBreakLength)
+                    }
+                }
+                Section.CATALOG -> {
+                    SettingRow(
+                        "Catalogus vernieuwen",
+                        state.lastSync?.let { "Bijgewerkt $it · ${state.counts}" } ?: "Nog nooit opgehaald.",
+                        leading = Icons.Filled.Refresh,
+                        onClick = onRefreshCatalog,
+                        modifier = top,
+                    )
+                    SettingRow("Gids vernieuwen", guideStatus, onClick = vm::refreshGuide, leading = Icons.Filled.EventNote)
+                    SettingRow("Zenderstatus", onClick = onOpenChannelHealth, leading = Icons.Filled.NetworkCheck)
+                    SettingRow("Filmgegevens", filmInfo, leading = Icons.Filled.Movie)
+                }
+                Section.ACCOUNT -> {
+                    SettingRow("Versie", "${BuildConfig.VERSION_NAME} · ${BuildConfig.GIT_SHA} · ${BuildConfig.BUILD_DATE}", leading = Icons.Filled.Info)
+                    SettingRow("Server", value = state.server, leading = Icons.Filled.Dns)
+                    SettingRow("Gebruiker", value = state.username, leading = Icons.Filled.AccountCircle)
+                    SettingRow("Uitloggen", leading = Icons.Filled.Logout, onClick = { confirmLogout = true }, destructive = true, modifier = top)
+                    SettingRow(
+                        "Alles wissen",
+                        leading = Icons.Filled.DeleteForever,
+                        onClick = {
+                            scope.launch {
+                                val lock = vm.wipeLock()
+                                if (lock.isEmpty()) confirmWipe = true else wipePin = lock
+                            }
+                        },
+                        destructive = true,
+                    )
+                }
+                Section.DEV -> {
+                    SettingRow("EPG controleren", epgCheck, onClick = vm::checkEpg, leading = Icons.Filled.BugReport, modifier = top)
+                    SettingRow("Screensaver bekijken", onClick = { dreamPreview = true }, leading = Icons.Filled.Wallpaper)
+                }
+            }
         }
     }
 
@@ -507,19 +504,56 @@ fun SettingsScreen(onRefreshCatalog: () -> Unit, onLoggedOut: () -> Unit, onEdit
     }
 }
 
+/** The settings' sections, in the left pane: the profile's four, then the household's. */
+private enum class Section(val title: String, val icon: androidx.compose.ui.graphics.vector.ImageVector) {
+    PROFILE("Profiel", Icons.Filled.Person),
+    WATCHING("Kijken", Icons.Filled.Tv),
+    FOLLOWING("Volgen", Icons.Filled.Visibility),
+    REST("Pauze en bedtijd", Icons.Filled.Bedtime),
+    CATALOG("Catalogus en gids", Icons.Filled.EventNote),
+    ACCOUNT("Abonnement", Icons.Filled.AccountCircle),
+    DEV("Ontwikkeling", Icons.Filled.BugReport),
+}
+
+/**
+ * A section in the left pane: its name and, under it, how it's set now, so most questions are
+ * answered without opening it. Focus picks the section; the one shown stays marked while focus is
+ * in its settings.
+ */
+@Composable
+private fun SectionItem(section: Section, summary: String, selected: Boolean, onFocus: () -> Unit, modifier: Modifier = Modifier) {
+    val focus = LocalFocusManager.current
+    Surface(
+        // OK goes into the section, the same as Right.
+        onClick = { focus.moveFocus(FocusDirection.Right) },
+        modifier = modifier.fillMaxWidth().onFocusChanged { if (it.isFocused) onFocus() },
+        shape = ClickableSurfaceDefaults.shape(RoundedCornerShape(10.dp)),
+        scale = ClickableSurfaceDefaults.scale(focusedScale = 1.02f),
+        colors = Focus.bar(if (selected) SurfaceRaised else androidx.compose.ui.graphics.Color.Transparent),
+    ) {
+        Row(Modifier.padding(horizontal = 14.dp, vertical = 10.dp), verticalAlignment = Alignment.CenterVertically) {
+            androidx.tv.material3.Icon(section.icon, contentDescription = null, tint = androidx.tv.material3.LocalContentColor.current, modifier = Modifier.padding(end = 14.dp).size(22.dp))
+            Column {
+                Text(section.title, style = MaterialTheme.typography.titleMedium)
+                Text(summary, style = MaterialTheme.typography.bodyMedium, color = androidx.tv.material3.LocalContentColor.current.copy(alpha = 0.7f), maxLines = 1, overflow = TextOverflow.Ellipsis)
+            }
+        }
+    }
+}
+
 /**
  * A section: whose settings these are, with their avatar (or the BUIS logo for the household), so
  * "Voor Bas" and "Voor iedereen" read as two different places, not as two captions.
  */
 @Composable
 internal fun Header(title: String, description: String? = null, icon: (@Composable () -> Unit)? = null) {
-    Row(Modifier.padding(start = 16.dp, top = 24.dp, bottom = 6.dp), verticalAlignment = Alignment.CenterVertically) {
+    Row(Modifier.padding(start = 14.dp, top = 16.dp, bottom = 4.dp), verticalAlignment = Alignment.CenterVertically) {
         icon?.let {
             it()
             Spacer(Modifier.width(12.dp))
         }
         Column {
-            Text(title, style = MaterialTheme.typography.titleLarge)
+            Text(title, style = MaterialTheme.typography.labelLarge, color = TextSecondary)
             description?.let { Text(it, style = MaterialTheme.typography.bodyMedium, color = TextSecondary) }
         }
     }
@@ -545,13 +579,18 @@ internal fun SettingRow(
     // Icon, title and value share one line and one centre; an explanation goes underneath, under the
     // title, so it never pulls the icon down between its two lines.
     val content: @Composable () -> Unit = {
-        Column(Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 12.dp)) {
+        Column(Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 10.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 // The row's own content colour (light at rest and on focus), never the theme default.
                 leading?.let { androidx.tv.material3.Icon(it, contentDescription = null, tint = androidx.tv.material3.LocalContentColor.current, modifier = Modifier.padding(end = 14.dp).size(24.dp)) }
-                Text(title, style = MaterialTheme.typography.titleMedium, color = if (destructive) danger() else androidx.compose.ui.graphics.Color.Unspecified, modifier = Modifier.weight(1f))
+                // The title never wraps or shrinks; a long value gives way instead, cut off at the end.
+                Text(title, style = MaterialTheme.typography.titleMedium, color = if (destructive) danger() else androidx.compose.ui.graphics.Color.Unspecified, maxLines = 1, softWrap = false)
                 // Values you can change are blue; plain information stays grey.
-                value?.let { Text(it, style = MaterialTheme.typography.titleMedium, color = if (onClick != null) BrandText else TextSecondary, modifier = Modifier.padding(start = 24.dp)) }
+                Text(
+                    value.orEmpty(), style = MaterialTheme.typography.titleMedium, color = if (onClick != null) BrandText else TextSecondary,
+                    textAlign = androidx.compose.ui.text.style.TextAlign.End, maxLines = 1, overflow = TextOverflow.Ellipsis,
+                    modifier = Modifier.weight(1f).padding(start = 24.dp),
+                )
                 toggle?.let { Switch(it, Modifier.padding(start = 24.dp)) }
             }
             description?.let { Text(it, style = MaterialTheme.typography.bodyMedium, color = TextSecondary, modifier = Modifier.padding(start = if (leading != null) 38.dp else 0.dp)) }

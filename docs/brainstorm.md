@@ -112,7 +112,8 @@ profile, ratings, voice search, Google TV "Watch Next".
 - **Bioscoopreleases**: a "Binnenkort in de bios" row from TMDB's NL now-playing/upcoming lists,
   ranked on the tv by the profile's genres (phase 3 weights). Only the region query goes out, never
   the profile or history. OK on a title adds it to the Wachtlijst, so you get it once it streams. `M` ⚠️
-- ✓ **Tweede gidsbron**: a public XMLTV for Dutch channels next to the provider's. BUIS compares
+- ~~✓ **Tweede gidsbron**~~ → built (7776bf5, 2026-10-30: open-epg → epgshare01 → provider, merged per
+  time slot; the per-channel conflict list in Instellingen not yet): a public XMLTV for Dutch channels next to the provider's. BUIS compares
   the two per channel and shows conflicts in Instellingen ("SBS6: provider zegt De Bondgenoten,
   bron 2 zegt True Crime"); when one source keeps being right for a channel, OK swaps which one
   leads there. Prompted by SBS6 on 2026-10-30, where the provider missed a late-night schedule
