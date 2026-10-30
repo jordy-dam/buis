@@ -36,6 +36,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.zIndex
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.tv.material3.Icon
 import nl.jordy.iptv.ui.theme.TextSecondary
@@ -47,6 +48,8 @@ import nl.jordy.iptv.ui.theme.TextSecondary
 val AvatarColors = listOf(
     Color(0xFF3F7CAC), Color(0xFFB5534B), Color(0xFF4E8F5A), Color(0xFF8A62A8),
     Color(0xFFC08A2E), Color(0xFF2E8C8C), Color(0xFFB0577F), Color(0xFF6B7380),
+    // Added later, at the end so stored indices keep their colour.
+    Color(0xFF5A6BB0), Color(0xFF7A8F3A), Color(0xFFC0603A), Color(0xFF4B6E7A),
 )
 
 fun avatarColor(index: Int) = AvatarColors[index.mod(AvatarColors.size)]
@@ -74,7 +77,8 @@ fun AvatarCircle(name: String, avatar: Int, size: Dp, modifier: Modifier = Modif
 
 /**
  * Focusable avatar with the name underneath, for the profile picker. [badge] marks the profile on
- * the circle itself (kids, PIN) instead of a line of text, so every tile has the same height.
+ * the circle itself (kids, PIN: upper left) instead of a line of text, so every tile has the same
+ * height; the profile's [gadget] sits on the lower right.
  */
 @Composable
 fun AvatarTile(
@@ -87,6 +91,7 @@ fun AvatarTile(
     face: Int = 0,
     badge: ImageVector? = null,
     badgeDescription: String? = null,
+    gadget: Int = 0,
 ) {
     var focused by remember { mutableStateOf(false) }
     // Scaled as a whole, so the badge stays on the circle's edge when it grows with focus.
@@ -101,23 +106,35 @@ fun AvatarTile(
                 border = ClickableSurfaceDefaults.border(focusedBorder = Border(BorderStroke(4.dp, TextPrimary), shape = CircleShape)),
                 colors = ClickableSurfaceDefaults.colors(containerColor = Color.Transparent, focusedContainerColor = Color.Transparent),
             ) { AvatarCircle(name, avatar, size, symbol = symbol, face = face) }
-            badge?.let { AvatarBadge(it, badgeDescription, size) }
+            AvatarMarks(size, badge, badgeDescription, gadget)
         }
         Text(name, style = MaterialTheme.typography.titleMedium, maxLines = 1, overflow = TextOverflow.Ellipsis, textAlign = TextAlign.Center)
     }
 }
 
 /**
- * A small dark disc on the circle's lower right edge (at 45°, where a corner badge would fall off
- * the round avatar), ringed in the page colour so it reads on every avatar colour.
+ * What sits on an avatar's edge, inside a box the avatar's [size]: the [status] (kids, PIN) upper
+ * left and the [gadget] lower right, so the two never compete for one spot.
  */
 @Composable
-private fun AvatarBadge(icon: ImageVector, description: String?, avatar: Dp) {
+fun AvatarMarks(size: Dp, status: ImageVector? = null, statusDescription: String? = null, gadget: Int = 0) {
+    status?.let { AvatarBadge(it, statusDescription, size, lowerRight = false) }
+    AvatarGadgets.get(gadget)?.let { AvatarBadge(it, AvatarGadgets.name(gadget), size, lowerRight = true) }
+}
+
+/**
+ * A small dark disc on the circle's edge at 45° (where a corner badge would fall off the round
+ * avatar), ringed in the page colour so it reads on every avatar colour.
+ */
+@Composable
+private fun AvatarBadge(icon: ImageVector, description: String?, avatar: Dp, lowerRight: Boolean) {
     val badge = avatar * 0.34f
-    // The point on the circle at 45°: r + r·cos 45° from the top left, minus half the badge.
-    val at = avatar * 0.854f - badge / 2
+    // The point on the circle at 45°: r ± r·cos 45° from the top left, minus half the badge.
+    val at = avatar * (if (lowerRight) 0.854f else 0.146f) - badge / 2
     Box(
         Modifier
+            // Above the circle: a focused tv Surface lifts itself (zIndex) and would cover the badge.
+            .zIndex(2f)
             .offset(at, at)
             .size(badge)
             .background(Background, CircleShape)

@@ -94,7 +94,7 @@ class ProfileRepository @Inject constructor(
         current.first { it?.id == id }
     }
 
-    suspend fun create(name: String, avatar: Int, kids: Boolean, pinHash: String?, face: Int = 0): Long {
+    suspend fun create(name: String, avatar: Int, kids: Boolean, pinHash: String?, face: Int = 0, gadget: Int = 0): Long {
         val now = System.currentTimeMillis()
         // Inherit the household's countries: a new profile in an NL+BE home wants NL+BE too.
         val template = runCatching { fresh() }.getOrNull()
@@ -103,6 +103,7 @@ class ProfileRepository @Inject constructor(
                 name = name.trim(),
                 avatar = avatar,
                 face = face,
+                gadget = gadget,
                 kids = kids,
                 pinHash = pinHash,
                 preferredCountries = template?.preferredCountries ?: "NL",
@@ -150,8 +151,8 @@ class ProfileRepository @Inject constructor(
 
     companion object {
         const val MAX_PROFILES = 8
-        const val FACES = 5
-        const val COLOURS = 8
+        const val FACES = 12
+        const val COLOURS = 12
 
         /** A new profile's look: the first drawn face and colour nobody uses yet, so faces stay apart. */
         fun defaultLook(profiles: List<ProfileEntity>): Pair<Int, Int> {

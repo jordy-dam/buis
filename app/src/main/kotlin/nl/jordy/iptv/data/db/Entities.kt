@@ -110,6 +110,8 @@ data class ProfileEntity(
     val avatar: Int,
     /** Drawn avatar 1..5 (cat, fox, robot, owl, monster), or 0 for the initial letter. */
     @ColumnInfo(defaultValue = "0") val face: Int = 0,
+    /** A small gadget on the avatar's lower right (wrench, football…), see [nl.jordy.iptv.ui.components.AvatarGadgets]; 0 = none. */
+    @ColumnInfo(defaultValue = "0") val gadget: Int = 0,
     val pinHash: String? = null,
     /** Comma-separated group codes ("NL,BE"). */
     val preferredCountries: String = "NL",

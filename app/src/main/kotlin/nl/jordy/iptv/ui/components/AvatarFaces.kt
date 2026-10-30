@@ -14,10 +14,16 @@ import androidx.compose.ui.unit.dp
  * ignore the theme and look different per device.
  */
 object AvatarFaces {
-    /** Index 1..5 as stored in `profile.face`; 0 is the initial letter. */
-    val all: List<Pair<String, ImageVector>> by lazy { listOf("Kat" to cat, "Vos" to fox, "Robot" to robot, "Uil" to owl, "Monster" to monster) }
+    /** Index 1..12 as stored in `profile.face`; 0 is the initial letter. New faces go at the end. */
+    val all: List<Pair<String, ImageVector>> by lazy {
+        listOf(
+            "Kat" to cat, "Vos" to fox, "Robot" to robot, "Uil" to owl, "Monster" to monster,
+            "Hond" to dog, "Beer" to bear, "Panda" to panda, "Konijn" to rabbit, "Pinguïn" to penguin, "Kikker" to frog, "Leeuw" to lion,
+        )
+    }
 
     fun get(face: Int): ImageVector? = all.getOrNull(face - 1)?.second
+    fun name(face: Int): String = all.getOrNull(face - 1)?.first ?: "Letter"
 
     private fun face(name: String, block: ImageVector.Builder.() -> Unit) =
         ImageVector.Builder(name, 24.dp, 24.dp, 24f, 24f).apply(block).build()
@@ -36,6 +42,18 @@ object AvatarFaces {
 
     private fun PathBuilder.rect(l: Float, t: Float, r: Float, b: Float) {
         moveTo(l, t); lineTo(r, t); lineTo(r, b); lineTo(l, b); close()
+    }
+
+    /** A star of [points] tips around (cx, cy): a lion's mane. */
+    private fun PathBuilder.star(cx: Float, cy: Float, outer: Float, inner: Float, points: Int) {
+        for (i in 0 until points * 2) {
+            val a = Math.PI * i / points - Math.PI / 2
+            val r = if (i % 2 == 0) outer else inner
+            val x = cx + (r * Math.cos(a)).toFloat()
+            val y = cy + (r * Math.sin(a)).toFloat()
+            if (i == 0) moveTo(x, y) else lineTo(x, y)
+        }
+        close()
     }
 
     private fun PathBuilder.poly(vararg xy: Float) {
@@ -119,5 +137,103 @@ object AvatarFaces {
             rect(9f, 14.2f, 15f, 15.5f) // mouth
         }
         shape(holes = false) { circle(12.7f, 10.4f, 1.3f) }
+    }
+
+    private val dog = face("Hond") {
+        shape(holes = false) {
+            ellipse(5.4f, 11.6f, 2.2f, 4.4f) // floppy ears
+            ellipse(18.6f, 11.6f, 2.2f, 4.4f)
+        }
+        shape {
+            ellipse(12f, 12.8f, 6.2f, 6.6f)
+            circle(9.6f, 11.6f, 1f) // eyes
+            circle(14.4f, 11.6f, 1f)
+            ellipse(12f, 15.4f, 1.6f, 1.1f) // nose
+        }
+    }
+
+    private val bear = face("Beer") {
+        shape(holes = false) {
+            circle(6.4f, 6.6f, 2.6f) // ears
+            circle(17.6f, 6.6f, 2.6f)
+        }
+        shape {
+            circle(12f, 13f, 7.2f)
+            circle(9.3f, 11.6f, 1f) // eyes
+            circle(14.7f, 11.6f, 1f)
+            ellipse(12f, 15.6f, 3f, 2.3f) // muzzle
+        }
+        shape(holes = false) { circle(12f, 14.9f, 0.9f) } // nose
+    }
+
+    private val panda = face("Panda") {
+        shape(holes = false) {
+            circle(6.4f, 6.6f, 2.6f) // ears
+            circle(17.6f, 6.6f, 2.6f)
+        }
+        shape {
+            circle(12f, 13f, 7.2f)
+            ellipse(9f, 12.4f, 1.9f, 2.4f) // eye patches
+            ellipse(15f, 12.4f, 1.9f, 2.4f)
+            ellipse(12f, 16.2f, 1.2f, 0.8f) // nose
+        }
+        shape(holes = false) {
+            circle(9.2f, 12.1f, 0.7f) // pupils
+            circle(14.8f, 12.1f, 0.7f)
+        }
+    }
+
+    private val rabbit = face("Konijn") {
+        shape(holes = false) {
+            ellipse(9.2f, 6f, 1.8f, 4.6f) // ears
+            ellipse(14.8f, 6f, 1.8f, 4.6f)
+        }
+        shape {
+            circle(12f, 14.6f, 6f)
+            circle(9.8f, 13.8f, 0.9f) // eyes
+            circle(14.2f, 13.8f, 0.9f)
+            poly(11.2f, 16f, 12.8f, 16f, 12f, 17f) // nose
+        }
+    }
+
+    private val penguin = face("Pinguïn") {
+        shape {
+            ellipse(12f, 12.4f, 7f, 8.4f)
+            ellipse(12f, 14f, 4.8f, 5.6f) // the face, in the avatar colour
+        }
+        shape(holes = false) {
+            circle(10f, 12.6f, 0.9f) // eyes
+            circle(14f, 12.6f, 0.9f)
+            poly(10.8f, 14.4f, 13.2f, 14.4f, 12f, 16f) // beak
+        }
+    }
+
+    private val frog = face("Kikker") {
+        shape {
+            circle(7.8f, 7.8f, 2.8f) // eye bumps with pupils
+            circle(7.8f, 7.8f, 1.1f)
+            circle(16.2f, 7.8f, 2.8f)
+            circle(16.2f, 7.8f, 1.1f)
+        }
+        shape {
+            ellipse(12f, 13.8f, 8f, 5.6f)
+            // A wide smile.
+            moveTo(8f, 15f)
+            curveTo(9.5f, 17.6f, 14.5f, 17.6f, 16f, 15f)
+            curveTo(14.5f, 16.6f, 9.5f, 16.6f, 8f, 15f)
+            close()
+        }
+    }
+
+    private val lion = face("Leeuw") {
+        shape {
+            star(12f, 12.5f, 10.5f, 8.6f, 12) // mane
+            circle(12f, 12.5f, 6f) // the face, in the avatar colour
+        }
+        shape(holes = false) {
+            circle(10f, 11.6f, 0.9f) // eyes
+            circle(14f, 11.6f, 0.9f)
+            poly(10.9f, 13.8f, 13.1f, 13.8f, 12f, 15.2f) // nose
+        }
     }
 }

@@ -223,6 +223,7 @@ internal fun PickerLayout(
                                 size = size,
                                 badge = badge,
                                 badgeDescription = what,
+                                gadget = p.gadget,
                                 modifier = Modifier.focusRequester(focus[profiles.indexOf(p)]),
                                 onClick = { onProfile(p) },
                             )

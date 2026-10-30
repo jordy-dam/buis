@@ -337,6 +337,20 @@ class MigrationTest {
         }
     }
 
+    @Test
+    fun `23 to 24 adds a gadget, none, and keeps the profile's face`() {
+        helper.createDatabase(DB, 23).use { db ->
+            db.execSQL("INSERT INTO profile (id, name, avatar, face, pinHash, preferredCountries, onlyPreferred, kids, lastUsedAt, createdAt, pinnedCategories) VALUES (1, 'Anna', 3, 4, NULL, 'NL', 1, 0, 5, 1, '')")
+        }
+        helper.runMigrationsAndValidate(DB, 24, true).use { db ->
+            db.query("SELECT gadget, face FROM profile").use {
+                it.moveToFirst()
+                assertEquals("no gadget until someone picks one", 0, it.getInt(0))
+                assertEquals(4, it.getInt(1))
+            }
+        }
+    }
+
     private fun SupportSQLiteDatabase.insertPhase1Data() {
         execSQL("INSERT INTO favorite (type, itemId, name, imageUrl, addedAt) VALUES ('LIVE', 101, '┃NL┃ NPO 1 HD', NULL, 1)")
         execSQL("INSERT INTO playback_position (type, itemId, positionMs, durationMs, updatedAt) VALUES ('MOVIE', 5001, 62000, 180000, 2)")
