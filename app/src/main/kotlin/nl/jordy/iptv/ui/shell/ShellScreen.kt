@@ -44,7 +44,6 @@ import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import dagger.hilt.android.lifecycle.HiltViewModel
-import nl.jordy.iptv.data.epg.EpgGuide
 import nl.jordy.iptv.data.profile.ProfileRepository
 import nl.jordy.iptv.data.repo.MovieEnricher
 import nl.jordy.iptv.ui.components.AvatarCircle
@@ -228,12 +227,11 @@ fun ShellScreen(
 }
 
 @HiltViewModel
-class ShellViewModel @Inject constructor(profiles: ProfileRepository, guide: EpgGuide, enricher: MovieEnricher) : ViewModel() {
+class ShellViewModel @Inject constructor(profiles: ProfileRepository, enricher: MovieEnricher) : ViewModel() {
     val profile = profiles.current
 
     init {
-        // Once a day, in the background; until then channel rows use the short EPG.
-        guide.refreshIfStale()
+        // The guide refreshes from MainActivity.onStart; until then channel rows use the short EPG.
         // Film details for the genre filter: resumes where it stopped, then only new films.
         enricher.start()
     }
