@@ -1,6 +1,8 @@
 package nl.jordy.iptv.ui.theme
 
+import androidx.annotation.DrawableRes
 import androidx.compose.foundation.layout.PaddingValues
+import nl.jordy.iptv.R
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.staticCompositionLocalOf
@@ -52,6 +54,8 @@ class Palette(
     val textSecondaryOnLight: Color,
     val live: Color,
     val liveOnLight: Color,
+    /** A photo behind the menu screens (not the player or a detail page), or none. */
+    @DrawableRes val backdrop: Int? = null,
 )
 
 private val standard = Palette(
@@ -93,6 +97,8 @@ private val garage = Palette(
     textSecondaryOnLight = Color(0xFF59606A),
     live = Color(0xFFD4AE55),
     liveOnLight = Color(0xFF6E5210),
+    // The white 911 in the night garage that Garage is named after.
+    backdrop = R.drawable.garage_backdrop,
 )
 
 private fun Look.palette() = when (this) {
@@ -118,6 +124,8 @@ val Brand: Color @Composable get() = LocalPalette.current.brand
 val Heart: Color @Composable get() = LocalPalette.current.let { if (onLight()) it.heartOnLight else it.heart }
 /** The icon on a [Heart]-filled badge. */
 val OnHeart: Color @Composable get() = LocalPalette.current.onHeart
+/** The look's photo behind the menu screens, null when it has none. */
+val Backdrop: Int? @Composable get() = LocalPalette.current.backdrop
 val FocusBar: Color @Composable get() = LocalPalette.current.focusBar
 /** Focus on rows, chips and buttons: one clear step lighter than a row, text stays light (2g, after the white bar). */
 val FocusFill: Color @Composable get() = LocalPalette.current.focusFill

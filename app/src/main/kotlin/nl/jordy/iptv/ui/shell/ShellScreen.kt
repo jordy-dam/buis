@@ -77,6 +77,13 @@ import nl.jordy.iptv.ui.favorites.FavoritesScreen
 import nl.jordy.iptv.ui.live.LiveScreen
 import nl.jordy.iptv.ui.search.SearchScreen
 import nl.jordy.iptv.ui.settings.SettingsScreen
+import androidx.compose.ui.draw.paint
+import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.res.painterResource
+import nl.jordy.iptv.ui.theme.Background
+import nl.jordy.iptv.ui.theme.Backdrop
 import nl.jordy.iptv.ui.theme.Brand
 import nl.jordy.iptv.ui.theme.SafeArea
 import nl.jordy.iptv.ui.theme.SurfaceColor
@@ -171,7 +178,12 @@ fun ShellScreen(
         } else confirmExit = true
     }
 
-    Row(Modifier.fillMaxSize()) {
+    // The look's photo, if it has one: dim, and fading into the background on the left where the lists are.
+    val photo = Backdrop?.let { painterResource(it) }
+    val backdrop = if (photo == null) Modifier else Modifier
+        .paint(photo, contentScale = ContentScale.Crop, alpha = 0.30f)
+        .background(Brush.horizontalGradient(0f to Background, 0.55f to Background.copy(alpha = 0.75f), 1f to Color.Transparent))
+    Row(Modifier.fillMaxSize().then(backdrop)) {
         Column(
             Modifier
                 .fillMaxHeight()
