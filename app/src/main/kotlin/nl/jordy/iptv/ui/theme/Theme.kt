@@ -56,6 +56,8 @@ class Palette(
     val liveOnLight: Color,
     /** A photo behind the menu screens (not the player or a detail page), or none. */
     @DrawableRes val backdrop: Int? = null,
+    /** How solid rows and cards are; below 1 the backdrop shows through them a little. */
+    val rowAlpha: Float = 1f,
 )
 
 private val standard = Palette(
@@ -99,6 +101,7 @@ private val garage = Palette(
     liveOnLight = Color(0xFF6E5210),
     // The white 911 in the night garage that Garage is named after.
     backdrop = R.drawable.garage_backdrop,
+    rowAlpha = 0.70f,
 )
 
 private fun Look.palette() = when (this) {
@@ -111,6 +114,8 @@ private val LocalPalette = staticCompositionLocalOf { standard }
 val Background: Color @Composable get() = LocalPalette.current.background
 val SurfaceColor: Color @Composable get() = LocalPalette.current.surface
 val SurfaceRaised: Color @Composable get() = LocalPalette.current.surfaceRaised
+/** Rows and cards at rest: [SurfaceColor], see-through in a look with a backdrop. */
+val RowSurface: Color @Composable get() = LocalPalette.current.let { it.surface.copy(alpha = it.rowAlpha) }
 /**
  * Everything that floats over the picture or a screen: the player bar, its track lists and every
  * pop-up (corner card). One surface, see-through so the picture shows a little; at 60 % text and

@@ -65,6 +65,7 @@ import nl.jordy.iptv.ui.theme.Live
 import nl.jordy.iptv.ui.theme.FocusFill
 import nl.jordy.iptv.ui.theme.SurfaceColor
 import nl.jordy.iptv.ui.theme.SurfaceRaised
+import nl.jordy.iptv.ui.theme.RowSurface
 import nl.jordy.iptv.ui.theme.TextPrimary
 import nl.jordy.iptv.ui.theme.TextSecondary
 
@@ -80,7 +81,7 @@ object Focus {
     val border: Border @Composable get() = Border(BorderStroke(2.dp, FocusBar), shape = tileShape)
 
     @Composable
-    fun bar(container: Color = SurfaceColor) = ClickableSurfaceDefaults.colors(
+    fun bar(container: Color = RowSurface) = ClickableSurfaceDefaults.colors(
         containerColor = container,
         contentColor = TextPrimary,
         focusedContainerColor = FocusFill,
@@ -177,7 +178,7 @@ fun ChannelTile(
     quality: String? = null,
     catchup: Boolean = false,
     /** The row's own background; over the picture it's see-through, so only its box shades it. */
-    container: Color = SurfaceColor,
+    container: Color = RowSurface,
 ) {
     Surface(
         onClick = onClick,
