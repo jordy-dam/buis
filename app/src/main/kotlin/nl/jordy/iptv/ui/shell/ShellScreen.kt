@@ -178,17 +178,26 @@ fun ShellScreen(
         } else confirmExit = true
     }
 
-    // The look's photo, if it has one: dim, and fading into the background on the left where the lists are.
+    // The look's photo, if it has one: dim, a little of it behind the see-through rail, darkest behind
+    // the lists (category names have no surface of their own), fading out towards the right.
     val photo = Backdrop?.let { painterResource(it) }
     val backdrop = if (photo == null) Modifier else Modifier
         .paint(photo, contentScale = ContentScale.Crop, alpha = 0.30f)
-        .background(Brush.horizontalGradient(0f to Background, 0.55f to Background.copy(alpha = 0.75f), 1f to Color.Transparent))
+        .background(
+            Brush.horizontalGradient(
+                0f to Background.copy(alpha = 0.55f),
+                0.2f to Background.copy(alpha = 0.9f),
+                0.55f to Background.copy(alpha = 0.75f),
+                1f to Color.Transparent,
+            ),
+        )
+    val railColor = if (photo == null) SurfaceColor else SurfaceColor.copy(alpha = 0.55f)
     Row(Modifier.fillMaxSize().then(backdrop)) {
         Column(
             Modifier
                 .fillMaxHeight()
                 .width(railWidth)
-                .background(SurfaceColor)
+                .background(railColor)
                 .padding(start = 12.dp, end = 8.dp, top = SafeArea, bottom = SafeArea)
                 .onFocusChanged { railOpen = it.hasFocus }
                 .focusRestorer(railFocus.getValue(tab))
