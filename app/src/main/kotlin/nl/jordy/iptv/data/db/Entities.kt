@@ -138,6 +138,8 @@ data class ProfileEntity(
     @ColumnInfo(defaultValue = "0") val autoSwitch: Boolean = false,
     /** Categories pinned to the top of Films/Series, as [nl.jordy.iptv.data.settings.CategoryGroups.pinKey]s, comma-separated. */
     @ColumnInfo(defaultValue = "") val pinnedCategories: String = "",
+    /** The colours the app wears for this profile, an index into [nl.jordy.iptv.ui.theme.Look]; 0 = Standaard. */
+    @ColumnInfo(defaultValue = "0") val look: Int = 0,
     /** The profile with the highest value is the active one; picking a profile bumps it. */
     val lastUsedAt: Long = 0,
     val createdAt: Long = 0,

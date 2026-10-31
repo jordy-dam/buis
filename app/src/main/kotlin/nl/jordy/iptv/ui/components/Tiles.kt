@@ -77,7 +77,7 @@ private val tileShape = RoundedCornerShape(10.dp)
  */
 object Focus {
     const val SCALE = 1.1f
-    val border = Border(BorderStroke(2.dp, FocusBar), shape = tileShape)
+    val border: Border @Composable get() = Border(BorderStroke(2.dp, FocusBar), shape = tileShape)
 
     @Composable
     fun bar(container: Color = SurfaceColor) = ClickableSurfaceDefaults.colors(

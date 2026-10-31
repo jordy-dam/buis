@@ -15,7 +15,10 @@ import androidx.lifecycle.viewModelScope
 import dagger.hilt.android.AndroidEntryPoint
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import nl.jordy.iptv.data.auth.CredentialStore
 import nl.jordy.iptv.data.db.AppDatabase
@@ -29,6 +32,7 @@ import nl.jordy.iptv.ui.ShellRoute
 import nl.jordy.iptv.ui.SyncRoute
 import nl.jordy.iptv.ui.theme.Background
 import nl.jordy.iptv.ui.theme.IptvTheme
+import nl.jordy.iptv.ui.theme.Look
 import nl.jordy.iptv.ui.theme.TextPrimary
 import javax.inject.Inject
 
@@ -41,7 +45,8 @@ class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContent {
-            IptvTheme {
+            val look by vm.look.collectAsStateWithLifecycle()
+            IptvTheme(look) {
                 // tv Surface provides the content colour; without it Text falls back to black.
                 Surface(Modifier.fillMaxSize(), colors = SurfaceDefaults.colors(containerColor = Background, contentColor = TextPrimary)) {
                     val start by vm.start.collectAsStateWithLifecycle()
@@ -71,6 +76,8 @@ class StartViewModel @Inject constructor(
 ) : ViewModel() {
     private val _start = MutableStateFlow<Any?>(null)
     val start = _start.asStateFlow()
+    /** The watching profile's colours; switching profile switches them. */
+    val look = profiles.current.map { Look.of(it?.look ?: 0) }.stateIn(viewModelScope, SharingStarted.Eagerly, Look.STANDARD)
 
     init {
         viewModelScope.launch {

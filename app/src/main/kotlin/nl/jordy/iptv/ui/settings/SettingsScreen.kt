@@ -28,6 +28,8 @@ import nl.jordy.iptv.player.BreakTimer
 import nl.jordy.iptv.player.SleepTimer
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Person
+import androidx.compose.material.icons.filled.Palette
+import nl.jordy.iptv.ui.theme.Look
 import androidx.compose.material.icons.filled.Public
 import androidx.compose.material.icons.filled.FilterAlt
 import androidx.compose.material.icons.filled.Audiotrack
@@ -236,6 +238,10 @@ class SettingsViewModel @Inject constructor(
 
     fun toggleOnlyPreferred() = viewModelScope.launch { profiles.setOnlyPreferred(!prefs.value.onlyPreferred) }
     fun toggleAutoSwitch() = viewModelScope.launch { profiles.setAutoSwitch(!prefs.value.autoSwitch) }
+    fun cycleLook() = viewModelScope.launch {
+        val now = profile.value?.look ?: 0
+        profiles.setLook((now + 1) % Look.entries.size)
+    }
     fun cycleSleepTimer() = viewModelScope.launch { profiles.setSleepMinutes(SleepTimer.nextChoice(prefs.value.sleepMinutes)) }
     fun cycleBreak() = viewModelScope.launch {
         // Debug builds add a 1-minute choice, to see the break without watching for an hour.
@@ -385,6 +391,7 @@ fun SettingsScreen(onRefreshCatalog: () -> Unit, onLoggedOut: () -> Unit, onEdit
                 Section.PROFILE -> {
                     SettingRow("Profiel bewerken", "Naam, avatar, pincode en kinderprofiel.", leading = Icons.Filled.Person, onClick = { openEdit() }, modifier = top)
                     SettingRow("Kijkgeschiedenis", "Wat er op dit profiel is gekeken, en het weekoverzicht.", leading = Icons.Filled.History, onClick = onOpenHistory)
+                    SettingRow("Uiterlijk", leading = Icons.Filled.Palette, value = Look.of(profile?.look ?: 0).label, onClick = vm::cycleLook)
                 }
                 Section.WATCHING -> {
                     SettingRow("Geluid", leading = Icons.Filled.Audiotrack, value = TrackLabels.name(prefs.audioLang, TrackLabels.AUDIO_CHOICES), onClick = vm::cycleAudioLang, modifier = top)

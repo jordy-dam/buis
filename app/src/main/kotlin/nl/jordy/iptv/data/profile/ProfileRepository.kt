@@ -132,6 +132,7 @@ class ProfileRepository @Inject constructor(
     suspend fun setBedtime(minutes: Int) = updateCurrent { it.copy(bedtime = minutes) }
     suspend fun setBedtimeDays(mask: Int) = updateCurrent { it.copy(bedtimeDays = mask) }
     suspend fun setAutoSwitch(on: Boolean) = updateCurrent { it.copy(autoSwitch = on) }
+    suspend fun setLook(look: Int) = updateCurrent { it.copy(look = look) }
 
     /** What the active profile pinned in Films and Series. */
     val pinned: Flow<Set<String>> = current.filterNotNull().map { it.pinnedSet() }.distinctUntilChanged()
