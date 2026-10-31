@@ -40,6 +40,10 @@ class Palette(
     val brand: Color,
     val brandText: Color,
     val heart: Color,
+    /** The heart on the light focus fill. */
+    val heartOnLight: Color,
+    /** The heart icon inside a [heart]-filled badge. */
+    val onHeart: Color,
     val focusBar: Color,
     val focusFill: Color,
     val textPrimary: Color,
@@ -58,6 +62,8 @@ private val standard = Palette(
     brand = Color(0xFF2D6AA8),
     brandText = Color(0xFF8DB8E8),
     heart = Color(0xFFE5484D),
+    heartOnLight = Color(0xFFE5484D),
+    onHeart = Color(0xFFF3F3F1),
     focusBar = Color(0xFFECEBE7),
     focusFill = Color(0xFF3B3E46),
     textPrimary = Color(0xFFF3F3F1),
@@ -68,14 +74,17 @@ private val standard = Palette(
     liveOnLight = Color(0xFF8A5A00),
 )
 
-// Red is the accent here, so the heart turns white to keep meaning one thing; live is the rims' gold.
+// Red is the accent here, so the heart is the rims' gold, like live; shape tells them apart (Jordy's
+// pick, 2026-10-31: a white heart disappeared in its own white badge).
 private val garage = Palette(
     background = Color(0xFF0D0F12),
     surface = Color(0xFF16191D),
     surfaceRaised = Color(0xFF20242A),
     brand = Color(0xFFB3262B),
     brandText = Color(0xFFEE8A8C),
-    heart = Color(0xFFF1F3F5),
+    heart = Color(0xFFD4AE55),
+    heartOnLight = Color(0xFF6E5210),
+    onHeart = Color(0xFF0D0F12),
     focusBar = Color(0xFFE9EEF2),
     focusFill = Color(0xFF343A43),
     textPrimary = Color(0xFFF1F3F5),
@@ -105,7 +114,10 @@ val SurfaceRaised: Color @Composable get() = LocalPalette.current.surfaceRaised
 val PopupSurface: Color @Composable get() = SurfaceRaised.copy(alpha = 0.60f)
 /** The accent: buttons and what's selected. */
 val Brand: Color @Composable get() = LocalPalette.current.brand
-val Heart: Color @Composable get() = LocalPalette.current.heart
+/** The heart; a darker shade on the focus bar, where a light one disappears. */
+val Heart: Color @Composable get() = LocalPalette.current.let { if (onLight()) it.heartOnLight else it.heart }
+/** The icon on a [Heart]-filled badge. */
+val OnHeart: Color @Composable get() = LocalPalette.current.onHeart
 val FocusBar: Color @Composable get() = LocalPalette.current.focusBar
 /** Focus on rows, chips and buttons: one clear step lighter than a row, text stays light (2g, after the white bar). */
 val FocusFill: Color @Composable get() = LocalPalette.current.focusFill

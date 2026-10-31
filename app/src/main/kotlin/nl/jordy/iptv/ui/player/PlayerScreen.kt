@@ -755,7 +755,7 @@ private fun ControlButton(
 ) = IconButton(
     icon, label, onClick,
     modifier.focusProperties { canFocus = available }.alpha(if (available) 1f else 0.35f),
-    tint = if (active) BrandText else null, large = true,
+    tint = if (active) ({ BrandText }) else null, large = true,
 )
 
 /**

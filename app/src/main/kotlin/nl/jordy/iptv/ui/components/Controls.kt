@@ -201,8 +201,11 @@ fun IconButton(
     label: String,
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
-    /** A colour that means something (red heart for a favourite); default follows the button. */
-    tint: androidx.compose.ui.graphics.Color? = null,
+    /**
+     * A colour that means something (the heart for a favourite); default follows the button. Read inside
+     * the button, so it can pick its shade for the light focus fill.
+     */
+    tint: (@Composable () -> androidx.compose.ui.graphics.Color)? = null,
     /** [ChoiceSize], for pop-ups and the player bar. */
     large: Boolean = false,
 ) {
@@ -227,7 +230,7 @@ fun IconButton(
     ) {
         // Centred in the whole circle (the button's content row would put it at the start).
         Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-            androidx.tv.material3.Icon(imageVector, contentDescription = label, tint = tint ?: androidx.tv.material3.LocalContentColor.current, modifier = Modifier.size(icon))
+            androidx.tv.material3.Icon(imageVector, contentDescription = label, tint = tint?.invoke() ?: androidx.tv.material3.LocalContentColor.current, modifier = Modifier.size(icon))
         }
     }
 }
@@ -253,12 +256,12 @@ fun Modifier.ignoreHeldKey(): Modifier {
     }
 }
 
-/** The heart: outlined to add, filled red when it's a favourite. */
+/** The heart: outlined to add, filled in the heart colour when it's a favourite. */
 @Composable
 fun FavoriteButton(favorite: Boolean, onToggle: () -> Unit, modifier: Modifier = Modifier) = IconButton(
     if (favorite) androidx.compose.material.icons.Icons.Filled.Favorite else androidx.compose.material.icons.Icons.Filled.FavoriteBorder,
     if (favorite) "In favorieten" else "Favoriet",
     onToggle,
     modifier,
-    tint = if (favorite) nl.jordy.iptv.ui.theme.Heart else null,
+    tint = if (favorite) ({ nl.jordy.iptv.ui.theme.Heart }) else null,
 )

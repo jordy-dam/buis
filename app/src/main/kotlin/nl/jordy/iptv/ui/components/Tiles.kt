@@ -376,7 +376,7 @@ fun ListItemSurface(
 @Composable
 fun FavoriteBadge(modifier: Modifier = Modifier) {
     Box(modifier.size(28.dp).background(Heart, RoundedCornerShape(14.dp)), contentAlignment = Alignment.Center) {
-        androidx.tv.material3.Icon(Icons.Filled.Favorite, contentDescription = "Favoriet", tint = TextPrimary, modifier = Modifier.size(16.dp))
+        androidx.tv.material3.Icon(Icons.Filled.Favorite, contentDescription = "Favoriet", tint = nl.jordy.iptv.ui.theme.OnHeart, modifier = Modifier.size(16.dp))
     }
 }
 
