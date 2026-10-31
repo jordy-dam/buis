@@ -1,6 +1,12 @@
 package nl.jordy.iptv.ui.favorites
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.focusGroup
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Check
+import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.KeyboardArrowDown
+import androidx.compose.material.icons.filled.KeyboardArrowUp
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -19,6 +25,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
+import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.input.key.Key
 import androidx.compose.ui.input.key.KeyEventType
 import androidx.compose.ui.input.key.key
@@ -31,6 +38,7 @@ import androidx.tv.material3.MaterialTheme
 import androidx.tv.material3.Text
 import nl.jordy.iptv.data.repo.Guide
 import nl.jordy.iptv.data.repo.GuideRepository
+import nl.jordy.iptv.ui.components.IconButton
 import nl.jordy.iptv.ui.components.ListItemSurface
 import nl.jordy.iptv.ui.components.PrimaryButton
 import nl.jordy.iptv.ui.components.SecondaryButton
@@ -107,30 +115,26 @@ fun GuideMenuDialog(guide: Guide, onRename: () -> Unit, onDelete: () -> Unit, on
 }
 
 /**
- * Long-press on a channel in a guide. Omhoog and Omlaag keep the dialog open, so a channel moves
- * several places with repeated OKs; the line above says where it is now.
+ * Long-press on a channel in a guide puts these four buttons next to it, instead of a dialog that
+ * would dim the list. The row moves under the focused arrow, so repeated OKs move it several places.
+ * The arrows stay enabled at either end (moving is a no-op there): a button turning disabled would
+ * drop the focus. [onLeave] when the focus moves elsewhere, so the buttons don't linger.
  */
 @Composable
-fun GuideChannelDialog(
-    name: String,
-    place: Int,
-    count: Int,
-    onMove: (Int) -> Unit,
-    onRemove: () -> Unit,
-    onDismiss: () -> Unit,
-) {
+fun GuideChannelEdit(onMove: (Int) -> Unit, onRemove: () -> Unit, onDone: () -> Unit, onLeave: () -> Unit, modifier: Modifier = Modifier) {
     val up = remember { FocusRequester() }
-    Dialog(onDismissRequest = onDismiss) {
-        DialogColumn {
-            Text(name, style = MaterialTheme.typography.headlineMedium)
-            Text("Plek $place van $count", style = MaterialTheme.typography.bodyLarge, color = TextSecondary)
-            Row(horizontalArrangement = Arrangement.spacedBy(16.dp)) {
-                PrimaryButton("Omhoog", { onMove(-1) }, Modifier.focusRequester(up), enabled = place > 1)
-                PrimaryButton("Omlaag", { onMove(1) }, enabled = place < count)
-                SecondaryButton("Uit gids", onRemove)
-                SecondaryButton("Klaar", onDismiss)
-            }
-        }
+    var hadFocus by remember { mutableStateOf(false) }
+    Row(
+        // Before focusGroup, so it sees the whole group; after it, it would see only the first button.
+        modifier.ignoreHeldKey().onFocusChanged {
+            if (it.hasFocus) hadFocus = true else if (hadFocus) onLeave()
+        }.focusGroup(),
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
+    ) {
+        IconButton(Icons.Filled.KeyboardArrowUp, "Omhoog", { onMove(-1) }, Modifier.focusRequester(up))
+        IconButton(Icons.Filled.KeyboardArrowDown, "Omlaag", { onMove(1) })
+        IconButton(Icons.Filled.Close, "Uit gids", onRemove)
+        IconButton(Icons.Filled.Check, "Klaar", onDone)
     }
     LaunchedEffect(Unit) { runCatching { up.requestFocus() } }
 }

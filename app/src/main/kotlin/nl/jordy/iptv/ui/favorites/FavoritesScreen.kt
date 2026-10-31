@@ -16,12 +16,15 @@ import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.itemsIndexed
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.ExperimentalComposeUiApi
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
@@ -101,7 +104,7 @@ class FavoritesViewModel @Inject constructor(
 /**
  * The watching profile's guides, then their favourite films and series, on the left; the focused
  * one on the right (the Live TV pattern). Long-press on a guide renames or deletes it, on a
- * channel moves it or takes it out.
+ * channel shows buttons in its row to move it or take it out.
  */
 @OptIn(ExperimentalComposeUiApi::class)
 @Composable
@@ -122,9 +125,18 @@ fun FavoritesScreen(
     var naming by remember { mutableStateOf<Guide?>(null) }
     var creating by remember { mutableStateOf(false) }
     var menuFor by remember { mutableStateOf<Guide?>(null) }
-    var channelMenu by remember { mutableStateOf<GuideChannelEntity?>(null) }
+    // The channel whose row shows the move buttons, by stream id.
+    var editing by remember { mutableStateOf<Int?>(null) }
+    val rowFocus = remember { mutableMapOf<Int, FocusRequester>() }
+    val channelList = rememberLazyListState()
 
     BackHandler(enabled = contentHasFocus) { listFocus.requestFocus() }
+    // Declared later, so it goes first: Back from the buttons returns to their row, not to the left.
+    BackHandler(enabled = editing != null) {
+        val id = editing
+        editing = null
+        runCatching { id?.let { rowFocus[it]?.requestFocus() } }
+    }
 
     Row(Modifier.fillMaxSize()) {
         LazyColumn(
@@ -163,21 +175,49 @@ fun FavoritesScreen(
                     if (guide.channels.isEmpty()) {
                         Hint("${guide.name} is nog leeg. Houd OK ingedrukt op een zender in Live TV om hem toe te voegen.")
                     }
+                    // The row being moved stays in view as it goes past the top or bottom edge.
+                    val at = guide.channels.indexOfFirst { it.streamId == editing }
+                    LaunchedEffect(at) {
+                        val visible = channelList.layoutInfo.visibleItemsInfo
+                        if (at < 0 || visible.isEmpty()) return@LaunchedEffect
+                        val first = visible.first().index
+                        val last = visible.last().index
+                        if (at <= first) channelList.animateScrollToItem(at) else if (at >= last) channelList.animateScrollToItem(at - (last - first) + 1)
+                    }
                     LazyColumn(
+                        state = channelList,
                         modifier = Modifier.fillMaxSize().focusRequester(contentFocus).focusRestorer(),
                         contentPadding = PaddingValues(top = 4.dp, bottom = 48.dp, start = 4.dp, end = 8.dp),
                         verticalArrangement = Arrangement.spacedBy(4.dp),
                     ) {
                         itemsIndexed(guide.channels, key = { _, c -> "${c.guideId}/${c.streamId}" }) { i, c ->
-                            ChannelTile(
-                                // Channels that came from favourites before 2a hold raw provider names.
-                                name = NameParser.parse(c.name).title,
-                                logoUrl = c.logoUrl,
-                                number = i + 1,
-                                now = rememberNowAndNext(c.streamId, vm::nowAndNext).first,
-                                onClick = { onPlay(PlayerRoute(PlayerRoute.Kind.LIVE, c.streamId, c.name, categoryId = PlayerRoute.guideCategory(guide.id))) },
-                                onLongClick = { channelMenu = c },
-                            )
+                            val tile = rowFocus.getOrPut(c.streamId) { FocusRequester() }
+                            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                                ChannelTile(
+                                    // Channels that came from favourites before 2a hold raw provider names.
+                                    name = NameParser.parse(c.name).title,
+                                    logoUrl = c.logoUrl,
+                                    number = i + 1,
+                                    now = rememberNowAndNext(c.streamId, vm::nowAndNext).first,
+                                    onClick = { onPlay(PlayerRoute(PlayerRoute.Kind.LIVE, c.streamId, c.name, categoryId = PlayerRoute.guideCategory(guide.id))) },
+                                    onLongClick = { editing = c.streamId },
+                                    modifier = Modifier.weight(1f).focusRequester(tile),
+                                )
+                                if (editing == c.streamId) {
+                                    GuideChannelEdit(
+                                        onMove = { vm.move(c, it) },
+                                        onRemove = {
+                                            // Focus first goes to the row that takes its place, so it isn't lost with it.
+                                            val next = guide.channels.getOrNull(i + 1) ?: guide.channels.getOrNull(i - 1)
+                                            runCatching { next?.let { rowFocus[it.streamId]?.requestFocus() } ?: listFocus.requestFocus() }
+                                            editing = null
+                                            vm.removeChannel(c)
+                                        },
+                                        onDone = { editing = null; runCatching { tile.requestFocus() } },
+                                        onLeave = { if (editing == c.streamId) editing = null },
+                                    )
+                                }
+                            }
                         }
                     }
                 }
@@ -218,23 +258,6 @@ fun FavoritesScreen(
             onDelete = { vm.delete(g); menuFor = null; listFocus.requestFocus() },
             onDismiss = { menuFor = null },
         )
-    }
-    channelMenu?.let { picked ->
-        // Follows the move: the dialog's "Plek x van y" comes from the guide as it is now.
-        val channels = s.guides.firstOrNull { it.id == picked.guideId }?.channels.orEmpty()
-        val at = channels.indexOfFirst { it.streamId == picked.streamId }
-        if (at < 0) {
-            channelMenu = null
-        } else {
-            GuideChannelDialog(
-                name = NameParser.parse(picked.name).title,
-                place = at + 1,
-                count = channels.size,
-                onMove = { vm.move(channels[at], it) },
-                onRemove = { vm.removeChannel(picked); channelMenu = null },
-                onDismiss = { channelMenu = null },
-            )
-        }
     }
 }
 
