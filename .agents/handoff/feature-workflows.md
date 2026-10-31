@@ -70,7 +70,7 @@ spec's design principles. On the tv since 16:47 (release f8f255f).
 `docs/plans/2026-10-30-sync-names-speed.md` not committed either. Jordy still has to set `main` as default branch on github.com.
 
 ## Next up
-00. **Agenda's (2026-10-31, committed on main, not pushed):** Instellingen → Volgen → Agenda's. Browse list by sport
+00. **Agenda's (2026-10-31, e91e71c on main, not pushed; release on the tv 18:46):** Instellingen → Volgen → Agenda's. Browse list by sport
    (F1 via f1calendar.com, FC Utrecht/Ajax/PSV/Feyenoord/Oranje via FotMob, Eredivisie via Smart Calendars)
    or an https/webcal link, then pick a channel. Schema 26. Code: `data/repo/Ics.kt`, `CalendarRepository.kt`,
    `ui/reminders/CalendarDialog.kt`. Emulator-tested: F1 on VIAPLAY FORMULE 1 shows FP3 in "Straks voor jou".
