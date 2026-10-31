@@ -1,5 +1,10 @@
 package nl.jordy.iptv.ui.components
 
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.core.MutableTransitionState
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.slideInVertically
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -8,18 +13,19 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.RowScope
 import androidx.compose.foundation.layout.aspectRatio
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.drawBehind
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.drawscope.scale
-import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.tv.material3.MaterialTheme
 import androidx.tv.material3.Text
@@ -33,8 +39,9 @@ import nl.jordy.iptv.ui.theme.TextSecondary
  * look. [label] says what and when in amber ("Over 5 min · 13:00"), [title] says what it's about,
  * [visual] sits on a 16:9 plate on the left, [actions] go underneath: the main choice as a word
  * with focus, the others as round icon buttons, all [ChoiceSize] like the player bar's controls.
- * No box: like the player bar, it sits on a soft dark glow over the picture ([softScrim]).
- * Back is the "no" choice. In the player too: one way for BUIS to ask something.
+ * No box of its own: it slides in from below over [CornerFade], the player bar's fade, so it reads
+ * as text on the picture like the bar does. Back is the "no" choice. In the player too: one way for
+ * BUIS to ask something.
  */
 @Composable
 fun CornerCard(
@@ -45,10 +52,13 @@ fun CornerCard(
     visual: (@Composable BoxScope.() -> Unit)? = null,
     actions: @Composable RowScope.() -> Unit,
 ) {
+    // Slides in once when it appears; a new label or moment on the same card doesn't slide again.
+    val shown = remember { MutableTransitionState(false).apply { targetState = true } }
+    AnimatedVisibility(shown, enter = slideInVertically(tween(280)) { it } + fadeIn(tween(200))) {
     Column(
         // As wide as the content needs, within limits: icon actions keep a card compact. (Plain
         // wrap-content: an intrinsic-width pass measured the card twice on every recomposition.)
-        modifier.widthIn(min = 360.dp, max = 560.dp).softScrim().padding(20.dp),
+        modifier.widthIn(min = 360.dp, max = 560.dp).padding(20.dp),
         verticalArrangement = Arrangement.spacedBy(14.dp),
     ) {
         Row(verticalAlignment = Alignment.CenterVertically) {
@@ -67,22 +77,17 @@ fun CornerCard(
         }
         Row(horizontalArrangement = Arrangement.spacedBy(12.dp), verticalAlignment = Alignment.CenterVertically, content = actions)
     }
+    }
 }
 
-/**
- * The pop-ups' backing, like the player bar's fade: a dark glow behind the content that fades out
- * well past it, so there's no edge. Drawn outside the bounds on purpose; nothing here clips.
- */
-fun Modifier.softScrim() = drawBehind {
-    val spread = 200.dp.toPx()
-    val rx = size.width / 2 + spread
-    val ry = size.height / 2 + spread
-    // A circle squeezed to an ellipse around the content: even fall-off on every side.
-    scale(scaleX = 1f, scaleY = ry / rx, pivot = center) {
-        drawCircle(
-            Brush.radialGradient(0f to Color.Black.copy(alpha = 0.9f), 0.6f to Color.Black.copy(alpha = 0.8f), 1f to Color.Transparent, center = center, radius = rx),
-            radius = rx,
-            center = center,
-        )
+/** The player bar's fade: transparent at the top, dark at the bottom edge, no panel. */
+val BottomFade = Brush.verticalGradient(0f to Color.Transparent, 0.3f to Color.Black.copy(alpha = 0.55f), 1f to Color.Black.copy(alpha = 0.85f))
+
+/** Behind a [CornerCard]: the bottom of the screen fades, full width, like under the player bar. Put it in a full-screen Box. */
+@Composable
+fun BoxScope.CornerFade() {
+    val shown = remember { MutableTransitionState(false).apply { targetState = true } }
+    AnimatedVisibility(shown, Modifier.align(Alignment.BottomCenter), enter = fadeIn(tween(280))) {
+        Box(Modifier.fillMaxWidth().height(460.dp).background(BottomFade))
     }
 }

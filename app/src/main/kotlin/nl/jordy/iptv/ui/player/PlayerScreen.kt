@@ -106,6 +106,8 @@ import nl.jordy.iptv.player.PlayerViewModel
 import nl.jordy.iptv.player.TrackOption
 import nl.jordy.iptv.ui.components.BreakIcons
 import nl.jordy.iptv.ui.components.CornerCard
+import nl.jordy.iptv.ui.components.CornerFade
+import nl.jordy.iptv.ui.components.BottomFade
 import nl.jordy.iptv.ui.components.PrimaryButton
 import nl.jordy.iptv.ui.components.IconButton
 import nl.jordy.iptv.ui.components.Focus
@@ -510,6 +512,8 @@ fun PlayerScreen(onExit: () -> Unit, vm: PlayerViewModel = hiltViewModel()) {
             .padding(start = SafeArea, end = SafeArea, top = SafeArea, bottom = maxOf(SafeArea, lift + 16.dp))
             .ignoreHeldKey()
             .stayIn()
+        // The bar's fade behind a card when the bar is hidden; with the bar, its own fade is there already.
+        if (card != null && !barShows) CornerFade()
         when (card) {
             Card.SLEEP -> SleepCard(state.sleepSecondsLeft ?: 0, cardFocus, vm::userActive, corner)
             Card.BREAK -> BreakCard(state.breakSecondsLeft ?: 0, cardFocus, vm::endBreak, corner)
@@ -595,7 +599,7 @@ private fun PlayerBar(
         Modifier
             .fillMaxWidth()
             // No panel: a fade over the bottom of the picture, so the bar is text and a line on the image.
-            .background(Brush.verticalGradient(0f to Color.Transparent, 0.3f to Color.Black.copy(alpha = 0.55f), 1f to Color.Black.copy(alpha = 0.85f)))
+            .background(BottomFade)
             .padding(start = SafeArea, end = SafeArea, top = SafeArea, bottom = 28.dp)
             .onGloballyPositioned { barX = it.positionInRoot().x; barWidth = it.size.width },
         verticalArrangement = Arrangement.spacedBy(8.dp),

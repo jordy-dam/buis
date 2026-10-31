@@ -32,6 +32,7 @@ import nl.jordy.iptv.data.profile.Bedtime
 import nl.jordy.iptv.data.profile.ProfileRepository
 import nl.jordy.iptv.data.profile.prefs
 import nl.jordy.iptv.ui.components.CornerCard
+import nl.jordy.iptv.ui.components.CornerFade
 import nl.jordy.iptv.ui.components.PrimaryButton
 import nl.jordy.iptv.ui.components.SecondaryButton
 import nl.jordy.iptv.ui.components.ignoreHeldKey
@@ -84,12 +85,13 @@ fun BedtimeHost(active: Boolean, vm: BedtimeViewModel = hiltViewModel()) {
     if (!active) return
     val stay = remember { FocusRequester() }
     Dialog(onDismissRequest = vm::dismiss, properties = DialogProperties(usePlatformDefaultWidth = false)) {
-        (LocalView.current.parent as? DialogWindowProvider)?.window?.setDimAmount(0.25f)
-        Box(Modifier.fillMaxSize().padding(SafeArea), contentAlignment = Alignment.BottomEnd) {
+        (LocalView.current.parent as? DialogWindowProvider)?.window?.setDimAmount(0f)
+        Box(Modifier.fillMaxSize(), contentAlignment = Alignment.BottomEnd) {
+            CornerFade()
             CornerCard(
                 label = "Het is $t · Bedtijd",
                 title = "Doorkijken of lekker naar bed?",
-                modifier = Modifier.ignoreHeldKey(),
+                modifier = Modifier.padding(SafeArea).ignoreHeldKey(),
             ) {
                 PrimaryButton("Doorkijken", vm::dismiss, Modifier.focusRequester(stay), large = true)
                 SecondaryButton("Naar bed", {

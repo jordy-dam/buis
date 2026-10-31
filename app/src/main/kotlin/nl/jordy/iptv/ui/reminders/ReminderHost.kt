@@ -14,6 +14,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
+import androidx.compose.ui.input.key.onPreviewKeyEvent
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
@@ -40,6 +41,7 @@ import nl.jordy.iptv.data.repo.FollowRepository
 import nl.jordy.iptv.data.profile.ProfileRepository
 import nl.jordy.iptv.ui.PlayerRoute
 import nl.jordy.iptv.ui.components.CornerCard
+import nl.jordy.iptv.ui.components.CornerFade
 import nl.jordy.iptv.ui.components.PrimaryButton
 import nl.jordy.iptv.ui.components.IconButton
 import androidx.compose.material.icons.Icons
@@ -69,6 +71,9 @@ import javax.inject.Inject
 
 /** How long a started programme counts down before Automatisch overschakelen tunes in. */
 private const val AUTO_SWITCH_SEC = 10
+
+/** A reminder nobody reacts to goes away by itself after this long. */
+private const val HIDE_AFTER_MS = 15_000L
 
 private val clock = DateTimeFormatter.ofPattern("HH:mm").withZone(ZoneId.systemDefault())
 
@@ -108,11 +113,9 @@ class ReminderViewModel @Inject constructor(private val follows: FollowRepositor
         }
     }
 
-    /** [watched]: Kijken or Vanaf begin, so no second reminder at the start. */
-    fun dismiss(watched: Boolean) {
+    fun dismiss(outcome: FollowMatches.Outcome) {
         val d = due.value ?: return
-        shown += "${d.match.key}:soon"
-        if (watched || d.moment == FollowMatches.Moment.STARTED) shown += "${d.match.key}:now"
+        shown += FollowMatches.dealtWith(d, outcome)
         due.value = null
     }
 }
@@ -147,13 +150,20 @@ fun ReminderHost(active: Boolean, onWatch: (PlayerRoute) -> Unit, vm: ReminderVi
             delay(1_000)
             left--
         }
-        vm.dismiss(watched = true)
+        vm.dismiss(FollowMatches.Outcome.WATCHED)
         onWatch(live)
     }
-    // A card in the corner over a lightly dimmed screen, like a tv notification, not a dialog in the middle.
-    Dialog(onDismissRequest = { vm.dismiss(watched = false) }, properties = DialogProperties(usePlatformDefaultWidth = false)) {
-        (LocalView.current.parent as? DialogWindowProvider)?.window?.setDimAmount(0.25f)
-        Box(Modifier.fillMaxSize().padding(SafeArea), contentAlignment = Alignment.BottomEnd) {
+    // Left alone, it goes by itself after a while; any key on it starts the wait again.
+    var touched by remember(m.key, d.moment) { mutableIntStateOf(0) }
+    if (!counting) LaunchedEffect(m.key, d.moment, touched) {
+        delay(HIDE_AFTER_MS)
+        vm.dismiss(FollowMatches.Outcome.TIMED_OUT)
+    }
+    // A card in the corner over the undimmed screen, like a tv notification, not a dialog in the middle.
+    Dialog(onDismissRequest = { vm.dismiss(FollowMatches.Outcome.REFUSED) }, properties = DialogProperties(usePlatformDefaultWidth = false)) {
+        (LocalView.current.parent as? DialogWindowProvider)?.window?.setDimAmount(0f)
+        Box(Modifier.fillMaxSize(), contentAlignment = Alignment.BottomEnd) {
+        CornerFade()
         val minutes = ((m.start - System.currentTimeMillis() / 1000 + 59) / 60).coerceAtLeast(1)
         val at = clock.format(Instant.ofEpochSecond(m.start))
         CornerCard(
@@ -164,7 +174,7 @@ fun ReminderHost(active: Boolean, onWatch: (PlayerRoute) -> Unit, vm: ReminderVi
             },
             title = m.title,
             subtitle = m.channelName,
-            modifier = Modifier.ignoreHeldKey(),
+            modifier = Modifier.padding(SafeArea).ignoreHeldKey().onPreviewKeyEvent { touched++; false },
             // Logo plate like the channel rows: logos are often transparent PNGs.
             visual = {
                 Text(m.channelName.take(2).uppercase(), style = MaterialTheme.typography.titleMedium, color = TextSecondary)
@@ -172,19 +182,19 @@ fun ReminderHost(active: Boolean, onWatch: (PlayerRoute) -> Unit, vm: ReminderVi
             },
         ) {
             PrimaryButton("Kijken", {
-                vm.dismiss(watched = true)
+                vm.dismiss(FollowMatches.Outcome.WATCHED)
                 onWatch(live)
             }, Modifier.focusRequester(watch), large = true)
-            // Secondary actions as icons: restart, later (close), the follow settings.
+            // Secondary actions as icons: restart, skip this one (close), the follow settings.
             if (started && m.hasArchive) {
                 IconButton(Icons.Filled.RestartAlt, "Vanaf begin", {
-                    vm.dismiss(watched = true)
+                    vm.dismiss(FollowMatches.Outcome.WATCHED)
                     onWatch(live.copy(fromStart = true))
                 }, large = true)
             }
-            IconButton(Icons.Filled.Close, "Later", { vm.dismiss(watched = false) }, large = true)
+            IconButton(Icons.Filled.Close, "Overslaan", { vm.dismiss(FollowMatches.Outcome.REFUSED) }, large = true)
             IconButton(Icons.Filled.Settings, "Volgen aanpassen", {
-                vm.dismiss(watched = true)
+                vm.dismiss(FollowMatches.Outcome.WATCHED)
                 editFollows = true
             }, large = true)
         }

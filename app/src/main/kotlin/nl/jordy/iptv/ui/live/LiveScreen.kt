@@ -60,6 +60,7 @@ import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
+import androidx.compose.runtime.rememberCoroutineScope
 import nl.jordy.iptv.data.db.AppDatabase
 import nl.jordy.iptv.data.db.CategoryEntity
 import nl.jordy.iptv.data.db.LiveChannelEntity
@@ -218,6 +219,7 @@ fun LiveScreen(onPlay: (PlayerRoute) -> Unit, vm: LiveViewModel = hiltViewModel(
     val categories by vm.categories.collectAsStateWithLifecycle()
     val sections by vm.sections.collectAsStateWithLifecycle()
     var guideFor by remember { mutableStateOf<LiveChannelEntity?>(null) }
+    val scope = rememberCoroutineScope()
     var pickGuideFor by remember { mutableStateOf<LiveChannelEntity?>(null) }
     val guides by vm.guideList.collectAsStateWithLifecycle()
     val filtered by vm.filtered.collectAsStateWithLifecycle()
@@ -287,10 +289,11 @@ fun LiveScreen(onPlay: (PlayerRoute) -> Unit, vm: LiveViewModel = hiltViewModel(
                     },
                     onLongClick = { if (guides.size > 1) pickGuideFor = channel else vm.toggleInOnlyGuide(channel) },
                     modifier = Modifier.focusRequester(itemFocus).onFocusChanged { if (it.isFocused) focusedChannel = channel }
-                        // Right on a channel: its guide, to scroll through what's on later.
+                        // Right on a channel: its guide, to scroll through what's on later. A channel
+                        // without a guide opens nothing: an empty panel is only something to close again.
                         .onPreviewKeyEvent { e ->
                             if (e.type == KeyEventType.KeyDown && e.key.nativeKeyCode == KeyEvent.KEYCODE_DPAD_RIGHT) {
-                                guideFor = channel
+                                scope.launch { if (vm.guide(channel.streamId).isNotEmpty()) guideFor = channel }
                                 true
                             } else false
                         },

@@ -95,4 +95,18 @@ class FollowMatchesTest {
         val session = FollowMatch("Formule 1", "F1: FP3", now + 9000, now + 12600, 42, "VIAPLAY FORMULE 1", "f1", false, fromCalendar = true)
         assertEquals(listOf("The Front Row", "F1: FP3"), FollowMatches.nextPerTerm(listOf(guideHit, session)).map { it.title })
     }
+
+    @Test
+    fun `refusing the 5-minute reminder also skips the one at the start, letting it hide by itself doesn't`() {
+        val m = FollowMatch("FC Utrecht", "Telstar - FC Utrecht", now + 240, now + 7440, 7, "ESPN 1", "sport", false, fromCalendar = true)
+        val soon = FollowMatches.Due(m, Moment.SOON)
+        val atStart = now + 260
+
+        val refused = FollowMatches.dealtWith(soon, FollowMatches.Outcome.REFUSED)
+        assertNull("refused: nothing at the start", FollowMatches.due(listOf(m), atStart, refused))
+
+        val ignored = FollowMatches.dealtWith(soon, FollowMatches.Outcome.TIMED_OUT)
+        assertEquals("left alone: a second chance at the start", Moment.STARTED, FollowMatches.due(listOf(m), atStart, ignored)?.moment)
+        assertNull("but not the 5-minute one again", FollowMatches.due(listOf(m), now + 30, ignored))
+    }
 }

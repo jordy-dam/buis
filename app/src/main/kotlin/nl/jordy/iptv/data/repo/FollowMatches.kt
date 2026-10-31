@@ -83,6 +83,19 @@ object FollowMatches {
     fun merge(followed: List<FollowMatch>, oneOffs: List<FollowMatch>): List<FollowMatch> =
         (oneOffs + followed).distinctBy { it.key }.sortedBy { it.start }
 
+    /** How a reminder went away. */
+    enum class Outcome { WATCHED, REFUSED, TIMED_OUT }
+
+    /**
+     * What to remember after [due] went away, so it doesn't come back: watching or refusing (X, Back)
+     * is the end of it, the start reminder included. A 5-minute reminder left alone until it hid itself
+     * still gets its second chance at the start.
+     */
+    fun dealtWith(due: Due, outcome: Outcome): Set<String> {
+        val k = due.match.key
+        return if (outcome == Outcome.TIMED_OUT && due.moment == Moment.SOON) setOf("$k:soon") else setOf("$k:soon", "$k:now")
+    }
+
     /** The banner to show now, if any; [shown] holds "<key>:soon" and "<key>:now" for what was dealt with. */
     fun due(matches: List<FollowMatch>, nowSec: Long, shown: Set<String>): Due? {
         for (m in matches) {
