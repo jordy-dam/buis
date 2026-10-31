@@ -10,7 +10,7 @@ session_focus: Uiterlijk per profile (Standaard + Garage), then everything on ma
 BUIS runs on the real tv (TCL Smart TV Pro, Android 14) with Jordy's subscription, as a release build.
 Since 2026-10-31 19:56 the tv runs a release of `main` at **2b8ab3a**. That includes own guides,
 Agenda's, Uiterlijk/Garage and the new reminder cards. Code: `git@github-personal:jordy-dam/buis.git` (private).
-**main is 6 commits ahead of origin, not pushed** (6e15a27 is the last pushed). Decisions: `.agents/decisions/`.
+main is pushed (220b59d, 2026-10-31). Decisions: `.agents/decisions/`.
 
 ## State
 **Where we are:**
@@ -32,7 +32,7 @@ nobody got interrupted); then `adb disconnect`.
 
 ## Next up
 1. Jordy looks at Garage on the tv (his own profile is still Standaard) and at the new reminder cards with the real remote.
-2. Push main once Jordy says so (`git push` via the `github-personal` alias).
+2. Garage on the tv since 21:24 (220b59d): gold heart, 911 photo behind the menu screens, see-through rail. Channel-row heart stays far left (Jordy).
 3. Garage, round 2, only if Jordy wants it: a subtle concrete texture on the background or another focus treatment.
    Keep readability from the couch the bar. The remaining hard-coded colours (Avatar, PinDialog, CalendarDialog,
    Testbeeld, SettingsScreen) don't follow the look yet.
