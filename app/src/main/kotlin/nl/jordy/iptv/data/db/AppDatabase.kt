@@ -31,8 +31,10 @@ import androidx.sqlite.db.SupportSQLiteDatabase
         SeriesIntroEntity::class,
         GuideEntity::class,
         GuideChannelEntity::class,
+        CalendarEntity::class,
+        CalendarEventEntity::class,
     ],
-    version = 25,
+    version = 26,
     exportSchema = true,
     autoMigrations = [
         AutoMigration(from = 1, to = 2, spec = AppDatabase.CatalogResync::class),
@@ -76,6 +78,8 @@ import androidx.sqlite.db.SupportSQLiteDatabase
         AutoMigration(from = 22, to = 23),
         // A gadget on the avatar per profile, none for everyone at first.
         AutoMigration(from = 23, to = 24),
+        // Followed calendars, none for anyone at first.
+        AutoMigration(from = 25, to = 26),
     ],
 )
 abstract class AppDatabase : RoomDatabase() {
@@ -91,6 +95,7 @@ abstract class AppDatabase : RoomDatabase() {
     abstract fun movieInfo(): MovieInfoDao
     abstract fun follows(): FollowDao
     abstract fun reminders(): ReminderDao
+    abstract fun calendars(): CalendarDao
     abstract fun watchLog(): WatchLogDao
     abstract fun channelHealth(): ChannelHealthDao
     abstract fun seriesIntro(): SeriesIntroDao

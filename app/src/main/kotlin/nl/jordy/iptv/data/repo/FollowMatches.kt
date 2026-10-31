@@ -18,6 +18,8 @@ data class FollowMatch(
     val parts: Int = 1,
     /** A reminder for this one programme only, set from the guide, not a followed term. */
     val oneOff: Boolean = false,
+    /** From a followed calendar; [term] is then the calendar's name. */
+    val fromCalendar: Boolean = false,
 ) {
     /** One programme on one channel, for remembering which reminders were shown. */
     val key get() = "$streamId:$start"
@@ -64,8 +66,18 @@ object FollowMatches {
         return blocks
     }
 
-    /** "Straks voor jou": per term only what comes first, so one busy term can't fill the row; every one-off reminder shows. */
-    fun nextPerTerm(matches: List<FollowMatch>): List<FollowMatch> = matches.distinctBy { if (it.oneOff) it.key else it.term.lowercase() }
+    /**
+     * "Straks voor jou": per term only what comes first, so one busy term can't fill the row; every
+     * one-off reminder shows. A calendar counts apart from a term of the same name ("Formule 1"),
+     * or the guide's first hit for the term would hide the calendar's session.
+     */
+    fun nextPerTerm(matches: List<FollowMatch>): List<FollowMatch> = matches.distinctBy {
+        when {
+            it.oneOff -> it.key
+            it.fromCalendar -> "calendar:" + it.term.lowercase()
+            else -> it.term.lowercase()
+        }
+    }
 
     /** Followed matches and one-off reminders in one list; a programme both followed and reminded shows once. */
     fun merge(followed: List<FollowMatch>, oneOffs: List<FollowMatch>): List<FollowMatch> =

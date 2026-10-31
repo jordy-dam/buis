@@ -70,6 +70,13 @@ spec's design principles. On the tv since 16:47 (release f8f255f).
 `docs/plans/2026-10-30-sync-names-speed.md` not committed either. Jordy still has to set `main` as default branch on github.com.
 
 ## Next up
+00. **Agenda's (2026-10-31, committed on main, not pushed):** Instellingen → Volgen → Agenda's. Browse list by sport
+   (F1 via f1calendar.com, FC Utrecht/Ajax/PSV/Feyenoord/Oranje via FotMob, Eredivisie via Smart Calendars)
+   or an https/webcal link, then pick a channel. Schema 26. Code: `data/repo/Ics.kt`, `CalendarRepository.kt`,
+   `ui/reminders/CalendarDialog.kt`. Emulator-tested: F1 on VIAPLAY FORMULE 1 shows FP3 in "Straks voor jou".
+   Open: Jordy adds F1 / FC Utrecht on the tv himself (data is per device), and
+   a real-remote test of the channel picker. The two VIAPLAY FORMULE 1 streams show as "versie 1/2": Jordy
+   says which one is live.
 0. Merged guide is on the tv (release APK installed 2026-10-30 08:00, one "Gids vernieuwen" at 08:02):
    547 → 609 zenders met gids, same as the emulator, refresh took < 90 s. Still open: Jordy checks
    Viaplay TV / FilmBox now have a guide, and SBS6 late in the evening against NLZIET. Committed on its
@@ -105,7 +112,9 @@ spec's design principles. On the tv since 16:47 (release f8f255f).
 
 ## Emulator gotchas
 - Clock drifts after a suspend (mock guide then has no "NU"): `adb -s emulator-5554 shell cmd alarm set-time $(($(date +%s)*1000))`.
-  Setting it to e.g. hh:26 is how reminders were tested.
+  Setting it to e.g. hh:26 is how reminders were tested. A clock hours behind also breaks HTTPS to sites
+  with a fresh certificate (2026-10-31: adding the FotMob calendar failed with "Chain validation failed");
+  a cold boot (`emulator -avd tv_1080p -no-snapshot-load`) fixes it too.
 - Google TV may show "Set up Google TV" on top: Back, relaunch. Profile picker first: OK on Bas before navigating.
 - Screenshots: `adb shell screencap -p /sdcard/s.png` + `adb pull` is reliable; `exec-out` can hang.
 - Mock server: `./gradlew :mockserver:run` (login demo/demo at 10.0.2.2:8080); has archive channels and

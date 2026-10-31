@@ -378,6 +378,19 @@ class MigrationTest {
         }
     }
 
+    @Test
+    fun `25 to 26 adds empty calendar tables and keeps follow terms`() {
+        helper.createDatabase(DB, 25).use { db ->
+            db.execSQL("INSERT INTO profile (id, name, avatar, face, pinHash, preferredCountries, onlyPreferred, kids, lastUsedAt, createdAt, sleepMinutes, pinnedCategories) VALUES (1, 'Anna', 3, 2, NULL, 'NL', 1, 0, 5, 1, 0, '')")
+            db.execSQL("INSERT INTO follow (profileId, term, addedAt) VALUES (1, 'Formule 1', 1)")
+        }
+        helper.runMigrationsAndValidate(DB, 26, true).use { db ->
+            assertEquals(0, db.count("calendar"))
+            assertEquals(0, db.count("calendar_event"))
+            assertEquals("follow terms stay", 1, db.count("follow"))
+        }
+    }
+
     private fun SupportSQLiteDatabase.insertPhase1Data() {
         execSQL("INSERT INTO favorite (type, itemId, name, imageUrl, addedAt) VALUES ('LIVE', 101, '┃NL┃ NPO 1 HD', NULL, 1)")
         execSQL("INSERT INTO playback_position (type, itemId, positionMs, durationMs, updatedAt) VALUES ('MOVIE', 5001, 62000, 180000, 2)")

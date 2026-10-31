@@ -66,6 +66,11 @@ import nl.jordy.iptv.ui.components.TvTextField
 import nl.jordy.iptv.data.repo.FollowRepository
 import nl.jordy.iptv.data.repo.FollowMatch
 import nl.jordy.iptv.ui.reminders.FollowDialog
+import nl.jordy.iptv.ui.reminders.CalendarDialog
+import nl.jordy.iptv.data.repo.CalendarRepository
+import nl.jordy.iptv.data.db.CalendarEntity
+import nl.jordy.iptv.data.db.ChannelPick
+import androidx.compose.material.icons.filled.CalendarMonth
 import nl.jordy.iptv.data.auth.SubscriptionData
 import kotlinx.coroutines.flow.mapLatest
 import androidx.compose.ui.text.style.TextOverflow
@@ -154,6 +159,7 @@ class SettingsViewModel @Inject constructor(
     enricher: MovieEnricher,
     private val follows: FollowRepository,
     private val posters: DreamPosters,
+    private val calendarRepo: CalendarRepository,
 ) : ViewModel() {
     /** Debug builds: the screensaver's posters, for its preview. */
     suspend fun dreamPosters() = posters.load()
@@ -167,6 +173,13 @@ class SettingsViewModel @Inject constructor(
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyMap())
     fun follow(term: String) = viewModelScope.launch { follows.add(term) }
     fun unfollow(term: String) = viewModelScope.launch { follows.remove(term) }
+
+    val calendars = calendarRepo.calendars.stateIn(viewModelScope, SharingStarted.Eagerly, emptyList())
+    val calendarNext = calendarRepo.next().stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
+    suspend fun searchChannels(query: String) = calendarRepo.channels(query)
+    suspend fun addCalendar(url: String, name: String?, channel: ChannelPick) = calendarRepo.add(url, name, channel)
+    fun setCalendarChannel(calendar: CalendarEntity, channel: ChannelPick) = viewModelScope.launch { calendarRepo.setChannel(calendar, channel) }
+    fun removeCalendar(url: String) = viewModelScope.launch { calendarRepo.remove(url) }
 
     /** "1.234 van 19.826 films": how far the background fetch of film details is. */
     val filmInfo = enricher.progress.map { (done, total) ->
@@ -313,6 +326,9 @@ fun SettingsScreen(onRefreshCatalog: () -> Unit, onLoggedOut: () -> Unit, onEdit
     var editFollows by remember { mutableStateOf(false) }
     val followTerms by vm.followTerms.collectAsStateWithLifecycle()
     val followNext by vm.followNext.collectAsStateWithLifecycle()
+    var editCalendars by remember { mutableStateOf(false) }
+    val calendars by vm.calendars.collectAsStateWithLifecycle()
+    val calendarNext by vm.calendarNext.collectAsStateWithLifecycle()
 
     // Two panes, like the tv's own settings: the sections on the left, each with a line saying how
     // it's set, and the focused section's settings on the right. Entering from the rail lands on
@@ -326,7 +342,7 @@ fun SettingsScreen(onRefreshCatalog: () -> Unit, onLoggedOut: () -> Unit, onEdit
     val summary = mapOf(
         Section.PROFILE to "Profiel en kijkgeschiedenis",
         Section.WATCHING to "Geluid ${TrackLabels.name(prefs.audioLang, TrackLabels.AUDIO_CHOICES)} · ondertitels ${TrackLabels.name(prefs.subtitleLang, TrackLabels.SUBTITLE_CHOICES)}",
-        Section.FOLLOWING to followTerms.joinToString(", ").ifEmpty { "Niets" } + if (prefs.autoSwitch) " · overschakelen aan" else "",
+        Section.FOLLOWING to (followTerms + calendars.map { it.name }).distinctBy { it.lowercase() }.joinToString(", ").ifEmpty { "Niets" } + if (prefs.autoSwitch) " · overschakelen aan" else "",
         Section.REST to listOfNotNull(
             prefs.sleepMinutes.takeIf { it > 0 }?.let { "Slaaptimer $it min" },
             prefs.bedtime.takeIf { it >= 0 }?.let { "Bedtijd ${Bedtime.timeName(it)}" },
@@ -383,6 +399,13 @@ fun SettingsScreen(onRefreshCatalog: () -> Unit, onLoggedOut: () -> Unit, onEdit
                 }
                 Section.FOLLOWING -> {
                     SettingRow("Volgen", "Zoektermen voor de gids; BUIS meldt het als iets bijna begint.", leading = Icons.Filled.Visibility, value = followTerms.joinToString(", ").ifEmpty { "Niets" }, onClick = { editFollows = true }, modifier = top)
+                    SettingRow(
+                        "Agenda's",
+                        "Een agenda op een vaste zender, voor sport zonder gids.",
+                        leading = Icons.Filled.CalendarMonth,
+                        value = calendars.map { it.name }.distinct().joinToString(", ").ifEmpty { "Geen" },
+                        onClick = { editCalendars = true },
+                    )
                     SettingRow(
                         "Automatisch overschakelen",
                         "Begint iets dat je volgt, dan schakelt BUIS na 10 seconden over.",
@@ -461,6 +484,12 @@ fun SettingsScreen(onRefreshCatalog: () -> Unit, onLoggedOut: () -> Unit, onEdit
     }
     if (editFollows) {
         FollowDialog(followTerms, followNext, vm::follow, vm::unfollow, onDismiss = { editFollows = false })
+    }
+    if (editCalendars) {
+        CalendarDialog(
+            calendars, calendarNext, CalendarRepository.presets, vm::searchChannels, vm::addCalendar, vm::setCalendarChannel, vm::removeCalendar,
+            onDismiss = { editCalendars = false },
+        )
     }
     if (pickCountries) {
         CountryDialog(countries, prefs.preferredCountries, vm::toggleCountry, onDismiss = { pickCountries = false })

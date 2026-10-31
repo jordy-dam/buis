@@ -15,7 +15,11 @@ import javax.inject.Singleton
 /** What the watching profile follows, and the guide programmes that match it. */
 @OptIn(ExperimentalCoroutinesApi::class)
 @Singleton
-class FollowRepository @Inject constructor(private val db: AppDatabase, private val profiles: ProfileRepository) {
+class FollowRepository @Inject constructor(
+    private val db: AppDatabase,
+    private val profiles: ProfileRepository,
+    private val calendars: CalendarRepository,
+) {
 
     val terms: Flow<List<String>> = profiles.current.filterNotNull()
         .flatMapLatest { db.follows().observe(it.id) }
@@ -30,12 +34,13 @@ class FollowRepository @Inject constructor(private val db: AppDatabase, private 
     suspend fun remove(term: String) = db.follows().delete(profiles.currentId(), term)
 
     /**
-     * Matches from now until the end of the guide window (about 36 hours), followed terms and one-off
-     * reminders together; a kids profile skips adult channels for terms.
+     * Matches from now until the end of the guide window (about 36 hours): followed terms, followed
+     * calendars and one-off reminders together; a kids profile skips adult channels for terms.
      */
     suspend fun upcoming(nowSec: Long = System.currentTimeMillis() / 1000, hours: Int = 36): List<FollowMatch> {
         val id = profiles.currentId()
-        val followed = FollowMatches.fold(db.follows().matches(id, nowSec, nowSec + hours * 3600L, profiles.currentPrefs().hideAdult))
+        val followed = FollowMatches.fold(db.follows().matches(id, nowSec, nowSec + hours * 3600L, profiles.currentPrefs().hideAdult)) +
+            calendars.matches(nowSec, nowSec + hours * 3600L)
         val oneOffs = db.reminders().upcoming(id, nowSec).map {
             FollowMatch(it.title, it.title, it.start, it.stop, it.streamId, it.channelName, it.categoryId, it.hasArchive, it.logoUrl, oneOff = true)
         }

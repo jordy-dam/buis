@@ -376,6 +376,70 @@ interface ReminderDao {
     @Query("DELETE FROM reminder WHERE stop <= :now") suspend fun deleteOver(now: Long)
 }
 
+/** A calendar appointment on the channel its calendar is tied to. */
+data class CalendarMatchRow(
+    val name: String,
+    val start: Long,
+    val stop: Long,
+    val title: String,
+    val streamId: Int,
+    val channelName: String,
+    val categoryId: String,
+    val hasArchive: Boolean,
+    val logoUrl: String?,
+)
+
+/** A live channel to tie a calendar to, with the category that tells copies apart. */
+data class ChannelPick(
+    val streamId: Int,
+    val name: String,
+    val categoryId: String,
+    val categoryName: String,
+    val logoUrl: String?,
+    val archiveDays: Int,
+    val catchup: Boolean,
+)
+
+/** Followed calendars per profile, and their appointments (shared per link). */
+@Dao
+interface CalendarDao {
+    @Upsert suspend fun upsert(item: CalendarEntity)
+    @Query("DELETE FROM calendar WHERE profileId = :profileId AND url = :url") suspend fun delete(profileId: Long, url: String)
+    @Query("SELECT * FROM calendar WHERE profileId = :profileId ORDER BY addedAt") fun observe(profileId: Long): Flow<List<CalendarEntity>>
+
+    /** Every followed link with its oldest fetch, for refreshing; links nobody follows any more are dropped by [dropOrphanEvents]. */
+    @Query("SELECT url, MIN(fetchedAt) AS fetchedAt FROM calendar GROUP BY url") suspend fun links(): List<CalendarLink>
+    @Query("UPDATE calendar SET fetchedAt = :at WHERE url = :url") suspend fun setFetched(url: String, at: Long)
+
+    @Query("DELETE FROM calendar_event WHERE url = :url") suspend fun clearEvents(url: String)
+    @Insert(onConflict = OnConflictStrategy.REPLACE) suspend fun insertEvents(items: List<CalendarEventEntity>)
+    @Query("DELETE FROM calendar_event WHERE url NOT IN (SELECT url FROM calendar)") suspend fun dropOrphanEvents()
+
+    /** Appointments between [from] and [until] of the profile's calendars, on each calendar's channel. */
+    @Query(
+        "SELECT c.name AS name, e.start AS start, e.stop AS stop, e.title AS title, c.streamId AS streamId, c.channelName AS channelName, " +
+            "c.categoryId AS categoryId, c.hasArchive AS hasArchive, c.logoUrl AS logoUrl " +
+            "FROM calendar c JOIN calendar_event e ON e.url = c.url " +
+            "WHERE c.profileId = :profileId AND e.stop > :from AND e.start < :until ORDER BY e.start",
+    )
+    suspend fun matches(profileId: Long, from: Long, until: Long): List<CalendarMatchRow>
+
+    /** The first appointment still to come per link, for the list in Volgen. */
+    @Query("SELECT url, MIN(start) AS start, title FROM calendar_event WHERE stop > :now GROUP BY url")
+    fun next(now: Long): Flow<List<CalendarNext>>
+
+    /** Live channels whose name contains [query], by the provider's order; one row per category it's in. */
+    @Query(
+        "SELECT l.streamId, l.name, l.categoryId, k.name AS categoryName, l.logoUrl, l.archiveDays, l.catchup FROM live_channel l " +
+            "JOIN category k ON k.type = 'LIVE' AND k.id = l.categoryId " +
+            "WHERE l.name LIKE '%' || :query || '%' AND (:hideAdult = 0 OR k.adult = 0) ORDER BY k.sortIndex, l.sortIndex LIMIT 60",
+    )
+    suspend fun channels(query: String, hideAdult: Boolean): List<ChannelPick>
+}
+
+data class CalendarLink(val url: String, val fetchedAt: Long)
+data class CalendarNext(val url: String, val start: Long, val title: String)
+
 
 /** Kijkgeschiedenis, per profile. */
 @Dao

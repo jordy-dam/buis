@@ -88,4 +88,11 @@ class FollowMatchesTest {
         assertEquals(Moment.STARTED, FollowMatches.due(m, now, emptySet())?.moment)
         assertNull("ten minutes in is no longer a reminder", FollowMatches.due(m, now + 480, emptySet()))
     }
+
+    @Test
+    fun `a calendar's session shows next to a term of the same name, not hidden behind the guide's first hit`() {
+        val guideHit = FollowMatch("Formule 1", "The Front Row", now + 100, now + 1900, 5, "Ziggo Sport 5", "sport", false)
+        val session = FollowMatch("Formule 1", "F1: FP3", now + 9000, now + 12600, 42, "VIAPLAY FORMULE 1", "f1", false, fromCalendar = true)
+        assertEquals(listOf("The Front Row", "F1: FP3"), FollowMatches.nextPerTerm(listOf(guideHit, session)).map { it.title })
+    }
 }

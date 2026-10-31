@@ -20,6 +20,7 @@ import kotlinx.coroutines.launch
 import nl.jordy.iptv.data.auth.CredentialStore
 import nl.jordy.iptv.data.db.AppDatabase
 import nl.jordy.iptv.data.epg.EpgGuide
+import nl.jordy.iptv.data.repo.CalendarRepository
 import nl.jordy.iptv.ui.AppNavHost
 import nl.jordy.iptv.data.profile.ProfileRepository
 import nl.jordy.iptv.ui.LoginRoute
@@ -35,6 +36,7 @@ import javax.inject.Inject
 class MainActivity : ComponentActivity() {
     private val vm: StartViewModel by viewModels()
     @Inject lateinit var guide: EpgGuide
+    @Inject lateinit var calendars: CalendarRepository
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -49,10 +51,11 @@ class MainActivity : ComponentActivity() {
         }
     }
 
-    // Every return to the app is a chance to pick up a newer guide, in the background.
+    // Every return to the app is a chance to pick up a newer guide and calendars, in the background.
     override fun onStart() {
         super.onStart()
         guide.refreshIfStale()
+        calendars.refreshIfStale()
     }
 }
 

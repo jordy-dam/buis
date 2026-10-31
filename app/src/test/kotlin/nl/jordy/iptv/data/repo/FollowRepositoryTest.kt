@@ -11,6 +11,9 @@ import nl.jordy.iptv.data.db.EpgChannelEntity
 import nl.jordy.iptv.data.db.EpgProgrammeEntity
 import nl.jordy.iptv.data.db.LiveChannelEntity
 import nl.jordy.iptv.data.db.ReminderEntity
+import nl.jordy.iptv.data.db.CalendarEntity
+import nl.jordy.iptv.data.db.CalendarEventEntity
+import okhttp3.OkHttpClient
 import nl.jordy.iptv.data.profile.ProfileRepository
 import nl.jordy.iptv.data.settings.SettingsStore
 import org.junit.After
@@ -35,7 +38,7 @@ class FollowRepositoryTest {
         val context = ApplicationProvider.getApplicationContext<Context>()
         db = Room.inMemoryDatabaseBuilder(context, AppDatabase::class.java).allowMainThreadQueries().build()
         profiles = ProfileRepository(db, SettingsStore(context))
-        follows = FollowRepository(db, profiles)
+        follows = FollowRepository(db, profiles, CalendarRepository(db, profiles, OkHttpClient()))
     }
 
     @After
@@ -140,6 +143,27 @@ class FollowRepositoryTest {
         profiles.ensureOne()
         guide()
         follows.add("Darts")
+        val bas = profiles.create("Bas", 1, kids = false, pinHash = null)
+        profiles.select(bas)
+        assertTrue(follows.upcoming(now).isEmpty())
+    }
+
+    @Test
+    fun `a calendar session reminds on its own channel, though that channel has no guide, and only its profile`() = runTest {
+        profiles.ensureOne()
+        val url = "https://f1calendar.com/f1.ics"
+        db.calendars().upsert(CalendarEntity(profiles.currentId(), url, "Formule 1", 42, "VIAPLAY FORMULE 1", "viaplay-f1", null, false, 1, 1))
+        db.calendars().insertEvents(
+            listOf(
+                CalendarEventEntity(url, now + 600, now + 4200, "F1: Qualifying (Mexico City Grand Prix)"),
+                CalendarEventEntity(url, now - 7200, now - 3600, "F1: FP3 (Mexico City Grand Prix)"),
+            ),
+        )
+        val m = follows.upcoming(now).single()
+        assertEquals("F1: Qualifying (Mexico City Grand Prix)", m.title)
+        assertEquals(42, m.streamId)
+        assertEquals("the calendar's name is what Straks voor jou groups by", "Formule 1", m.term)
+
         val bas = profiles.create("Bas", 1, kids = false, pinHash = null)
         profiles.select(bas)
         assertTrue(follows.upcoming(now).isEmpty())

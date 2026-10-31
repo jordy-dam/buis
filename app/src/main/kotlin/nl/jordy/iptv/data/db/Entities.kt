@@ -308,6 +308,38 @@ data class ReminderEntity(
     val hasArchive: Boolean,
 )
 
+/**
+ * A calendar a profile follows (the F1 season), on the one channel that shows it: every appointment
+ * gets a reminder there, whether or not the guide knows about it. Per profile, like follow terms.
+ */
+@Entity(
+    tableName = "calendar",
+    primaryKeys = ["profileId", "url"],
+    foreignKeys = [ForeignKey(ProfileEntity::class, ["id"], ["profileId"], onDelete = ForeignKey.CASCADE)],
+)
+data class CalendarEntity(
+    val profileId: Long,
+    val url: String,
+    val name: String,
+    val streamId: Int,
+    val channelName: String,
+    val categoryId: String,
+    val logoUrl: String?,
+    val hasArchive: Boolean,
+    val addedAt: Long,
+    /** When [url] was last fetched; the same for every profile that follows it. */
+    val fetchedAt: Long,
+)
+
+/** A calendar's appointments as last fetched, shared by every profile that follows [url]. */
+@Entity(tableName = "calendar_event", primaryKeys = ["url", "start", "title"])
+data class CalendarEventEntity(
+    val url: String,
+    val start: Long,
+    val stop: Long,
+    val title: String,
+)
+
 
 /**
  * What a profile watched: one row per film, episode or channel watched for at least a minute
