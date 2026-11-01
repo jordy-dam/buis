@@ -16,8 +16,8 @@ android {
         applicationId = "nl.jordy.iptv"
         minSdk = 28
         targetSdk = 37
-        versionCode = 1
-        versionName = "0.1.0"
+        versionCode = 2
+        versionName = "0.2.0"
         // Instellingen → Versie shows which commit and day this build is, so it's clear what's on the tv.
         val gitSha = runCatching {
             providers.exec { commandLine("git", "rev-parse", "--short", "HEAD") }.standardOutput.asText.get().trim()
