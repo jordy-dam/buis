@@ -4,6 +4,8 @@ import android.view.KeyEvent
 import androidx.activity.compose.BackHandler
 import androidx.annotation.OptIn
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.EnterExitState
+import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.foundation.Image
@@ -146,6 +148,9 @@ private val clock = DateTimeFormatter.ofPattern("HH:mm").withZone(ZoneId.systemD
 
 /** How long the bar stays after the last key while something plays. Paused, it stays. */
 private const val BAR_MS = 5_000L
+
+/** How long the bar takes to fade out, so it goes softly instead of all at once. */
+private const val BAR_FADE_OUT_MS = 350
 
 /** How long the progress line waits after the last Left/Right before it seeks there. */
 private const val SCRUB_SETTLE_MS = 800L
@@ -478,9 +483,14 @@ fun PlayerScreen(onExit: () -> Unit, vm: PlayerViewModel = hiltViewModel()) {
         AnimatedVisibility(
             visible = barShows,
             enter = fadeIn(),
-            exit = fadeOut(),
+            exit = fadeOut(tween(BAR_FADE_OUT_MS)),
             modifier = Modifier.align(Alignment.BottomCenter).onSizeChanged { barHeight = it.height },
         ) {
+            // Fading out, the bar keeps its row of buttons: dropping it at once made the bar collapse
+            // before the fade could be seen.
+            val leaving = transition.targetState == EnterExitState.PostExit
+            val rowShown = remember { booleanArrayOf(controls) }
+            if (!leaving) rowShown[0] = controls
             PlayerBar(
                 state = state,
                 live = live,
@@ -488,7 +498,7 @@ fun PlayerScreen(onExit: () -> Unit, vm: PlayerViewModel = hiltViewModel()) {
                 position = position,
                 duration = duration,
                 playing = playWhenReady,
-                controls = controls,
+                controls = if (leaving) rowShown[0] else controls,
                 choice = choice,
                 scrub = scrub,
                 onScrub = { scrub = it },
