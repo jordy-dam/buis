@@ -55,6 +55,35 @@ object TrackLabels {
     fun liveSubtitleLang(country: String?, profileLang: String): String =
         if (country == "NL") "" else profileLang.ifEmpty { "nl" }
 
+    /**
+     * An OpenSubtitles file: "Nederlands · BluRay", so two files in one language differ by what they
+     * were timed to (which decides whether they run in sync). A number only when that's the same too.
+     * The list shows an internet icon in front, so the name doesn't say "online".
+     */
+    fun online(language: String, source: String?, nth: Int): String =
+        listOfNotNull(language(language) ?: language.uppercase(), source).joinToString(" · ") + if (nth > 0) " ${nth + 1}" else ""
+
+    /** "BluRay", "WEB", "TV", "DVD" or "Cam" from a release name like "Film.2022.1080p.WEB-DL.x264"; null when it says none. */
+    fun source(release: String?): String? {
+        val r = release?.lowercase() ?: return null
+        return SOURCES.firstOrNull { (pattern, _) -> pattern.containsMatchIn(r) }?.second
+    }
+
+    private fun token(alternatives: String) = Regex("""(^|[^a-z0-9])($alternatives)([^a-z0-9]|$)""")
+    private val SOURCES = listOf(
+        token("blu-?ray|bdrip|brrip|bd25|bd50|bdremux|remux") to "BluRay",
+        token("web-?dl|web-?rip|web|amzn|nf|dsnp|hmax|atvp") to "WEB",
+        token("hdtv|pdtv|tvrip") to "TV",
+        token("dvd-?rip|dvd|dvdr") to "DVD",
+        token("cam|hdcam|ts|telesync") to "Cam",
+    )
+
+    /**
+     * Leads the label of a track that came from OpenSubtitles, so the list can give it the internet
+     * icon. A zero-width space: it survives the player's own track format and never shows.
+     */
+    const val ONLINE = "\u200B"
+
     fun subtitle(language: String?, label: String?, forced: Boolean, index: Int): String =
-        (language(language) ?: label?.takeIf { it.isNotBlank() } ?: "Ondertitels ${index + 1}") + if (forced) " (alleen vertaling)" else ""
+        label?.takeIf { it.startsWith(ONLINE) }?.removePrefix(ONLINE) ?: ((language(language) ?: label?.takeIf { it.isNotBlank() } ?: "Ondertitels ${index + 1}") + if (forced) " (alleen vertaling)" else "")
 }

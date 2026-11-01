@@ -33,6 +33,7 @@ import nl.jordy.iptv.ui.theme.Look
 import androidx.compose.material.icons.filled.Public
 import androidx.compose.material.icons.filled.FilterAlt
 import androidx.compose.material.icons.filled.Audiotrack
+import androidx.compose.material.icons.filled.ClosedCaption
 import androidx.compose.material.icons.filled.Subtitles
 import androidx.compose.material.icons.filled.Snooze
 import androidx.compose.material.icons.filled.Bedtime
@@ -57,6 +58,8 @@ import androidx.compose.ui.window.DialogProperties
 import nl.jordy.iptv.ui.dream.DreamScreen
 import nl.jordy.iptv.ui.dream.DreamPosters
 import nl.jordy.iptv.player.TrackLabels
+import nl.jordy.iptv.data.subs.OpenSubtitles
+import nl.jordy.iptv.data.subs.OpenSubtitlesLogin
 import nl.jordy.iptv.data.profile.Bedtime
 import nl.jordy.iptv.ui.profiles.PinDialog
 import androidx.compose.runtime.rememberCoroutineScope
@@ -162,6 +165,7 @@ class SettingsViewModel @Inject constructor(
     private val follows: FollowRepository,
     private val posters: DreamPosters,
     private val calendarRepo: CalendarRepository,
+    private val openSubtitles: OpenSubtitles,
 ) : ViewModel() {
     /** Debug builds: the screensaver's posters, for its preview. */
     suspend fun dreamPosters() = posters.load()
@@ -182,6 +186,11 @@ class SettingsViewModel @Inject constructor(
     suspend fun addCalendar(url: String, name: String?, channel: ChannelPick) = calendarRepo.add(url, name, channel)
     fun setCalendarChannel(calendar: CalendarEntity, channel: ChannelPick) = viewModelScope.launch { calendarRepo.setChannel(calendar, channel) }
     fun removeCalendar(url: String) = viewModelScope.launch { calendarRepo.remove(url) }
+
+    val openSubtitlesLogin = openSubtitles.login.stateIn(viewModelScope, SharingStarted.Eagerly, null)
+    /** Null when it signed in and is saved; else what went wrong. */
+    suspend fun saveOpenSubtitles(login: OpenSubtitlesLogin): String? = runCatching { openSubtitles.save(login) }.exceptionOrNull()?.let { it.message ?: "Inloggen lukte niet." }
+    fun removeOpenSubtitles() = viewModelScope.launch { openSubtitles.clear() }
 
     /** "1.234 van 19.826 films": how far the background fetch of film details is. */
     val filmInfo = enricher.progress.map { (done, total) ->
@@ -335,6 +344,8 @@ fun SettingsScreen(onRefreshCatalog: () -> Unit, onLoggedOut: () -> Unit, onEdit
     var editCalendars by remember { mutableStateOf(false) }
     val calendars by vm.calendars.collectAsStateWithLifecycle()
     val calendarNext by vm.calendarNext.collectAsStateWithLifecycle()
+    var editOpenSubtitles by remember { mutableStateOf(false) }
+    val openSubtitlesLogin by vm.openSubtitlesLogin.collectAsStateWithLifecycle()
 
     // Two panes, like the tv's own settings: the sections on the left, each with a line saying how
     // it's set, and the focused section's settings on the right. Entering from the rail lands on
@@ -396,6 +407,13 @@ fun SettingsScreen(onRefreshCatalog: () -> Unit, onLoggedOut: () -> Unit, onEdit
                 Section.WATCHING -> {
                     SettingRow("Geluid", leading = Icons.Filled.Audiotrack, value = TrackLabels.name(prefs.audioLang, TrackLabels.AUDIO_CHOICES), onClick = vm::cycleAudioLang, modifier = top)
                     SettingRow("Ondertitels", leading = Icons.Filled.Subtitles, value = TrackLabels.name(prefs.subtitleLang, TrackLabels.SUBTITLE_CHOICES), onClick = vm::cycleSubtitleLang)
+                    SettingRow(
+                        "OpenSubtitles",
+                        "Meer ondertitels bij films en series, voor iedereen in huis.",
+                        leading = Icons.Filled.ClosedCaption,
+                        value = openSubtitlesLogin?.username ?: "Niet ingesteld",
+                        onClick = { editOpenSubtitles = true },
+                    )
                     SettingRow(
                         "Voorkeurslanden",
                         leading = Icons.Filled.Public,
@@ -501,6 +519,12 @@ fun SettingsScreen(onRefreshCatalog: () -> Unit, onLoggedOut: () -> Unit, onEdit
     if (pickCountries) {
         CountryDialog(countries, prefs.preferredCountries, vm::toggleCountry, onDismiss = { pickCountries = false })
     }
+    if (editOpenSubtitles) OpenSubtitlesDialog(
+        current = openSubtitlesLogin,
+        onSave = vm::saveOpenSubtitles,
+        onRemove = { vm.removeOpenSubtitles(); editOpenSubtitles = false },
+        onDismiss = { editOpenSubtitles = false },
+    )
     if (confirmLogout) {
         ConsequenceDialog(
             title = "Uitloggen?",

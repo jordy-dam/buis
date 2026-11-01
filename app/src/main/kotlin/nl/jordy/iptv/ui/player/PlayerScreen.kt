@@ -31,6 +31,7 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Audiotrack
 import androidx.compose.material.icons.filled.Check
+import androidx.compose.material.icons.filled.Language
 import androidx.compose.material.icons.filled.LiveTv
 import androidx.compose.material.icons.filled.Pause
 import androidx.compose.material.icons.filled.PlayArrow
@@ -700,6 +701,7 @@ private fun PlayerBar(
         }
         if (live) Hints(Hint(text = "Lang OK  Zenderlijst"))
         state.replayHint?.let { Text(it, style = MaterialTheme.typography.bodyMedium, color = Live) }
+        state.subtitleNote?.let { Text(it, style = MaterialTheme.typography.bodyMedium) }
     }
 }
 
@@ -778,11 +780,11 @@ private fun TrackList(
     val widthPx = with(density) { width.toPx() }
     // Centred on the button, kept inside the bar.
     val x = (anchorPx - widthPx / 2).coerceIn(0f, (barWidthPx - widthPx).coerceAtLeast(0f))
-    // (label, index): index null is "off"; an empty list still gets one row, so focus has a place.
+    // (label, index, online): index null is "off"; an empty list still gets one row, so focus has a place.
     val rows = buildList {
-        offLabel?.let { add(it to null) }
-        options.forEachIndexed { i, o -> add(o.label to i) }
-        if (isEmpty()) add(emptyLabel to null)
+        offLabel?.let { add(Triple(it, null, false)) }
+        options.forEachIndexed { i, o -> add(Triple(o.label, i, o.online)) }
+        if (isEmpty()) add(Triple(emptyLabel, null, false))
     }
     val current = rows.indexOfFirst { it.second == selected }.coerceAtLeast(0)
     Column(
@@ -798,7 +800,7 @@ private fun TrackList(
             .stayIn(),
         verticalArrangement = Arrangement.spacedBy(4.dp),
     ) {
-        rows.forEachIndexed { i, (label, index) ->
+        rows.forEachIndexed { i, (label, index, online) ->
             Surface(
                 onClick = { onPick(index) },
                 modifier = Modifier.fillMaxWidth().then(if (i == current) Modifier.focusRequester(first) else Modifier),
@@ -814,6 +816,8 @@ private fun TrackList(
                 ),
             ) {
                 Row(Modifier.padding(horizontal = 12.dp, vertical = 8.dp), verticalAlignment = Alignment.CenterVertically) {
+                    // From OpenSubtitles, not from the stream.
+                    if (online) Icon(Icons.Filled.Language, contentDescription = "Online", tint = LocalContentColor.current, modifier = Modifier.padding(end = 10.dp).size(20.dp))
                     Text(label, style = MaterialTheme.typography.titleMedium, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f))
                     if (i == current) Icon(Icons.Filled.Check, contentDescription = "Gekozen", tint = LocalContentColor.current, modifier = Modifier.size(22.dp))
                 }

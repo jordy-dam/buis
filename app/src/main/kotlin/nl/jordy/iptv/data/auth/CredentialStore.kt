@@ -14,6 +14,7 @@ import com.google.crypto.tink.integration.android.AndroidKeysetManager
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.first
+import kotlinx.serialization.KSerializer
 import kotlinx.serialization.json.Json
 import nl.jordy.iptv.data.xtream.XtreamCredentials
 import java.io.InputStream
@@ -27,7 +28,7 @@ import javax.inject.Singleton
  * the Android Keystore, so the credentials file is useless off the device.
  */
 @Singleton
-class CredentialStore @Inject constructor(@ApplicationContext context: Context) {
+class CredentialStore @Inject constructor(@ApplicationContext private val context: Context) {
 
     private val aead: Aead by lazy {
         AeadConfig.register()
@@ -41,8 +42,12 @@ class CredentialStore @Inject constructor(@ApplicationContext context: Context) 
     }
 
     private val store: DataStore<XtreamCredentials?> by lazy {
-        DataStoreFactory.create(EncryptedSerializer { aead }) { context.dataStoreFile("credentials.bin") }
+        DataStoreFactory.create(EncryptedSerializer(XtreamCredentials.serializer(), AAD) { aead }) { context.dataStoreFile("credentials.bin") }
     }
+
+    /** Another login (OpenSubtitles) in its own file, under the same device-bound key. */
+    fun <T : Any> store(file: String, serializer: KSerializer<T>, aad: String): DataStore<T?> =
+        DataStoreFactory.create(EncryptedSerializer(serializer, aad.toByteArray()) { aead }) { context.dataStoreFile(file) }
 
     val credentials: Flow<XtreamCredentials?> get() = store.data
 
@@ -56,22 +61,26 @@ class CredentialStore @Inject constructor(@ApplicationContext context: Context) 
         store.updateData { null }
     }
 
-    private class EncryptedSerializer(private val aead: () -> Aead) : Serializer<XtreamCredentials?> {
-        override val defaultValue: XtreamCredentials? = null
+    private class EncryptedSerializer<T : Any>(
+        private val serializer: KSerializer<T>,
+        private val aad: ByteArray,
+        private val aead: () -> Aead,
+    ) : Serializer<T?> {
+        override val defaultValue: T? = null
 
-        override suspend fun readFrom(input: InputStream): XtreamCredentials? {
+        override suspend fun readFrom(input: InputStream): T? {
             val bytes = input.readBytes()
             if (bytes.isEmpty()) return null
             return try {
-                Json.decodeFromString(XtreamCredentials.serializer(), String(aead().decrypt(bytes, AAD), Charsets.UTF_8))
+                Json.decodeFromString(serializer, String(aead().decrypt(bytes, aad), Charsets.UTF_8))
             } catch (e: GeneralSecurityException) {
                 throw CorruptionException("Cannot decrypt credentials", e)
             }
         }
 
-        override suspend fun writeTo(t: XtreamCredentials?, output: OutputStream) {
+        override suspend fun writeTo(t: T?, output: OutputStream) {
             if (t == null) return
-            output.write(aead().encrypt(Json.encodeToString(XtreamCredentials.serializer(), t).toByteArray(), AAD))
+            output.write(aead().encrypt(Json.encodeToString(serializer, t).toByteArray(), aad))
         }
     }
 

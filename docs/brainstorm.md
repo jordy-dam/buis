@@ -28,6 +28,7 @@ profile, ratings, voice search, Google TV "Watch Next".
   stream has (a panel in the player). Next to that a default per profile ("Nederlands, ondertitels uit"),
   which the player picks by itself when the stream has it; a choice in the player only counts for that
   title. Nothing exists yet: the player takes the stream's default today. `S`–`M`
+  Follow-up 2026-10-31: subtitles from OpenSubtitles for films and episodes when an account is set (see decisions).
 - ~~**Slanke spelerbalk**~~ → built 2026-10-30 (5e6fa8d), outside this list: no panel but a fade, one
   title line, times above a thin line. One key model: without buttons the arrows steer the picture,
   OK brings the buttons and then only Back leaves. Films scrub on the progress line.

@@ -31,6 +31,13 @@ nobody got interrupted); then `adb disconnect`.
 **Mid-flight:** nothing, clean break. The working tree is clean.
 
 ## Next up
+0. Player Back: with the bar's buttons focused it takes 3 presses (Compose moves focus off the buttons
+   first, then the bar, then exit). Jordy wants the bar gone in one press, then exit, and never the film
+   closing while the bar shows. Two tries reverted 2026-11-01. The tv (API 34) gets Back as a key; the
+   emulator (API 36, predictive back) only via BackHandler, so test on the tv. Plan: catch Key.Back in the
+   player Box's onPreviewKeyEvent (KeyDown and KeyUp) plus a BackHandler for the callback path.
+0b. OpenSubtitles (2026-11-01): on the bedroom tv (192.168.68.71, "Tv in Slaapkamer", first BUIS install
+   there). Key + account under Instellingen → Kijken. Not yet on the living-room tv.
 1. Jordy looks at Garage on the tv (his own profile is still Standaard) and at the new reminder cards with the real remote.
 2. Garage on the tv since 21:24 (220b59d): gold heart, 911 photo behind the menu screens, see-through rail. Channel-row heart stays far left (Jordy).
 3. Garage, round 2, only if Jordy wants it: a subtle concrete texture on the background or another focus treatment.

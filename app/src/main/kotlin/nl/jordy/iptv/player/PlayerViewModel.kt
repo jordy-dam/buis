@@ -7,6 +7,7 @@ import androidx.annotation.OptIn
 import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import android.net.Uri
 import androidx.media3.common.MediaItem
 import androidx.media3.common.MimeTypes
 import androidx.media3.common.PlaybackException
@@ -39,6 +40,9 @@ import nl.jordy.iptv.data.db.EpisodeEntity
 import nl.jordy.iptv.data.db.SeriesIntroEntity
 import nl.jordy.iptv.data.db.LiveChannelEntity
 import nl.jordy.iptv.data.profile.ProfileRepository
+import nl.jordy.iptv.data.subs.OpenSubtitles
+import nl.jordy.iptv.data.subs.SubtitleHit
+import nl.jordy.iptv.data.subs.SubtitleQuery
 import nl.jordy.iptv.data.repo.EpgRepository
 import nl.jordy.iptv.data.repo.GuideRepository
 import nl.jordy.iptv.data.repo.MovieEnricher
@@ -56,6 +60,7 @@ import nl.jordy.iptv.data.xtream.XtreamCredentials
 import nl.jordy.iptv.data.xtream.XtreamParser
 import java.time.ZoneId
 import nl.jordy.iptv.ui.PlayerRoute
+import java.io.IOException
 import javax.inject.Inject
 
 data class PlayerUiState(
@@ -91,12 +96,17 @@ data class PlayerUiState(
     val replaying: Boolean = false,
     /** Live: why −10 did nothing, for the info bar. */
     val replayHint: String? = null,
+    /** Why an OpenSubtitles file didn't come ("De downloads van vandaag zijn op."), for a few seconds. */
+    val subtitleNote: String? = null,
     /** Episodes: where "Intro overslaan" jumps to, while the card shows. */
     val skipIntroTo: Long? = null,
 )
 
 /** One audio or subtitle track: its name and where it sits in the player's track groups. */
-data class TrackOption(val label: String, val group: Int, val track: Int)
+data class TrackOption(val label: String, val group: Int, val track: Int, val online: Boolean = false)
+
+/** [TrackOption.group] of an OpenSubtitles file not fetched yet. */
+private const val ONLINE = -1
 
 /** Instant replay: how far one hold of Left goes back in live. */
 const val REPLAY_MS = 10_000L
@@ -124,6 +134,7 @@ class PlayerViewModel @Inject constructor(
     private val xtream: XtreamClient,
     private val watchLog: WatchLog,
     private val channelHealth: ChannelHealthRepository,
+    private val openSubtitles: OpenSubtitles,
 ) : ViewModel() {
 
     val route = savedState.toRoute<PlayerRoute>()
@@ -226,12 +237,16 @@ class PlayerViewModel @Inject constructor(
             PlayerRoute.Kind.MOVIE -> {
                 watching(WatchItem(ContentType.MOVIE, route.id, route.title, containerExtension = route.containerExtension))
                 playVod(StreamUrls.movie(base, c, route.id, route.containerExtension), ContentType.MOVIE)
+                db.catalog().movie(route.id)?.let { searchOnline(SubtitleQuery.Film(it.name, it.year, it.tmdbId)) }
+                    ?: Log.i("OpenSubtitles", "film ${route.id} not in the catalog")
             }
             PlayerRoute.Kind.EPISODE -> {
                 loadSeries()
-                val title = episodes.firstOrNull { it.episodeId == route.id }?.let { "$seriesName – ${it.title}" } ?: route.title
+                val episode = episodes.firstOrNull { it.episodeId == route.id }
+                val title = episode?.let { "$seriesName – ${it.title}" } ?: route.title
                 watching(WatchItem(ContentType.SERIES, route.id, title, containerExtension = route.containerExtension))
                 playVod(StreamUrls.episode(base, c, route.id, route.containerExtension), ContentType.SERIES)
+                episode?.let { searchOnline(SubtitleQuery.Episode(seriesName, it.season, it.number)) }
             }
         }
     }
@@ -603,7 +618,10 @@ class PlayerViewModel @Inject constructor(
         _state.update { PlayerUiState(title = "$seriesName – ${e.title}") }
         // A track picked in the player was for that episode; the next one starts from the profile's languages.
         applyProfileTracks()
-        viewModelScope.launch { playVod(StreamUrls.episode(base, c, e.episodeId, e.containerExtension), ContentType.SERIES, fromStart = false) }
+        viewModelScope.launch {
+            playVod(StreamUrls.episode(base, c, e.episodeId, e.containerExtension), ContentType.SERIES, fromStart = false)
+            searchOnline(SubtitleQuery.Episode(seriesName, e.season, e.number))
+        }
     }
 
     fun seekBy(ms: Long) {
@@ -743,12 +761,91 @@ class PlayerViewModel @Inject constructor(
                     C.TRACK_TYPE_TEXT -> {
                         if (group.isTrackSelected(t)) subSelected = subs.size
                         val forced = f.selectionFlags and C.SELECTION_FLAG_FORCED != 0
-                        subs += TrackOption(TrackLabels.subtitle(f.language, f.label, forced, subs.size), g, t)
+                        val online = f.label?.startsWith(TrackLabels.ONLINE) == true
+                        subs += TrackOption(TrackLabels.subtitle(f.language, f.label, forced, subs.size), g, t, online)
                     }
                 }
             }
         }
-        _state.update { it.copy(audio = audio, audioSelected = audioSelected, subtitles = subs, subtitleSelected = subSelected) }
+        streamSubs = subs
+        _state.update { it.copy(audio = audio, audioSelected = audioSelected, subtitles = subs + onlineOptions(), subtitleSelected = subSelected) }
+        // A file just fetched from OpenSubtitles is in the tracks now: switch it on.
+        pendingOnline?.let { label ->
+            val i = subs.indexOfFirst { it.label == label }
+            if (i >= 0) {
+                pendingOnline = null
+                selectSubtitle(i)
+            }
+        }
+    }
+
+    // OpenSubtitles: files for the film or episode, offered after the stream's own subtitles
+
+    private var streamSubs: List<TrackOption> = emptyList()
+    private var online: List<SubtitleHit> = emptyList()
+    /** Files already added to the media item; their track is among the stream's now. */
+    private val onlineLoaded = mutableSetOf<Int>()
+    /** The label of a file being added, picked once its track shows up. */
+    private var pendingOnline: String? = null
+    private var onlineJob: Job? = null
+
+    /** OpenSubtitles' entries in the list: [TrackOption.group] [ONLINE], [TrackOption.track] the index in [online]. */
+    private fun onlineOptions() = online.mapIndexedNotNull { i, hit ->
+        if (hit.fileId in onlineLoaded) null else TrackOption(onlineLabel(i), ONLINE, i, online = true)
+    }
+
+    private fun onlineLabel(i: Int): String {
+        val hit = online[i]
+        val source = TrackLabels.source(hit.release)
+        return TrackLabels.online(hit.language, source, online.take(i).count { it.language == hit.language && TrackLabels.source(it.release) == source })
+    }
+
+    /** Searching costs nothing; only a file picked in the list is downloaded. Without an account it finds nothing. */
+    private fun searchOnline(query: SubtitleQuery) {
+        online = emptyList()
+        onlineLoaded.clear()
+        pendingOnline = null
+        onlineJob?.cancel()
+        onlineJob = viewModelScope.launch {
+            val languages = listOf(profilePrefs.subtitleLang, "nl", "en").filter { it.isNotEmpty() }.distinct()
+            online = runCatching { openSubtitles.search(query, languages) }
+                .onFailure { Log.w("OpenSubtitles", "search: ${it.message}") }
+                .getOrDefault(emptyList())
+            _state.update { it.copy(subtitles = streamSubs + onlineOptions()) }
+        }
+    }
+
+    /** Downloads the file and adds it to what's playing, at the same position; [readTracks] then switches it on. */
+    private fun loadOnline(index: Int) {
+        val hit = online.getOrNull(index) ?: return
+        val label = onlineLabel(index)
+        viewModelScope.launch {
+            val file = try {
+                openSubtitles.download(hit)
+            } catch (e: IOException) {
+                note(e.message ?: "Ondertitels ophalen lukte niet.")
+                return@launch
+            }
+            val item = player.currentMediaItem ?: return@launch
+            val subtitle = MediaItem.SubtitleConfiguration.Builder(Uri.fromFile(file))
+                .setMimeType(MimeTypes.APPLICATION_SUBRIP)
+                .setLanguage(hit.language)
+                .setLabel(TrackLabels.ONLINE + label)
+                .build()
+            val configs = item.localConfiguration?.subtitleConfigurations.orEmpty() + subtitle
+            onlineLoaded += hit.fileId
+            pendingOnline = label
+            player.setMediaItem(item.buildUpon().setSubtitleConfigurations(configs).build(), player.currentPosition)
+            player.prepare()
+        }
+    }
+
+    private fun note(message: String) {
+        _state.update { it.copy(subtitleNote = message) }
+        viewModelScope.launch {
+            delay(6_000)
+            _state.update { if (it.subtitleNote == message) it.copy(subtitleNote = null) else it }
+        }
     }
 
     private fun override(option: TrackOption): TrackSelectionOverride? =
@@ -764,6 +861,7 @@ class PlayerViewModel @Inject constructor(
     fun selectSubtitle(index: Int?) {
         val builder = player.trackSelectionParameters.buildUpon()
         val option = index?.let { _state.value.subtitles.getOrNull(it) }
+        if (option?.group == ONLINE) return loadOnline(option.track)
         if (option == null) {
             builder.setTrackTypeDisabled(C.TRACK_TYPE_TEXT, true)
         } else {
