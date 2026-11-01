@@ -35,7 +35,27 @@ enum class Look(val label: String) {
     }
 }
 
-class Palette(
+/**
+ * The car behind Garage's menu screens, picked per profile. Stored as an index: the 911 stays first so
+ * profiles that had Garage before the choice keep their car; add new ones at the end.
+ */
+enum class GarageCar(val label: String, @DrawableRes val photo: Int) {
+    PORSCHE("911", R.drawable.garage_car_porsche),
+    AUDI("Audi geel", R.drawable.garage_car_audi),
+    AUDI_BLUE("Audi blauw", R.drawable.garage_car_audi_blue),
+    AUDI_GREY("Audi grijs", R.drawable.garage_car_audi_grey),
+    BMW("BMW", R.drawable.garage_car_bmw),
+    NISSAN("Skyline", R.drawable.garage_car_nissan),
+    NISSAN_BLUE("Skyline blauw", R.drawable.garage_car_nissan_blue),
+    SUBARU("Subaru", R.drawable.garage_car_subaru),
+    SUBARU_BACK("Subaru achter", R.drawable.garage_car_subaru_back);
+
+    companion object {
+        fun of(index: Int): GarageCar = entries.getOrElse(index) { PORSCHE }
+    }
+}
+
+data class Palette(
     val background: Color,
     val surface: Color,
     val surfaceRaised: Color,
@@ -99,8 +119,8 @@ private val garage = Palette(
     textSecondaryOnLight = Color(0xFF59606A),
     live = Color(0xFFD4AE55),
     liveOnLight = Color(0xFF6E5210),
-    // The white 911 in the night garage that Garage is named after.
-    backdrop = R.drawable.garage_backdrop,
+    // The white 911 in the night garage that Garage is named after; the profile's [GarageCar] replaces it.
+    backdrop = R.drawable.garage_car_porsche,
     rowAlpha = 0.70f,
 )
 
@@ -190,8 +210,8 @@ private val typography = Typography(
 )
 
 @Composable
-fun IptvTheme(look: Look = Look.STANDARD, content: @Composable () -> Unit) {
-    val palette = look.palette()
+fun IptvTheme(look: Look = Look.STANDARD, car: GarageCar = GarageCar.PORSCHE, content: @Composable () -> Unit) {
+    val palette = look.palette().let { if (it.backdrop != null) it.copy(backdrop = car.photo) else it }
     CompositionLocalProvider(LocalPalette provides palette) {
         MaterialTheme(colorScheme = palette.colors(), typography = typography, content = content)
     }

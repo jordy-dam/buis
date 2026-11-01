@@ -22,4 +22,11 @@ class LookTest {
         // The index is persisted per profile: reordering the enum would repaint people's profiles.
         assertEquals(Look.GARAGE, Look.of(1))
     }
+
+    @Test
+    fun `garage keeps the 911 for profiles that never picked a car`() {
+        // 0 is what the migration gives every profile: Garage profiles had the 911 before the choice.
+        assertEquals(GarageCar.PORSCHE, GarageCar.of(0))
+        assertEquals(GarageCar.PORSCHE, GarageCar.of(GarageCar.entries.size))
+    }
 }

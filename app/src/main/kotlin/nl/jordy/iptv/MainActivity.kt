@@ -31,6 +31,7 @@ import nl.jordy.iptv.ui.ProfilesRoute
 import nl.jordy.iptv.ui.ShellRoute
 import nl.jordy.iptv.ui.SyncRoute
 import nl.jordy.iptv.ui.theme.Background
+import nl.jordy.iptv.ui.theme.GarageCar
 import nl.jordy.iptv.ui.theme.IptvTheme
 import nl.jordy.iptv.ui.theme.Look
 import nl.jordy.iptv.ui.theme.TextPrimary
@@ -46,7 +47,8 @@ class MainActivity : ComponentActivity() {
         super.onCreate(savedInstanceState)
         setContent {
             val look by vm.look.collectAsStateWithLifecycle()
-            IptvTheme(look) {
+            val car by vm.car.collectAsStateWithLifecycle()
+            IptvTheme(look, car) {
                 // tv Surface provides the content colour; without it Text falls back to black.
                 Surface(Modifier.fillMaxSize(), colors = SurfaceDefaults.colors(containerColor = Background, contentColor = TextPrimary)) {
                     val start by vm.start.collectAsStateWithLifecycle()
@@ -78,6 +80,8 @@ class StartViewModel @Inject constructor(
     val start = _start.asStateFlow()
     /** The watching profile's colours; switching profile switches them. */
     val look = profiles.current.map { Look.of(it?.look ?: 0) }.stateIn(viewModelScope, SharingStarted.Eagerly, Look.STANDARD)
+    /** The car behind Garage's menu screens. */
+    val car = profiles.current.map { GarageCar.of(it?.car ?: 0) }.stateIn(viewModelScope, SharingStarted.Eagerly, GarageCar.PORSCHE)
 
     init {
         viewModelScope.launch {

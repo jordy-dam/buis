@@ -140,6 +140,8 @@ data class ProfileEntity(
     @ColumnInfo(defaultValue = "") val pinnedCategories: String = "",
     /** The colours the app wears for this profile, an index into [nl.jordy.iptv.ui.theme.Look]; 0 = Standaard. */
     @ColumnInfo(defaultValue = "0") val look: Int = 0,
+    /** The car behind Garage's menu screens, an index into [nl.jordy.iptv.ui.theme.GarageCar]; 0 = the 911. */
+    @ColumnInfo(defaultValue = "0") val car: Int = 0,
     /** The profile with the highest value is the active one; picking a profile bumps it. */
     val lastUsedAt: Long = 0,
     val createdAt: Long = 0,

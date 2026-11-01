@@ -34,7 +34,7 @@ import androidx.sqlite.db.SupportSQLiteDatabase
         CalendarEntity::class,
         CalendarEventEntity::class,
     ],
-    version = 27,
+    version = 28,
     exportSchema = true,
     autoMigrations = [
         AutoMigration(from = 1, to = 2, spec = AppDatabase.CatalogResync::class),
@@ -82,6 +82,8 @@ import androidx.sqlite.db.SupportSQLiteDatabase
         AutoMigration(from = 25, to = 26),
         // A look per profile, Standaard for everyone at first.
         AutoMigration(from = 26, to = 27),
+        // A car per profile for Garage, the 911 for everyone at first.
+        AutoMigration(from = 27, to = 28),
     ],
 )
 abstract class AppDatabase : RoomDatabase() {
