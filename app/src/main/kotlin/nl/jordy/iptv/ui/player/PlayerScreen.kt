@@ -206,6 +206,13 @@ fun PlayerScreen(onExit: () -> Unit, vm: PlayerViewModel = hiltViewModel()) {
         controls = false
         runCatching { focus.requestFocus() }
     }
+    // Back with the bar up: buttons and bar go in one press, the next Back leaves.
+    fun hideBar() {
+        closeControls()
+        overlayVisible = false
+    }
+    // A Back seen going down while the bar was up: its release hides the bar.
+    var backDown by remember { mutableStateOf(false) }
 
     LaunchedEffect(overlayTick, paused, choice, panel) {
         overlayVisible = true
@@ -314,8 +321,11 @@ fun PlayerScreen(onExit: () -> Unit, vm: PlayerViewModel = hiltViewModel()) {
     // Back on the break card: no break this time, play on.
     BackHandler(enabled = state.breakSecondsLeft != null) { vm.endBreak() }
     BackHandler(enabled = state.skipIntroTo != null) { vm.dismissIntro() }
-    // The innermost layer first: the controls, then the track list above them.
-    BackHandler(enabled = controls) { closeControls(); overlayTick++ }
+    // The innermost layer first: the bar with its controls, then the track list above them. Back
+    // never leaves while the bar shows. A pop-up keeps its own Back.
+    val barUp = overlayVisible && state.error == null && card == null
+    val backHidesBar = (controls || barUp) && choice == null && panel == null
+    BackHandler(enabled = controls || barUp) { hideBar() }
     BackHandler(enabled = choice != null) {
         val from = choice
         choice = null
@@ -336,6 +346,17 @@ fun PlayerScreen(onExit: () -> Unit, vm: PlayerViewModel = hiltViewModel()) {
             .focusRequester(focus)
             // In the controls every key keeps the bar up; the buttons handle the keys themselves.
             .onPreviewKeyEvent { e ->
+                // Where Back comes as a key (Android 14 on the tv), focus would spend the first press
+                // stepping out of the buttons. Taken here, before focus sees it, it hides the bar at once.
+                if (e.key.nativeKeyCode == KeyEvent.KEYCODE_BACK) {
+                    if (e.type == KeyEventType.KeyDown && backHidesBar) backDown = true
+                    if (!backDown) return@onPreviewKeyEvent false
+                    if (e.type == KeyEventType.KeyUp) {
+                        backDown = false
+                        hideBar()
+                    }
+                    return@onPreviewKeyEvent true
+                }
                 if (controls && e.type == KeyEventType.KeyDown) {
                     vm.userActive()
                     overlayTick++
