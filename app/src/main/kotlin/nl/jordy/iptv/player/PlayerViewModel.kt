@@ -692,6 +692,7 @@ class PlayerViewModel @Inject constructor(
     private fun watching(item: WatchItem) {
         logWatched()
         watchItem = item
+        watchLog.onAir.value = item.itemId.takeIf { item.type == ContentType.LIVE }
     }
 
     /** Writes what played since the last write (a minute or more), and keeps counting from now. */
@@ -876,6 +877,8 @@ class PlayerViewModel @Inject constructor(
     }
 
     override fun onCleared() {
+        // Only if no newer player took over already (a reminder swaps one player for the next).
+        watchItem?.takeIf { it.type == ContentType.LIVE }?.let { watchLog.onAir.compareAndSet(it.itemId, null) }
         healthEnd()
         saveNow()
         player.release()

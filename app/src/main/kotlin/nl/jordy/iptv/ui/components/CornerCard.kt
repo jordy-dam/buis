@@ -24,6 +24,10 @@ import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.draw.drawBehind
+import androidx.compose.ui.geometry.CornerRadius
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
@@ -50,15 +54,27 @@ fun CornerCard(
     modifier: Modifier = Modifier,
     subtitle: String? = null,
     visual: (@Composable BoxScope.() -> Unit)? = null,
+    /** Share of the wait still left (1 → 0), drawn as a thin amber bar along the bottom; read while drawing only. */
+    timeLeft: (() -> Float)? = null,
     actions: @Composable RowScope.() -> Unit,
 ) {
     // Slides in once when it appears; a new label or moment on the same card doesn't slide again.
     val shown = remember { MutableTransitionState(false).apply { targetState = true } }
+    val barColor = Live
     AnimatedVisibility(shown, enter = slideInVertically(tween(280)) { it } + fadeIn(tween(200))) {
     Column(
         // As wide as the content needs, within limits: icon actions keep a card compact. (Plain
         // wrap-content: an intrinsic-width pass measured the card twice on every recomposition.)
-        modifier.widthIn(min = 360.dp, max = 560.dp).padding(20.dp),
+        // The bar is drawn, not laid out, so it never widens the card.
+        modifier.widthIn(min = 360.dp, max = 560.dp).drawBehind {
+            val left = timeLeft?.invoke() ?: return@drawBehind
+            val inset = 20.dp.toPx()
+            val h = 4.dp.toPx()
+            val top = size.height - inset / 2 - h
+            val full = size.width - 2 * inset
+            drawRoundRect(Color.White.copy(alpha = 0.2f), Offset(inset, top), Size(full, h), CornerRadius(h / 2))
+            drawRoundRect(barColor, Offset(inset, top), Size(full * left.coerceIn(0f, 1f), h), CornerRadius(h / 2))
+        }.padding(20.dp),
         verticalArrangement = Arrangement.spacedBy(14.dp),
     ) {
         Row(verticalAlignment = Alignment.CenterVertically) {

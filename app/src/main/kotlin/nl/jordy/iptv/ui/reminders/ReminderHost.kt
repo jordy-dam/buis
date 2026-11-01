@@ -1,5 +1,8 @@
 package nl.jordy.iptv.ui.reminders
 
+import androidx.compose.animation.core.Animatable
+import androidx.compose.animation.core.LinearEasing
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -38,6 +41,7 @@ import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import nl.jordy.iptv.data.repo.FollowMatches
 import nl.jordy.iptv.data.repo.FollowRepository
+import nl.jordy.iptv.data.repo.WatchLog
 import nl.jordy.iptv.data.profile.ProfileRepository
 import nl.jordy.iptv.ui.PlayerRoute
 import nl.jordy.iptv.ui.components.CornerCard
@@ -79,7 +83,7 @@ private val clock = DateTimeFormatter.ofPattern("HH:mm").withZone(ZoneId.systemD
 
 /** Looks in the guide every 20 seconds for something the profile follows that's about to start. */
 @HiltViewModel
-class ReminderViewModel @Inject constructor(private val follows: FollowRepository, profiles: ProfileRepository) : ViewModel() {
+class ReminderViewModel @Inject constructor(private val follows: FollowRepository, profiles: ProfileRepository, private val watchLog: WatchLog) : ViewModel() {
 
     /** What was dealt with this app run ("<key>:soon", "<key>:now"), so nothing nags twice. */
     private val shown = mutableSetOf<String>()
@@ -106,7 +110,14 @@ class ReminderViewModel @Inject constructor(private val follows: FollowRepositor
                 if (due.value == null) {
                     val now = System.currentTimeMillis() / 1000
                     val matches = runCatching { follows.upcoming(now, hours = 1) }.getOrDefault(emptyList())
-                    due.value = FollowMatches.due(matches, now, shown)
+                    var found = FollowMatches.due(matches, now, shown)
+                    // Already on that channel: nothing to remind. Counts as left alone, so zapping away
+                    // before the start still brings the start reminder.
+                    while (found != null && found.match.streamId == watchLog.onAir.value) {
+                        shown += FollowMatches.dealtWith(found, FollowMatches.Outcome.TIMED_OUT)
+                        found = FollowMatches.due(matches, now, shown)
+                    }
+                    due.value = found
                 }
                 delay(20_000)
             }
@@ -159,6 +170,12 @@ fun ReminderHost(active: Boolean, onWatch: (PlayerRoute) -> Unit, vm: ReminderVi
         delay(HIDE_AFTER_MS)
         vm.dismiss(FollowMatches.Outcome.TIMED_OUT)
     }
+    // The wait as a bar running out: the hide timer (back to full on a key), or the auto-switch countdown.
+    val bar = remember(m.key, d.moment) { Animatable(1f) }
+    LaunchedEffect(m.key, d.moment, counting, if (counting) 0 else touched) {
+        bar.snapTo(1f)
+        bar.animateTo(0f, tween(if (counting) AUTO_SWITCH_SEC * 1000 else HIDE_AFTER_MS.toInt(), easing = LinearEasing))
+    }
     // A card in the corner over the undimmed screen, like a tv notification, not a dialog in the middle.
     Dialog(onDismissRequest = { vm.dismiss(FollowMatches.Outcome.REFUSED) }, properties = DialogProperties(usePlatformDefaultWidth = false)) {
         (LocalView.current.parent as? DialogWindowProvider)?.window?.setDimAmount(0f)
@@ -175,6 +192,7 @@ fun ReminderHost(active: Boolean, onWatch: (PlayerRoute) -> Unit, vm: ReminderVi
             title = m.title,
             subtitle = m.channelName,
             modifier = Modifier.padding(SafeArea).ignoreHeldKey().onPreviewKeyEvent { touched++; false },
+            timeLeft = { bar.value },
             // Logo plate like the channel rows: logos are often transparent PNGs.
             visual = {
                 Text(m.channelName.take(2).uppercase(), style = MaterialTheme.typography.titleMedium, color = TextSecondary)

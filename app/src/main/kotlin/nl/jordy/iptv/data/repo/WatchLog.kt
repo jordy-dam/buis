@@ -5,6 +5,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.launch
 import nl.jordy.iptv.data.db.AppDatabase
@@ -50,6 +51,9 @@ class WatchCounter {
 @Singleton
 class WatchLog @Inject constructor(private val db: AppDatabase, private val profiles: ProfileRepository) {
     private val detached = CoroutineScope(SupervisorJob() + Dispatchers.IO)
+
+    /** The live channel the player shows now, null outside it: a reminder for what's already on stays away. */
+    val onAir = MutableStateFlow<Int?>(null)
 
     /** Survives the player closing: the last stretch is written while its screen goes away. */
     fun record(item: WatchItem, startedAt: Long, playedMs: Long) {
