@@ -58,7 +58,8 @@ import nl.jordy.iptv.ui.theme.TextSecondary
  * Text field for the d-pad. Focus lands on the field itself, so its input connection is open and
  * text typed on a phone (Google TV app, Home Assistant) or sent with `adb input text` arrives. The
  * keyboard only opens on OK, and while it's closed the d-pad moves focus: otherwise moving down
- * through the form pops the keyboard at every field and traps the d-pad.
+ * through the form pops the keyboard at every field and traps the d-pad. It never opens by itself:
+ * while Gboard is on screen, the tv drops text sent from a phone (tested on the TCL, 2026-11-01).
  */
 @Composable
 fun TvTextField(
@@ -70,13 +71,10 @@ fun TvTextField(
     keyboardType: KeyboardType = KeyboardType.Text,
     imeAction: ImeAction = ImeAction.Next,
     onImeAction: () -> Unit = {},
-    /** Open the keyboard the first time the field gets focus (search), instead of waiting for OK. */
-    editOnFirstFocus: Boolean = false,
 ) {
     val keyboard = LocalSoftwareKeyboardController.current
     val focusManager = LocalFocusManager.current
     var focused by remember { mutableStateOf(false) }
-    var focusedBefore by remember { mutableStateOf(false) }
     val shape = RoundedCornerShape(8.dp)
 
     Column(modifier.fillMaxWidth()) {
@@ -99,7 +97,6 @@ fun TvTextField(
                     keyboardType = keyboardType,
                     imeAction = imeAction,
                     autoCorrectEnabled = false,
-                    showKeyboardOnFocus = false,
                 ),
                 keyboardActions = KeyboardActions(onAny = {
                     keyboard?.hide()
@@ -107,10 +104,11 @@ fun TvTextField(
                 }),
                 modifier = Modifier
                     .fillMaxWidth()
+                    // The String BasicTextField ignores showKeyboardOnFocus: starting its input session
+                    // queues "show". A hide queued in the same frame cancels it before anything draws.
                     .onFocusChanged {
                         focused = it.isFocused
-                        if (it.isFocused && editOnFirstFocus && !focusedBefore) keyboard?.show()
-                        if (it.isFocused) focusedBefore = true
+                        if (it.isFocused) keyboard?.hide()
                     }
                     // While the keyboard is open it takes these keys itself; we only see them once it's closed.
                     .onPreviewKeyEvent { e ->

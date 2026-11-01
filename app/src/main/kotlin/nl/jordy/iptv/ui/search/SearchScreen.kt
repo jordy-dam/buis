@@ -73,7 +73,6 @@ fun SearchScreen(
                 { vm.query.value = it },
                 Modifier.width(560.dp),
                 imeAction = ImeAction.Search,
-                editOnFirstFocus = true,
             )
         }
         val r: SearchResults? = results
