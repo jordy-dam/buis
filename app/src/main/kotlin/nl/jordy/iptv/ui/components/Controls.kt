@@ -3,6 +3,8 @@ package nl.jordy.iptv.ui.components
 import androidx.compose.material.icons.filled.Favorite
 import androidx.compose.material.icons.filled.FavoriteBorder
 import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
@@ -18,17 +20,15 @@ import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.focus.FocusRequester
-import androidx.compose.ui.focus.focusProperties
-import androidx.compose.ui.focus.focusRequester
+import androidx.compose.ui.focus.FocusDirection
 import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.graphics.SolidColor
+import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardType
@@ -39,11 +39,11 @@ import androidx.compose.ui.unit.sp
 import androidx.tv.material3.Border
 import androidx.tv.material3.Button
 import androidx.tv.material3.ButtonDefaults
-import androidx.tv.material3.ClickableSurfaceDefaults
 import androidx.tv.material3.MaterialTheme
-import androidx.tv.material3.Surface
 import androidx.tv.material3.Text
+import androidx.compose.ui.input.key.Key
 import androidx.compose.ui.input.key.KeyEventType
+import androidx.compose.ui.input.key.key
 import androidx.compose.ui.input.key.onPreviewKeyEvent
 import androidx.compose.ui.input.key.type
 import nl.jordy.iptv.ui.theme.FocusBar
@@ -55,9 +55,10 @@ import nl.jordy.iptv.ui.theme.TextOnLight
 import nl.jordy.iptv.ui.theme.TextSecondary
 
 /**
- * Text field for the d-pad. The outer surface takes focus like any other control; only OK puts
- * the inner field in edit mode and opens the keyboard. Without this, moving down through the
- * form pops the keyboard at every field and traps the d-pad.
+ * Text field for the d-pad. Focus lands on the field itself, so its input connection is open and
+ * text typed on a phone (Google TV app, Home Assistant) or sent with `adb input text` arrives. The
+ * keyboard only opens on OK, and while it's closed the d-pad moves focus: otherwise moving down
+ * through the form pops the keyboard at every field and traps the d-pad.
  */
 @Composable
 fun TvTextField(
@@ -73,58 +74,57 @@ fun TvTextField(
     editOnFirstFocus: Boolean = false,
 ) {
     val keyboard = LocalSoftwareKeyboardController.current
-    val outer = remember { FocusRequester() }
-    val inner = remember { FocusRequester() }
-    var editing by remember { mutableStateOf(false) }
-    var outerFocused by remember { mutableStateOf(false) }
+    val focusManager = LocalFocusManager.current
+    var focused by remember { mutableStateOf(false) }
     var focusedBefore by remember { mutableStateOf(false) }
-
-    LaunchedEffect(editing) {
-        if (editing) {
-            inner.requestFocus()
-            keyboard?.show()
-        }
-    }
+    val shape = RoundedCornerShape(8.dp)
 
     Column(modifier.fillMaxWidth()) {
         Text(label, style = MaterialTheme.typography.labelLarge, color = TextSecondary, modifier = Modifier.padding(bottom = 4.dp))
-        Surface(
-            onClick = { editing = true },
-            modifier = Modifier.fillMaxWidth().focusRequester(outer).onFocusChanged {
-                outerFocused = it.hasFocus
-                if (it.isFocused && editOnFirstFocus && !focusedBefore) editing = true
-                if (it.hasFocus) focusedBefore = true
-            },
-            shape = ClickableSurfaceDefaults.shape(RoundedCornerShape(8.dp)),
-            scale = ClickableSurfaceDefaults.scale(focusedScale = 1f),
-            border = ClickableSurfaceDefaults.border(
-                border = Border(BorderStroke(1.dp, SurfaceRaised), shape = RoundedCornerShape(8.dp)),
-                focusedBorder = Border(BorderStroke(2.dp, FocusBar), shape = RoundedCornerShape(8.dp)),
-            ),
-            colors = ClickableSurfaceDefaults.colors(containerColor = SurfaceColor, focusedContainerColor = SurfaceColor),
+        Box(
+            Modifier
+                .fillMaxWidth()
+                .background(SurfaceColor, shape)
+                .border(if (focused) 2.dp else 1.dp, if (focused) FocusBar else SurfaceRaised, shape)
+                .padding(horizontal = 16.dp, vertical = 10.dp),
         ) {
-            Box(Modifier.padding(horizontal = 16.dp, vertical = 10.dp)) {
-                BasicTextField(
-                    value = value,
-                    onValueChange = onValueChange,
-                    singleLine = true,
-                    textStyle = MaterialTheme.typography.bodyLarge.copy(color = TextPrimary),
-                    cursorBrush = SolidColor(TextPrimary),
-                    visualTransformation = if (password) PasswordVisualTransformation() else VisualTransformation.None,
-                    keyboardOptions = KeyboardOptions(keyboardType = keyboardType, imeAction = imeAction, autoCorrectEnabled = false),
-                    keyboardActions = KeyboardActions(onAny = {
-                        keyboard?.hide()
-                        editing = false
-                        outer.requestFocus()
-                        onImeAction()
-                    }),
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .focusRequester(inner)
-                        .focusProperties { canFocus = editing }
-                        .onFocusChanged { if (!it.isFocused && editing && !outerFocused) editing = false },
-                )
-            }
+            BasicTextField(
+                value = value,
+                onValueChange = onValueChange,
+                singleLine = true,
+                textStyle = MaterialTheme.typography.bodyLarge.copy(color = TextPrimary),
+                cursorBrush = SolidColor(TextPrimary),
+                visualTransformation = if (password) PasswordVisualTransformation() else VisualTransformation.None,
+                keyboardOptions = KeyboardOptions(
+                    keyboardType = keyboardType,
+                    imeAction = imeAction,
+                    autoCorrectEnabled = false,
+                    showKeyboardOnFocus = false,
+                ),
+                keyboardActions = KeyboardActions(onAny = {
+                    keyboard?.hide()
+                    onImeAction()
+                }),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .onFocusChanged {
+                        focused = it.isFocused
+                        if (it.isFocused && editOnFirstFocus && !focusedBefore) keyboard?.show()
+                        if (it.isFocused) focusedBefore = true
+                    }
+                    // While the keyboard is open it takes these keys itself; we only see them once it's closed.
+                    .onPreviewKeyEvent { e ->
+                        if (e.type != KeyEventType.KeyDown) return@onPreviewKeyEvent false
+                        when (e.key) {
+                            Key.DirectionUp -> focusManager.moveFocus(FocusDirection.Up)
+                            Key.DirectionDown -> focusManager.moveFocus(FocusDirection.Down)
+                            Key.DirectionLeft -> focusManager.moveFocus(FocusDirection.Left)
+                            Key.DirectionRight -> focusManager.moveFocus(FocusDirection.Right)
+                            Key.DirectionCenter, Key.Enter, Key.NumPadEnter -> { keyboard?.show(); true }
+                            else -> false
+                        }
+                    },
+            )
         }
     }
 }
