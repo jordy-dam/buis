@@ -47,6 +47,7 @@ import nl.jordy.iptv.data.repo.EpgRepository
 import nl.jordy.iptv.data.repo.GuideRepository
 import nl.jordy.iptv.data.repo.MovieEnricher
 import nl.jordy.iptv.data.repo.LibraryRepository
+import nl.jordy.iptv.data.repo.ChannelAdvice
 import nl.jordy.iptv.data.repo.ChannelHealthRepository
 import nl.jordy.iptv.data.repo.StallDetector
 import nl.jordy.iptv.data.repo.WatchCounter
@@ -100,7 +101,18 @@ data class PlayerUiState(
     val subtitleNote: String? = null,
     /** Episodes: where "Intro overslaan" jumps to, while the card shows. */
     val skipIntroTo: Long? = null,
+    /** Live: the stream dropped and the player is getting it back. */
+    val reconnecting: Boolean = false,
+    /** Live: the channel's versions (same name, other category or quality), best bet first; empty when there's only one. */
+    val versions: List<LiveVersion> = emptyList(),
+    /** Live: the version playing, an index into [versions]. */
+    val versionPlaying: Int? = null,
+    /** Live: the version playing is the one this channel always plays. */
+    val versionKept: Boolean = true,
 )
+
+/** One version of a live channel: "ESPN 1 · FHD · Odido", and how it ran here ("liep goed"). */
+data class LiveVersion(val streamId: Int, val label: String, val note: String?)
 
 /** One audio or subtitle track: its name and where it sits in the player's track groups. */
 data class TrackOption(val label: String, val group: Int, val track: Int, val online: Boolean = false)
@@ -194,6 +206,17 @@ class PlayerViewModel @Inject constructor(
 
             override fun onIsPlayingChanged(isPlaying: Boolean) {
                 if (isPlaying) playbackStarted = true
+                if (isPlaying && isLive && _state.value.catchup == null) {
+                    liveStarted = true
+                    if (_state.value.reconnecting) _state.update { it.copy(reconnecting = false) }
+                }
+            }
+
+            // Paused in live: from here it's behind on purpose, and the bar offers "Terug naar live".
+            override fun onPlayWhenReadyChanged(playWhenReady: Boolean, reason: Int) {
+                if (isLive && !playWhenReady && reason == Player.PLAY_WHEN_READY_CHANGE_REASON_USER_REQUEST && _state.value.catchup == null) {
+                    _state.update { it.copy(replaying = true) }
+                }
             }
 
             override fun onRenderedFirstFrame() {
@@ -268,12 +291,28 @@ class PlayerViewModel @Inject constructor(
 
     // Live
 
-    /** Up = next channel, down = previous, wrapping around the category. */
+    private var lastZapAt: Long? = null
+    private var zapJob: Job? = null
+
+    /**
+     * Up = next channel, down = previous, wrapping around the category. In a quick run of presses only
+     * the channel the run stops on is opened (see [ZapTune]); the bar shows each step meanwhile.
+     */
     fun zap(delta: Int) {
         if (channels.size < 2) return
+        val now = SystemClock.uptimeMillis()
+        val wait = ZapTune.delayMs(lastZapAt, now)
+        lastZapAt = now
         channelIndex = (channelIndex + delta).mod(channels.size)
         val ch = channels[channelIndex]
-        playLive(ch.streamId, ch.name)
+        if (wait == 0L) return playLive(ch.streamId, ch.name)
+        zapJob?.cancel()
+        _state.update { it.copy(title = ch.name, channelNumber = channelIndex + 1, logoUrl = ch.logoUrl, now = null, next = null) }
+        zapJob = viewModelScope.launch {
+            delay(wait)
+            zapJob = null
+            playLive(ch.streamId, ch.name)
+        }
     }
 
     /** The channels Up/Down zap through, for the player's channel list. */
@@ -303,10 +342,15 @@ class PlayerViewModel @Inject constructor(
         }
     }
 
-    private fun playLive(streamId: Int, name: String) {
+    private fun playLive(streamId: Int, name: String, version: Int? = null) {
         // Zenderstatus: a channel the household replaced plays its steadier version; guide and catch-up stay the channel's own.
-        val played = swaps[streamId] ?: streamId
+        val played = version ?: swaps[streamId] ?: streamId
         val source = liveSources?.first(played) ?: return
+        zapJob?.cancel()
+        zapJob = null
+        reconnectJob?.cancel()
+        reconnect = LiveReconnect()
+        liveStarted = false
         liveStreamId = streamId
         playedStreamId = played
         healthStart(played)
@@ -333,6 +377,7 @@ class PlayerViewModel @Inject constructor(
             val channel = channels.firstOrNull { it.streamId == streamId } ?: db.catalog().liveByIds(listOf(streamId)).firstOrNull()
             _state.update { it.copy(now = now, next = next, canRestart = Catchup.canRestart(channel, now, System.currentTimeMillis() / 1000)) }
             if (watchItem?.itemId == streamId) watchItem = watchItem?.copy(detail = now?.title)
+            channel?.let { loadVersions(it) }
             // "Vanaf begin" from a reminder: once, for the channel the player opened on.
             if (startFromBeginning && streamId == route.id) {
                 startFromBeginning = false
@@ -365,6 +410,8 @@ class PlayerViewModel @Inject constructor(
                 ?: ZoneId.systemDefault()
             currentSource = null
             epgJob?.cancel()
+            zapJob?.cancel()
+            reconnectJob?.cancel()
             healthEnd()
             _state.update { it.copy(catchup = programme, buffering = true, error = null) }
             val url = StreamUrls.timeshift(base, c, streamId, programme.start, Catchup.minutes(programme), zone)
@@ -382,6 +429,7 @@ class PlayerViewModel @Inject constructor(
 
     private fun setSource(source: LiveSources.Source) {
         currentSource = source
+        liveEdge.reset()
         val item = MediaItem.Builder()
             .setUri(source.url)
             // A MIME hint skips content sniffing, which saves a round trip on every zap.
@@ -398,27 +446,101 @@ class PlayerViewModel @Inject constructor(
         }
         if (isLive) {
             val failed = currentSource
+            // It played and the line dropped: the same stream again, a few times, before anything else.
+            if (failed != null && liveStarted && droppedLine(error)) {
+                reconnect.next()?.let { wait -> return reconnectAfter(wait, failed) }
+            }
             val next = failed?.let { liveSources?.fallback(playedStreamId, it) }
             if (next != null) return setSource(next)
             healthFailed = true
         }
         showError(
-            when (error.errorCode) {
-                PlaybackException.ERROR_CODE_IO_BAD_HTTP_STATUS -> "De server weigert deze stream. Mogelijk zijn al je verbindingen in gebruik."
-                PlaybackException.ERROR_CODE_IO_NETWORK_CONNECTION_FAILED,
-                PlaybackException.ERROR_CODE_IO_NETWORK_CONNECTION_TIMEOUT -> "Geen verbinding met de server."
-                else -> "Kan dit niet afspelen (${error.errorCodeName})."
+            when {
+                isLive && liveStarted && droppedLine(error) -> "De zender viel weg en kwam niet terug."
+                else -> errorText(error)
             },
         )
     }
 
+    // Opnieuw verbinden (live)
+
+    private var reconnect = LiveReconnect()
+    private var reconnectJob: Job? = null
+    /** This live stream showed a picture: a later error is a drop, not a stream that never opened. */
+    private var liveStarted = false
+
+    /** The connection broke or the stream fell behind; a 4xx is the provider refusing, which another try won't change. */
+    private fun droppedLine(error: PlaybackException): Boolean =
+        error.errorCode == PlaybackException.ERROR_CODE_BEHIND_LIVE_WINDOW ||
+            (error.errorCode in 2000..2999 && !FailFastLoadErrorPolicy.isClientError(error.cause ?: error))
+
+    private fun reconnectAfter(wait: Long, source: LiveSources.Source) {
+        Log.i("Reconnect", "live ${playedStreamId}: try ${reconnect.attempt} in $wait ms")
+        _state.update { it.copy(reconnecting = true, buffering = true) }
+        reconnectJob = viewModelScope.launch {
+            delay(wait)
+            setSource(source)
+        }
+    }
+
+    private fun errorText(error: PlaybackException) = when (error.errorCode) {
+        PlaybackException.ERROR_CODE_IO_BAD_HTTP_STATUS -> "De server weigert deze stream. Mogelijk zijn al je verbindingen in gebruik."
+        PlaybackException.ERROR_CODE_IO_NETWORK_CONNECTION_FAILED,
+        PlaybackException.ERROR_CODE_IO_NETWORK_CONNECTION_TIMEOUT -> "Geen verbinding met de server."
+        else -> "Kan dit niet afspelen (${error.errorCodeName})."
+    }
+
     private fun showError(message: String) = _state.update { it.copy(error = message, buffering = false) }
+
+    // Andere versie (live)
+
+    private suspend fun loadVersions(channel: LiveChannelEntity) {
+        val found = runCatching { channelHealth.versions(channel) }.getOrDefault(emptyList())
+        val versions = found.map { (c, stats, category) ->
+            val note = when {
+                stats == null -> null
+                ChannelAdvice.steady(stats) -> "liep goed"
+                ChannelAdvice.troubled(stats) -> "haperde vaak"
+                else -> null
+            }
+            LiveVersion(c.streamId, (listOf(ChannelAdvice.label(c)) + listOfNotNull(category)).joinToString(" · "), note)
+        }
+        _state.update { it.copy(versions = versions) }
+        markVersion()
+    }
+
+    private fun markVersion() = _state.update { s ->
+        s.copy(
+            versionPlaying = s.versions.indexOfFirst { it.streamId == playedStreamId }.takeIf { it >= 0 },
+            versionKept = playedStreamId == (swaps[liveStreamId] ?: liveStreamId),
+        )
+    }
+
+    /** A version picked in the player: this channel plays it now; guide, history and zapping stay the channel's own. */
+    fun playVersion(streamId: Int) {
+        if (streamId == playedStreamId && _state.value.error == null) return
+        val versions = _state.value.versions
+        playLive(liveStreamId, _state.value.title, version = streamId)
+        _state.update { it.copy(versions = versions) }
+        markVersion()
+    }
+
+    /** "Voortaan deze": the version playing becomes the one this channel always plays, as Zenderstatus would. */
+    fun keepVersion() {
+        val from = liveStreamId
+        val to = playedStreamId
+        swaps = if (to == from) swaps - from else swaps + (from to to)
+        markVersion()
+        viewModelScope.launch { if (to == from) channelHealth.undo(from) else channelHealth.swap(from, to) }
+    }
 
     fun retry() {
         _state.update { it.copy(error = null) }
         if (isLive) {
             val ch = channels.getOrNull(channelIndex)
-            playLive(ch?.streamId ?: route.id, ch?.name ?: route.title)
+            // The version that was playing again, not the channel's usual one.
+            if (ch == null || ch.streamId == liveStreamId) return playLive(liveStreamId, _state.value.title, version = playedStreamId)
+            playLive(ch.streamId, ch.name)
         } else {
             player.prepare()
             player.play()
@@ -521,6 +643,12 @@ class PlayerViewModel @Inject constructor(
         watchCounter.tick(now, player.isPlaying)
         if (isLive && _state.value.catchup == null) {
             healthCounter.tick(now, player.isPlaying)
+            reconnect.tick(now, player.isPlaying)
+            // Slid behind by itself (stalls): back to live. Behind on purpose (pause, −10) is left alone.
+            if (!_state.value.replaying && liveEdge.tick(now, player.isPlaying, player.playbackState == Player.STATE_BUFFERING, fromEdgeMs())) {
+                Log.i("LiveEdge", "live ${playedStreamId} slid behind, back to live")
+                goLive()
+            }
             stall.tick(now, player.isPlaying, player.playbackState == Player.STATE_BUFFERING)
         }
         if (breakTick(now)) return
@@ -645,8 +773,30 @@ class PlayerViewModel @Inject constructor(
     }
 
     fun goLive() {
-        player.seekToDefaultPosition()
+        val source = currentSource
+        // TS can't seek: opening it again is what brings it to now.
+        if (source != null && !source.isHls) setSource(source) else player.seekToDefaultPosition()
+        liveEdge.reset()
         _state.update { it.copy(replaying = false) }
+    }
+
+    /** Back from Home or the screensaver: live is now, not where it was left. Watching from the start goes on. */
+    fun resumeLive() {
+        if (_state.value.catchup == null && _state.value.error == null) {
+            Log.i("LiveEdge", "live ${playedStreamId} resumed, back to live")
+            goLive()
+        }
+        player.play()
+    }
+
+    private val liveEdge = LiveEdge()
+
+    /** HLS: how far playback is from the end of the playlist's window; null when that can't be known (TS, not loaded). */
+    private fun fromEdgeMs(): Long? {
+        if (currentSource?.isHls != true || player.currentTimeline.isEmpty) return null
+        val window = player.currentTimeline.getWindow(player.currentMediaItemIndex, androidx.media3.common.Timeline.Window())
+        if (!window.isDynamic || window.durationMs == C.TIME_UNSET) return null
+        return window.durationMs - player.currentPosition
     }
 
     // Intro overslaan

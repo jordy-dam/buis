@@ -4,6 +4,7 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import nl.jordy.iptv.data.db.AppDatabase
 import nl.jordy.iptv.data.db.ChannelCheckEntity
@@ -81,6 +82,44 @@ object ChannelAdvice {
         Proposal(channel, s, best, best?.let { stats[it.streamId] })
     }.sortedByDescending { it.stats.troubled }
 
+    /**
+     * The names one channel goes by: "ESPN 1" is plain "ESPN" in some packages (Odido), and the other way round.
+     */
+    fun aliases(name: String): List<String> {
+        val bare = name.removeSuffix(" 1")
+        return when {
+            bare != name -> listOf(name, bare)
+            name.lastOrNull()?.isDigit() != false -> listOf(name)
+            else -> listOf(name, "$name 1")
+        }
+    }
+
+    /**
+     * Versions of [current] among [candidates] (found by its [aliases]): only those from a category of the
+     * same country. "ESPN 1" in AUSTRALIA is another channel than "ESPN 1" in ZIGGO KABEL.
+     */
+    fun sameCountry(current: LiveChannelEntity, candidates: List<LiveChannelEntity>, countryOf: (String) -> String?): List<LiveChannelEntity> {
+        val country = countryOf(current.categoryId)
+        return candidates.filter { it.streamId == current.streamId || countryOf(it.categoryId) == country }
+    }
+
+    /**
+     * The versions of one channel for the player's "Andere versie", best bet first: steady ones (most
+     * watched first), then untried, then the rest, with troubled ones last. Equal ones keep their order.
+     */
+    fun ranked(versions: List<LiveChannelEntity>, stats: Map<Int, Stats>): List<LiveChannelEntity> =
+        versions.sortedWith(
+            compareBy<LiveChannelEntity> { v ->
+                val s = stats[v.streamId]
+                when {
+                    s == null -> 1
+                    steady(s) -> 0
+                    troubled(s) -> 3
+                    else -> 2
+                }
+            }.thenByDescending { stats[it.streamId]?.sessions ?: 0 },
+        )
+
     /** "NPO 1 · FHD": the name with the badges that tell versions apart. */
     fun label(c: LiveChannelEntity) = (listOf(c.name) + c.badges.split(',').filter { it.isNotBlank() }).joinToString(" · ")
 }
@@ -108,6 +147,17 @@ class ChannelHealthRepository @Inject constructor(private val db: AppDatabase) {
         val siblings = channels.values.associate { c -> c.streamId to dao.liveNamed(c.name) }
         val all = (channels.values + siblings.values.flatten()).associateBy { it.streamId }
         return ChannelAdvice.proposals(stats, all) { siblings[it.streamId].orEmpty() }
+    }
+
+    /** Every version of a channel in its country, ranked, each with how it ran and its category's name. */
+    suspend fun versions(channel: LiveChannelEntity): List<Triple<LiveChannelEntity, ChannelAdvice.Stats?, String?>> {
+        val dao = db.channelHealth()
+        val categories = db.catalog().liveCategories().first().associateBy { it.id }
+        val found = ChannelAdvice.aliases(channel.name).flatMap { dao.liveNamed(it) }.distinctBy { it.streamId }
+        val versions = ChannelAdvice.sameCountry(channel, found) { categories[it]?.country }
+        if (versions.size < 2) return emptyList()
+        val stats = ChannelAdvice.stats(dao.checks())
+        return ChannelAdvice.ranked(versions, stats).map { Triple(it, stats[it.streamId], categories[it.categoryId]?.name) }
     }
 
     val swaps: Flow<List<ChannelSwapEntity>> = db.channelHealth().observeSwaps()

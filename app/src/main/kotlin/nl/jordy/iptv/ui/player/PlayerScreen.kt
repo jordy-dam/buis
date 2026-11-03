@@ -112,6 +112,9 @@ import nl.jordy.iptv.ui.components.CornerCard
 import nl.jordy.iptv.ui.components.CornerFade
 import nl.jordy.iptv.ui.components.BottomFade
 import nl.jordy.iptv.ui.components.PrimaryButton
+import nl.jordy.iptv.ui.components.SecondaryButton
+import androidx.compose.ui.unit.Dp
+import androidx.compose.material.icons.filled.SwapHoriz
 import nl.jordy.iptv.ui.components.IconButton
 import nl.jordy.iptv.ui.components.Focus
 import nl.jordy.iptv.ui.components.ignoreHeldKey
@@ -159,7 +162,7 @@ private const val SCRUB_SETTLE_MS = 800L
 private const val CARD_GRACE_MS = 700L
 
 /** The track list that is open above its button in the bar. */
-private enum class Choice { AUDIO, SUBTITLES }
+private enum class Choice { AUDIO, SUBTITLES, VERSIONS }
 
 /**
  * The player. Everything you steer sits in one bar at the bottom: title, progress, and a row of round
@@ -310,7 +313,7 @@ fun PlayerScreen(onExit: () -> Unit, vm: PlayerViewModel = hiltViewModel()) {
         val observer = LifecycleEventObserver { _, event ->
             when (event) {
                 Lifecycle.Event.ON_STOP -> { vm.cancelBreak(); vm.saveNow(); vm.player.pause() }
-                Lifecycle.Event.ON_START -> if (vm.isLive) vm.player.play()
+                Lifecycle.Event.ON_START -> if (vm.isLive) vm.resumeLive()
                 else -> Unit
             }
         }
@@ -334,7 +337,11 @@ fun PlayerScreen(onExit: () -> Unit, vm: PlayerViewModel = hiltViewModel()) {
     BackHandler(enabled = choice != null) {
         val from = choice
         choice = null
-        focusTarget = if (from == Choice.AUDIO) buttons.audio else buttons.subtitles
+        focusTarget = when (from) {
+            Choice.AUDIO -> buttons.audio
+            Choice.VERSIONS -> buttons.versions
+            else -> buttons.subtitles
+        }
     }
     BackHandler(enabled = panel != null) {
         val from = panel
@@ -467,7 +474,7 @@ fun PlayerScreen(onExit: () -> Unit, vm: PlayerViewModel = hiltViewModel()) {
         Subtitles(vm.player, lift, Modifier.fillMaxSize())
 
         if (state.buffering && state.error == null) {
-            Text("Laden…", style = MaterialTheme.typography.titleLarge, color = TextSecondary, modifier = Modifier.align(Alignment.Center))
+            Text(if (state.reconnecting) "Zender weggevallen, opnieuw verbinden…" else "Laden…",style = MaterialTheme.typography.titleLarge, color = TextSecondary, modifier = Modifier.align(Alignment.Center))
         }
 
         state.error?.let { error ->
@@ -476,6 +483,10 @@ fun PlayerScreen(onExit: () -> Unit, vm: PlayerViewModel = hiltViewModel()) {
                 Text(error, style = MaterialTheme.typography.bodyLarge, color = TextSecondary)
                 val retry = remember { FocusRequester() }
                 PrimaryButton("Opnieuw proberen", vm::retry, Modifier.focusRequester(retry))
+                // A channel that won't play here may play in another category: the best bet, one press away.
+                state.versions.withIndex().firstOrNull { it.index != state.versionPlaying }?.let { (_, v) ->
+                    SecondaryButton("Probeer ${v.label}", { vm.playVersion(v.streamId) })
+                }
                 LaunchedEffect(error) { retry.requestFocus() }
             }
         }
@@ -522,6 +533,9 @@ fun PlayerScreen(onExit: () -> Unit, vm: PlayerViewModel = hiltViewModel()) {
                     seekTo = { to -> vm.seekBy(to - vm.player.currentPosition); position = to },
                     audio = { i -> vm.selectAudio(i); choice = null; focusTarget = buttons.audio },
                     subtitle = { i -> vm.selectSubtitle(i); choice = null; focusTarget = buttons.subtitles },
+                    // The list stays open on the version now playing, so "Voortaan deze versie" is right there.
+                    version = { i -> state.versions.getOrNull(i)?.let { vm.playVersion(it.streamId) }; focusTarget = buttons.firstChoice },
+                    keepVersion = { vm.keepVersion(); choice = null; focusTarget = buttons.versions },
                 ),
             )
         }
@@ -577,6 +591,7 @@ private class ControlFocus {
     val scrub = FocusRequester()
     val audio = FocusRequester()
     val subtitles = FocusRequester()
+    val versions = FocusRequester()
     /** The selected entry of the open track list. */
     val firstChoice = FocusRequester()
     val info = FocusRequester()
@@ -595,6 +610,9 @@ private class BarActions(
     val seekTo: (Long) -> Unit,
     val audio: (Int) -> Unit,
     val subtitle: (Int?) -> Unit,
+    /** Live: play another version of the channel, by its index in [PlayerUiState.versions]. */
+    val version: (Int) -> Unit,
+    val keepVersion: () -> Unit,
 )
 
 /**
@@ -624,6 +642,7 @@ private fun PlayerBar(
     // Where the open list's button sits, to put the list right above it.
     var audioX by remember { mutableFloatStateOf(0f) }
     var subtitlesX by remember { mutableFloatStateOf(0f) }
+    var versionsX by remember { mutableFloatStateOf(0f) }
     var barX by remember { mutableFloatStateOf(0f) }
     var barWidth by remember { mutableIntStateOf(0) }
     val shown = scrub ?: position
@@ -672,7 +691,20 @@ private fun PlayerBar(
         ) else fraction?.let { ProgressBar(it, thickness = 3.dp) }
 
         // The open track list, above its button.
-        choice?.let { c ->
+        if (choice == Choice.VERSIONS) TrackList(
+            options = state.versions.mapIndexed { i, v -> TrackOption(listOfNotNull(v.label, v.note).joinToString(" · "), 0, i) },
+            selected = state.versionPlaying,
+            offLabel = null,
+            emptyLabel = "Geen andere versies",
+            anchorPx = versionsX - barX,
+            barWidthPx = barWidth,
+            first = buttons.firstChoice,
+            onPick = { i -> i?.let(actions.version) },
+            width = 520.dp,
+            // Room for a channel's usual handful of versions and the footer under them, without scrolling.
+            maxHeight = 420.dp,
+            footer = if (state.versionKept) null else "Voortaan deze versie" to actions.keepVersion,
+        ) else choice?.let { c ->
             val anchor = (if (c == Choice.AUDIO) audioX else subtitlesX) - barX
             TrackList(
                 options = if (c == Choice.AUDIO) state.audio else state.subtitles,
@@ -713,6 +745,12 @@ private fun PlayerBar(
                 ControlButton(
                     Icons.Filled.Info, "Programma-info", { onPanel(Panel.INFO) },
                     Modifier.focusRequester(buttons.info), active = panel == Panel.INFO, available = live,
+                )
+                // The same channel from another category or in another quality, for when this one hiccups.
+                if (live) ControlButton(
+                    Icons.Filled.SwapHoriz, "Andere versie", { onChoice(Choice.VERSIONS) },
+                    Modifier.focusRequester(buttons.versions).onGloballyPositioned { versionsX = it.positionInRoot().x + it.size.width / 2f },
+                    active = choice == Choice.VERSIONS || !state.versionKept, available = state.versions.size > 1,
                 )
                 ControlButton(
                     Icons.Filled.Audiotrack, "Geluid", { onChoice(Choice.AUDIO) },
@@ -805,9 +843,12 @@ private fun TrackList(
     barWidthPx: Int,
     first: FocusRequester,
     onPick: (Int?) -> Unit,
+    width: Dp = 320.dp,
+    maxHeight: Dp = 280.dp,
+    /** One more row under the options, with its own action. */
+    footer: Pair<String, () -> Unit>? = null,
 ) {
     val density = LocalDensity.current
-    val width = 320.dp
     val widthPx = with(density) { width.toPx() }
     // Centred on the button, kept inside the bar.
     val x = (anchorPx - widthPx / 2).coerceIn(0f, (barWidthPx - widthPx).coerceAtLeast(0f))
@@ -816,13 +857,14 @@ private fun TrackList(
         offLabel?.let { add(Triple(it, null, false)) }
         options.forEachIndexed { i, o -> add(Triple(o.label, i, o.online)) }
         if (isEmpty()) add(Triple(emptyLabel, null, false))
+        footer?.let { add(Triple(it.first, FOOTER, false)) }
     }
     val current = rows.indexOfFirst { it.second == selected }.coerceAtLeast(0)
     Column(
         Modifier
             .offset { IntOffset(x.roundToInt(), 0) }
             .width(width)
-            .heightIn(max = 280.dp)
+            .heightIn(max = maxHeight)
             // The pop-up surface, outlined so it stands apart from the bar it opens in.
             .background(PopupSurface, RoundedCornerShape(16.dp))
             .border(1.dp, FocusFill, RoundedCornerShape(16.dp))
@@ -833,7 +875,7 @@ private fun TrackList(
     ) {
         rows.forEachIndexed { i, (label, index, online) ->
             Surface(
-                onClick = { onPick(index) },
+                onClick = { if (index == FOOTER) footer?.second?.invoke() else onPick(index) },
                 modifier = Modifier.fillMaxWidth().then(if (i == current) Modifier.focusRequester(first) else Modifier),
                 shape = ClickableSurfaceDefaults.shape(RoundedCornerShape(10.dp)),
                 scale = ClickableSurfaceDefaults.scale(focusedScale = 1f),
@@ -856,6 +898,9 @@ private fun TrackList(
         }
     }
 }
+
+/** [TrackList]'s row index for its footer. */
+private const val FOOTER = -2
 
 /** A key hint that isn't a control: icons, sometimes a word (a channel name). */
 private class Hint(vararg val icons: ImageVector, val text: String? = null)

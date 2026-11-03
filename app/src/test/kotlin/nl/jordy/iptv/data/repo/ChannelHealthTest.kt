@@ -66,4 +66,28 @@ class ChannelHealthTest {
         assertNull(alone.sibling)
         assertEquals("RTL 4 · HD", ChannelAdvice.label(hd))
     }
+
+    @Test
+    fun `the player offers the version that ran well first and the hiccuping one last`() {
+        val bad = ch(1, "ESPN 1")
+        val fresh = ch(2, "ESPN 1")
+        val good = ch(3, "ESPN 1")
+        val busy = ch(4, "ESPN 1")
+        val checks = List(3) { check(1, stalls = 1) } + List(2) { check(3) } + List(5) { check(4) }
+        val ranked = ChannelAdvice.ranked(listOf(bad, fresh, good, busy), ChannelAdvice.stats(checks))
+        assertEquals(listOf(4, 3, 2, 1), ranked.map { it.streamId })
+    }
+
+    @Test
+    fun `ESPN 1 at Ziggo finds plain ESPN at Odido, but not ESPN 1 in Australia`() {
+        assertEquals(listOf("ESPN 1", "ESPN"), ChannelAdvice.aliases("ESPN 1"))
+        assertEquals(listOf("ESPN", "ESPN 1"), ChannelAdvice.aliases("ESPN"))
+        assertEquals(listOf("ESPN 2"), ChannelAdvice.aliases("ESPN 2"))
+        val country = mapOf("ziggo" to "NL", "odido" to "NL", "au" to "AU")
+        val ziggo = LiveChannelEntity("ziggo", 1, "ESPN 1", null, null, 0, 1)
+        val odido = LiveChannelEntity("odido", 2, "ESPN", null, null, 0, 1)
+        val australia = LiveChannelEntity("au", 3, "ESPN 1", null, null, 0, 1)
+        val found = ChannelAdvice.sameCountry(ziggo, listOf(ziggo, odido, australia)) { country[it] }
+        assertEquals(listOf(1, 2), found.map { it.streamId })
+    }
 }
