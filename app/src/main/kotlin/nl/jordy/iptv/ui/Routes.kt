@@ -20,6 +20,8 @@ import kotlinx.serialization.Serializable
 /** Zenderstatus: channels that hiccup and their replacements. */
 @Serializable data object ChannelHealthRoute
 @Serializable data class SeriesDetailRoute(val seriesId: Int)
+/** "Gids": the timeline grid of one of the profile's guides. */
+@Serializable data class TvGuideRoute(val guideId: Long)
 
 /** What to play. Live carries its category so up/down can zap through the same list. */
 @Serializable
@@ -31,6 +33,10 @@ data class PlayerRoute(
     /** Live: category to zap through, or a profile's guide ([guideCategory]). */
     val categoryId: String? = null,
     val fromStart: Boolean = false,
+    /** Live with [fromStart]: a programme that already ended (from the guide grid); 0 = the one on now. */
+    val catchupStart: Long = 0,
+    val catchupStop: Long = 0,
+    val catchupTitle: String = "",
 ) {
     enum class Kind { LIVE, MOVIE, EPISODE }
 

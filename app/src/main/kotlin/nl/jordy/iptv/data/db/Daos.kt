@@ -264,6 +264,8 @@ interface SyncInfoDao {
     @Query("SELECT * FROM sync_info WHERE id = 0") suspend fun get(): SyncInfoEntity?
 }
 
+data class StreamProgramme(val streamId: Int, val start: Long, val stop: Long, val title: String, val description: String?)
+
 data class LiveGuideRow(val streamId: Int, val name: String, val epgChannelId: String?, val country: String?)
 
 data class CategoryCountry(val id: String, val country: String?)
@@ -284,6 +286,14 @@ interface EpgDao {
             "WHERE c.streamId = :streamId AND p.stop > :now ORDER BY p.start LIMIT :limit",
     )
     suspend fun upcoming(streamId: Int, now: Long, limit: Int = 2): List<EpgProgrammeEntity>
+
+    /** Programmes of several streams that overlap [from, to), for the guide grid. */
+    @Query(
+        "SELECT c.streamId AS streamId, p.start AS start, p.stop AS stop, p.title AS title, p.description AS description " +
+            "FROM epg_programme p JOIN epg_channel c ON c.channelId = p.channelId " +
+            "WHERE c.streamId IN (:streamIds) AND p.stop > :from AND p.start < :to ORDER BY p.start",
+    )
+    suspend fun between(streamIds: List<Int>, from: Long, to: Long): List<StreamProgramme>
 
 }
 

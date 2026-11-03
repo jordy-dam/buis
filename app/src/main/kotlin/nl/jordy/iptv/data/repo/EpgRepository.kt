@@ -1,6 +1,9 @@
 package nl.jordy.iptv.data.repo
 
 import android.util.LruCache
+import kotlinx.coroutines.async
+import kotlinx.coroutines.awaitAll
+import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.sync.Semaphore
 import kotlinx.coroutines.sync.withPermit
 import nl.jordy.iptv.data.auth.CredentialStore
@@ -52,6 +55,19 @@ class EpgRepository @Inject constructor(
         }.filter { it.stop > nowSec }
     }
 
+    /**
+     * Programmes per stream overlapping [from, to), for the guide grid: the stored guide, and the
+     * provider's short EPG (from now on) for the streams it doesn't cover. Streams with neither are absent.
+     */
+    suspend fun window(streamIds: List<Int>, from: Long, to: Long): Map<Int, List<EpgEntry>> {
+        val stored = db.epg().between(streamIds, from, to).groupBy({ it.streamId }) { EpgEntry(it.title, it.description, it.start, it.stop) }
+        val missing = streamIds.filter { it !in stored }
+        if (missing.isEmpty()) return stored
+        val fetched = coroutineScope {
+            missing.map { id -> async { id to schedule(id).filter { it.stop > from && it.start < to } } }.awaitAll()
+        }
+        return stored + fetched.filter { it.second.isNotEmpty() }
+    }
 
     private suspend fun entries(streamId: Int): List<EpgEntry> {
         cache.get(streamId)?.takeIf { System.currentTimeMillis() - it.fetchedAt < TTL_MS }?.let { return it.entries }

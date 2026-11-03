@@ -103,7 +103,8 @@ class FavoritesViewModel @Inject constructor(
 
 /**
  * The watching profile's guides, then their favourite films and series, on the left; the focused
- * one on the right (the Live TV pattern). Long-press on a guide renames or deletes it, on a
+ * one on the right (the Live TV pattern). OK on a guide opens it as a timeline grid ("Gids"; Right
+ * still goes into its channels). Long-press on a guide renames or deletes it, on a
  * channel shows buttons in its row to move it or take it out.
  */
 @OptIn(ExperimentalComposeUiApi::class)
@@ -112,6 +113,7 @@ fun FavoritesScreen(
     onPlay: (PlayerRoute) -> Unit,
     onOpenMovie: (Int) -> Unit,
     onOpenSeries: (Int) -> Unit,
+    onOpenGuide: (Long) -> Unit,
     vm: FavoritesViewModel = hiltViewModel(),
 ) {
     val loaded by vm.state.collectAsStateWithLifecycle()
@@ -149,7 +151,7 @@ fun FavoritesScreen(
                 ListItemSurface(
                     text = g.name,
                     selected = entry == selected,
-                    onClick = { runCatching { contentFocus.requestFocus() } },
+                    onClick = { if (g.channels.isNotEmpty()) onOpenGuide(g.id) else runCatching { contentFocus.requestFocus() } },
                     onLongClick = { menuFor = g },
                     modifier = Modifier.selectedFocus(entry == selected, selectedFocus).onFocusChanged { if (it.isFocused) vm.select(entry) },
                 )
