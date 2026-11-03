@@ -381,7 +381,8 @@ class PlayerViewModel @Inject constructor(
             // "Vanaf begin" from a reminder: once, for the channel the player opened on.
             if (startFromBeginning && streamId == route.id) {
                 startFromBeginning = false
-                watchFromStart()
+                if (route.catchupStart > 0) watchFromStart(EpgEntry(route.catchupTitle, null, route.catchupStart, route.catchupStop))
+                else watchFromStart()
             }
         }
     }
@@ -398,9 +399,12 @@ class PlayerViewModel @Inject constructor(
     /** The panel's time zone, asked once: timeshift URLs need the start time in it. */
     private var panelZone: ZoneId? = null
 
-    /** OK on a programme with an archive: play it from its start, with normal seek controls. */
-    fun watchFromStart() {
-        val programme = _state.value.now?.takeIf { _state.value.canRestart } ?: return
+    /**
+     * OK on a programme with an archive: play it from its start, with normal seek controls. Without
+     * [given] it's the one on now; the guide grid passes one that already ended.
+     */
+    fun watchFromStart(given: EpgEntry? = null) {
+        val programme = given ?: _state.value.now?.takeIf { _state.value.canRestart } ?: return
         val c = credentials ?: return
         val base = c.baseUrl ?: return
         val streamId = liveStreamId
