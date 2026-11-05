@@ -56,6 +56,8 @@ fun CornerCard(
     visual: (@Composable BoxScope.() -> Unit)? = null,
     /** Share of the wait still left (1 → 0), drawn as a thin amber bar along the bottom; read while drawing only. */
     timeLeft: (() -> Float)? = null,
+    /** A single action that sits behind the text, on the same line, instead of a row underneath. */
+    inlineActions: Boolean = false,
     actions: @Composable RowScope.() -> Unit,
 ) {
     // Slides in once when it appears; a new label or moment on the same card doesn't slide again.
@@ -85,13 +87,14 @@ fun CornerCard(
                     content = visual,
                 )
             }
-            Column {
+            Column(if (inlineActions) Modifier.weight(1f, fill = false).padding(end = 20.dp) else Modifier) {
                 Text(label, style = MaterialTheme.typography.bodyLarge, color = Live)
                 Text(title, style = MaterialTheme.typography.headlineMedium, maxLines = 2, overflow = TextOverflow.Ellipsis)
                 subtitle?.let { Text(it, style = MaterialTheme.typography.bodyLarge, color = TextSecondary, maxLines = 1) }
             }
+            if (inlineActions) actions()
         }
-        Row(horizontalArrangement = Arrangement.spacedBy(12.dp), verticalAlignment = Alignment.CenterVertically, content = actions)
+        if (!inlineActions) Row(horizontalArrangement = Arrangement.spacedBy(12.dp), verticalAlignment = Alignment.CenterVertically, content = actions)
     }
     }
 }

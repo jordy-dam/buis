@@ -29,13 +29,10 @@ import androidx.tv.material3.Text
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
-import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.map
-import kotlinx.coroutines.flow.mapLatest
 import kotlinx.coroutines.flow.stateIn
 import androidx.compose.runtime.mutableIntStateOf
-import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
@@ -47,11 +44,6 @@ import nl.jordy.iptv.ui.PlayerRoute
 import nl.jordy.iptv.ui.components.CornerCard
 import nl.jordy.iptv.ui.components.CornerFade
 import nl.jordy.iptv.ui.components.PrimaryButton
-import nl.jordy.iptv.ui.components.IconButton
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Close
-import androidx.compose.material.icons.filled.RestartAlt
-import androidx.compose.material.icons.filled.Settings
 import nl.jordy.iptv.ui.components.ignoreHeldKey
 import nl.jordy.iptv.ui.theme.Live
 import nl.jordy.iptv.ui.theme.SurfaceColor
@@ -76,8 +68,8 @@ import javax.inject.Inject
 /** How long a started programme counts down before Automatisch overschakelen tunes in. */
 private const val AUTO_SWITCH_SEC = 10
 
-/** A reminder nobody reacts to goes away by itself after this long. */
-private const val HIDE_AFTER_MS = 15_000L
+/** A reminder nobody reacts to goes away by itself after this long: no OK, you stay where you are. */
+private const val HIDE_AFTER_MS = 10_000L
 
 private val clock = DateTimeFormatter.ofPattern("HH:mm").withZone(ZoneId.systemDefault())
 
@@ -91,17 +83,6 @@ class ReminderViewModel @Inject constructor(private val follows: FollowRepositor
 
     /** Automatisch overschakelen: a programme that started counts down and tunes in by itself. */
     val autoSwitch = profiles.prefs.map { it.autoSwitch }.stateIn(viewModelScope, SharingStarted.Eagerly, false)
-
-    /** For "Volgen aanpassen" straight from a reminder. */
-    // Kept up to date all along, so the dialog opens with its terms already there.
-    val terms = follows.terms.stateIn(viewModelScope, SharingStarted.Eagerly, emptyList())
-    @OptIn(ExperimentalCoroutinesApi::class)
-    val next = follows.terms.mapLatest { terms ->
-        val found = runCatching { follows.upcoming() }.getOrDefault(emptyList())
-        terms.associateWith { t -> found.firstOrNull { it.term == t } }
-    }.stateIn(viewModelScope, SharingStarted.Eagerly, emptyMap())
-    fun follow(term: String) = viewModelScope.launch { follows.add(term) }
-    fun unfollow(term: String) = viewModelScope.launch { follows.remove(term) }
 
     init {
         viewModelScope.launch {
@@ -139,14 +120,6 @@ class ReminderViewModel @Inject constructor(private val follows: FollowRepositor
 fun ReminderHost(active: Boolean, onWatch: (PlayerRoute) -> Unit, vm: ReminderViewModel = hiltViewModel()) {
     val due by vm.due.collectAsStateWithLifecycle()
     val autoSwitch by vm.autoSwitch.collectAsStateWithLifecycle()
-    // Outlives the reminder: "Volgen aanpassen" puts the reminder away and opens the terms in its place.
-    var editFollows by remember { mutableStateOf(false) }
-    if (editFollows) {
-        val terms by vm.terms.collectAsStateWithLifecycle()
-        val next by vm.next.collectAsStateWithLifecycle()
-        FollowDialog(terms, next, vm::follow, vm::unfollow, onDismiss = { editFollows = false })
-        return
-    }
     val d = due ?: return
     if (!active) return
     val m = d.match
@@ -193,28 +166,18 @@ fun ReminderHost(active: Boolean, onWatch: (PlayerRoute) -> Unit, vm: ReminderVi
             subtitle = m.channelName,
             modifier = Modifier.padding(SafeArea).ignoreHeldKey().onPreviewKeyEvent { touched++; false },
             timeLeft = { bar.value },
+            inlineActions = true,
             // Logo plate like the channel rows: logos are often transparent PNGs.
             visual = {
                 Text(m.channelName.take(2).uppercase(), style = MaterialTheme.typography.titleMedium, color = TextSecondary)
                 if (m.logoUrl != null) AsyncImage(model = m.logoUrl, contentDescription = null, contentScale = ContentScale.Fit, modifier = Modifier.fillMaxSize().padding(6.dp))
             },
         ) {
+            // One choice only: OK watches, Back skips. Following is changed in Instellingen.
             PrimaryButton("Kijken", {
                 vm.dismiss(FollowMatches.Outcome.WATCHED)
                 onWatch(live)
             }, Modifier.focusRequester(watch), large = true)
-            // Secondary actions as icons: restart, skip this one (close), the follow settings.
-            if (started && m.hasArchive) {
-                IconButton(Icons.Filled.RestartAlt, "Vanaf begin", {
-                    vm.dismiss(FollowMatches.Outcome.WATCHED)
-                    onWatch(live.copy(fromStart = true))
-                }, large = true)
-            }
-            IconButton(Icons.Filled.Close, "Overslaan", { vm.dismiss(FollowMatches.Outcome.REFUSED) }, large = true)
-            IconButton(Icons.Filled.Settings, "Volgen aanpassen", {
-                vm.dismiss(FollowMatches.Outcome.WATCHED)
-                editFollows = true
-            }, large = true)
         }
         }
     }
