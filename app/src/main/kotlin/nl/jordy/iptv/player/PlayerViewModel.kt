@@ -123,6 +123,9 @@ private const val ONLINE = -1
 /** Instant replay: how far one hold of Left goes back in live. */
 const val REPLAY_MS = 10_000L
 
+/** Live HLS: where playback starts, behind the newest segment. The provider sends no clock, so this is all we steer. */
+private const val LIVE_OFFSET_MS = 20_000L
+
 /** [secondsLeft] counts down to the next episode; null means it waits for OK ("Kijk je nog?"). */
 data class NextUpCard(val code: String, val title: String, val secondsLeft: Int?)
 
@@ -221,7 +224,7 @@ class PlayerViewModel @Inject constructor(
 
             override fun onRenderedFirstFrame() {
                 if (zapStartedAt > 0 && BuildConfig.DEBUG) {
-                    Log.d("Zap", "first frame after ${SystemClock.elapsedRealtime() - zapStartedAt} ms (hls=${currentSource?.isHls})")
+                    Log.d("Zap", "first frame after ${SystemClock.elapsedRealtime() - zapStartedAt} ms (hls=${currentSource?.isHls}, from edge ${fromEdgeMs()} ms)")
                 }
                 zapStartedAt = 0
             }
@@ -438,6 +441,8 @@ class PlayerViewModel @Inject constructor(
             .setUri(source.url)
             // A MIME hint skips content sniffing, which saves a round trip on every zap.
             .setMimeType(if (source.isHls) MimeTypes.APPLICATION_M3U8 else MimeTypes.VIDEO_MP2T)
+            // HLS starts 3 segments back by default: 30 s with this provider's 10 s segments. Two is enough margin.
+            .setLiveConfiguration(MediaItem.LiveConfiguration.Builder().setTargetOffsetMs(LIVE_OFFSET_MS).build())
             .build()
         player.setMediaItem(item)
         player.prepare()
