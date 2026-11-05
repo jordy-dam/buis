@@ -19,6 +19,9 @@ import nl.jordy.iptv.data.settings.UserPrefs
 import androidx.media3.common.util.UnstableApi
 import androidx.media3.datasource.DefaultHttpDataSource
 import androidx.media3.exoplayer.DefaultLoadControl
+import nl.jordy.iptv.data.settings.LiveDelay
+import nl.jordy.iptv.data.settings.LiveDelayStepper
+import nl.jordy.iptv.data.settings.LiveDelayStore
 import androidx.media3.exoplayer.DefaultRenderersFactory
 import androidx.media3.exoplayer.ExoPlayer
 import androidx.media3.exoplayer.source.DefaultMediaSourceFactory
@@ -123,9 +126,6 @@ private const val ONLINE = -1
 /** Instant replay: how far one hold of Left goes back in live. */
 const val REPLAY_MS = 10_000L
 
-/** Live HLS: where playback starts, behind the newest segment. The provider sends no clock, so this is all we steer. */
-private const val LIVE_OFFSET_MS = 20_000L
-
 /** [secondsLeft] counts down to the next episode; null means it waits for OK ("Kijk je nog?"). */
 data class NextUpCard(val code: String, val title: String, val secondsLeft: Int?)
 
@@ -150,6 +150,7 @@ class PlayerViewModel @Inject constructor(
     private val watchLog: WatchLog,
     private val channelHealth: ChannelHealthRepository,
     private val openSubtitles: OpenSubtitles,
+    private val liveDelayStore: LiveDelayStore,
 ) : ViewModel() {
 
     val route = savedState.toRoute<PlayerRoute>()
@@ -249,6 +250,7 @@ class PlayerViewModel @Inject constructor(
         sleepTimer = SleepTimer(prefs.sleepMinutes, SystemClock.elapsedRealtime())
         if (!isLive) breakTimer = BreakTimer(prefs.breakMinutes, prefs.breakLength)
         profilePrefs = prefs
+        if (isLive) delayStepper = LiveDelayStepper(liveDelayStore.delay.first())
         applyProfileTracks()
         when (route.kind) {
             PlayerRoute.Kind.LIVE -> {
@@ -441,8 +443,8 @@ class PlayerViewModel @Inject constructor(
             .setUri(source.url)
             // A MIME hint skips content sniffing, which saves a round trip on every zap.
             .setMimeType(if (source.isHls) MimeTypes.APPLICATION_M3U8 else MimeTypes.VIDEO_MP2T)
-            // HLS starts 3 segments back by default: 30 s with this provider's 10 s segments. Two is enough margin.
-            .setLiveConfiguration(MediaItem.LiveConfiguration.Builder().setTargetOffsetMs(LIVE_OFFSET_MS).build())
+            // Where live HLS starts behind the newest segment: Instellingen → Kijken → Live-vertraging.
+            .setLiveConfiguration(MediaItem.LiveConfiguration.Builder().setTargetOffsetMs(liveDelay.targetMs).build())
             .build()
         player.setMediaItem(item)
         player.prepare()
@@ -659,6 +661,7 @@ class PlayerViewModel @Inject constructor(
                 goLive()
             }
             stall.tick(now, player.isPlaying, player.playbackState == Player.STATE_BUFFERING)
+            delayTick(now)
         }
         if (breakTick(now)) return
         if (route.kind == PlayerRoute.Kind.EPISODE) {
@@ -861,6 +864,30 @@ class PlayerViewModel @Inject constructor(
         watchStartedAt = System.currentTimeMillis()
     }
 
+    // Live-vertraging
+
+    /**
+     * Set from the setting when the player opens, then steps safer on stalls while it stays open (zaps
+     * included). The stream already playing keeps its place: a stall has put it further back already;
+     * the next channel or "terug naar live" starts at the new delay.
+     */
+    private var delayStepper = LiveDelayStepper(LiveDelay.DEFAULT)
+    private val liveDelay get() = delayStepper.delay
+    private var delayCounter = WatchCounter()
+
+    private fun delayTick(now: Long) {
+        delayCounter.tick(now, player.isPlaying)
+        val left = delayStepper.tick(now, player.isPlaying, player.playbackState == Player.STATE_BUFFERING) ?: return
+        Log.i("LiveDelay", "${left.label} stalled ${LiveDelayStepper.STEP_STALLS}×, now ${liveDelay.label}")
+        liveDelayStore.record(left, delayCounter.take(), LiveDelayStepper.STEP_STALLS)
+    }
+
+    /** What played at [liveDelay] so far goes into the setting's week line. */
+    private fun delayEnd() {
+        liveDelayStore.record(liveDelay, delayCounter.take(), delayStepper.stalls)
+        delayStepper.restartCount()
+    }
+
     // Zenderstatus
 
     private var healthId: Int? = null
@@ -876,6 +903,7 @@ class PlayerViewModel @Inject constructor(
     /** One live session ends (zap, catch-up, leaving): how it went goes into the channel's record. */
     private fun healthEnd() {
         healthId?.let { channelHealth.record(it, healthCounter.take(), stall.stalls, healthFailed) }
+        delayEnd()
         healthId = null
         healthCounter = WatchCounter()
         stall = StallDetector()

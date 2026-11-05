@@ -6,6 +6,9 @@ import androidx.compose.ui.focus.FocusDirection
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.material.icons.filled.Tv
+import androidx.compose.material.icons.filled.Timer
+import nl.jordy.iptv.data.settings.LiveDelay
+import nl.jordy.iptv.data.settings.LiveDelayStore
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.foundation.background
 import androidx.compose.foundation.focusGroup
@@ -168,6 +171,7 @@ class SettingsViewModel @Inject constructor(
     private val posters: DreamPosters,
     private val calendarRepo: CalendarRepository,
     private val openSubtitles: OpenSubtitles,
+    private val liveDelayStore: LiveDelayStore,
 ) : ViewModel() {
     /** Debug builds: the screensaver's posters, for its preview. */
     suspend fun dreamPosters() = posters.load()
@@ -188,6 +192,10 @@ class SettingsViewModel @Inject constructor(
     suspend fun addCalendar(url: String, name: String?, channel: ChannelPick) = calendarRepo.add(url, name, channel)
     fun setCalendarChannel(calendar: CalendarEntity, channel: ChannelPick) = viewModelScope.launch { calendarRepo.setChannel(calendar, channel) }
     fun removeCalendar(url: String) = viewModelScope.launch { calendarRepo.remove(url) }
+
+    val liveDelay = liveDelayStore.delay.stateIn(viewModelScope, SharingStarted.Eagerly, LiveDelay.DEFAULT)
+    val liveDelaySummary = liveDelayStore.summary.stateIn(viewModelScope, SharingStarted.Eagerly, null)
+    fun cycleLiveDelay() = viewModelScope.launch { liveDelayStore.set(liveDelay.value.next()) }
 
     val openSubtitlesLogin = openSubtitles.login.stateIn(viewModelScope, SharingStarted.Eagerly, null)
     /** Null when it signed in and is saved; else what went wrong. */
@@ -352,6 +360,8 @@ fun SettingsScreen(onRefreshCatalog: () -> Unit, onLoggedOut: () -> Unit, onEdit
     val calendarNext by vm.calendarNext.collectAsStateWithLifecycle()
     var editOpenSubtitles by remember { mutableStateOf(false) }
     val openSubtitlesLogin by vm.openSubtitlesLogin.collectAsStateWithLifecycle()
+    val liveDelay by vm.liveDelay.collectAsStateWithLifecycle()
+    val liveDelaySummary by vm.liveDelaySummary.collectAsStateWithLifecycle()
 
     // Two panes, like the tv's own settings: the sections on the left, each with a line saying how
     // it's set, and the focused section's settings on the right. Entering from the rail lands on
@@ -417,6 +427,15 @@ fun SettingsScreen(onRefreshCatalog: () -> Unit, onLoggedOut: () -> Unit, onEdit
                 Section.WATCHING -> {
                     SettingRow("Geluid", leading = Icons.Filled.Audiotrack, value = TrackLabels.name(prefs.audioLang, TrackLabels.AUDIO_CHOICES), onClick = vm::cycleAudioLang, modifier = top)
                     SettingRow("Ondertitels", leading = Icons.Filled.Subtitles, value = TrackLabels.name(prefs.subtitleLang, TrackLabels.SUBTITLE_CHOICES), onClick = vm::cycleSubtitleLang)
+                    SettingRow(
+                        "Live-vertraging",
+                        // The week line says how each one held up; before that, what it does.
+                        liveDelaySummary?.let { "Afgelopen week: $it" }
+                            ?: "Hoe ver achter de provider live begint. Korter is eerder bij, maar hapert sneller. Voor iedereen in huis.",
+                        leading = Icons.Filled.Timer,
+                        value = "${liveDelay.label} · ca. ${liveDelay.offsetMs / 1000} s",
+                        onClick = vm::cycleLiveDelay,
+                    )
                     SettingRow(
                         "OpenSubtitles",
                         "Meer ondertitels bij films en series, voor iedereen in huis.",
