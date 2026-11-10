@@ -25,6 +25,7 @@ import androidx.tv.material3.MaterialTheme
 import androidx.tv.material3.Text
 import nl.jordy.iptv.data.db.CategoryEntity
 import nl.jordy.iptv.data.settings.FilteredCategories
+import nl.jordy.iptv.ui.theme.TextPrimary
 import nl.jordy.iptv.ui.theme.TextSecondary
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Column
@@ -61,13 +62,13 @@ fun CategoryList(
     LaunchedEffect(sections) {
         val id = follow ?: return@LaunchedEffect
         follow = null
-        // Same item count as below: the pinned panel is one item, other sections a header plus a row each.
+        // Same item count as below: a panel is one item, other sections a header plus a row each.
         var index = 0
         for ((header, categories) in sections) {
             val at = categories.indexOfFirst { it.id == id }
             val target = when {
                 at < 0 -> null
-                header == PINNED -> index
+                header in PANELS -> index
                 else -> index + at // the row before it (or the header), so it isn't glued to the top edge
             }
             if (target != null) {
@@ -76,7 +77,7 @@ fun CategoryList(
                 runCatching { selectedFocus.requestFocus() }
                 return@LaunchedEffect
             }
-            index += if (header == PINNED) 1 else categories.size + (if (header != null) 1 else 0)
+            index += if (header in PANELS) 1 else categories.size + (if (header != null) 1 else 0)
         }
     }
     LazyColumn(
@@ -98,14 +99,18 @@ fun CategoryList(
         )
 
         sections.forEach { (header, categories) ->
-            // The profile's own pins sit on one light-blue panel, so they read as theirs, apart from the catalog.
-            if (header == PINNED) {
-                item(key = "pinned") {
+            // The profile's own pins sit on a panel in the profile's colour, so they read as theirs, apart from
+            // the catalog; Uitgelicht gets a neutral one, so the two blocks above the catalog match.
+            if (header in PANELS) {
+                item(key = "panel/$header") {
+                    val pinned = header == PINNED
                     Column(
-                        Modifier.fillMaxWidth().background(Brand.copy(alpha = 0.16f), RoundedCornerShape(10.dp)).padding(4.dp),
+                        Modifier.fillMaxWidth()
+                            .background(if (pinned) Brand.copy(alpha = 0.16f) else TextPrimary.copy(alpha = 0.06f), RoundedCornerShape(10.dp))
+                            .padding(4.dp),
                         verticalArrangement = Arrangement.spacedBy(4.dp),
                     ) {
-                        SectionTitle(header, BrandText)
+                        SectionTitle(header!!, if (pinned) BrandText else TextSecondary)
                         categories.forEach { row(it) }
                     }
                 }
@@ -121,6 +126,8 @@ fun CategoryList(
 }
 
 private val PINNED = CategoryGroups.Kind.PINNED.title
+/** Sections drawn as one panel item (header and rows together) rather than a header plus a row each. */
+private val PANELS = setOf(CategoryGroups.Kind.FEATURED.title, PINNED)
 
 @Composable
 private fun SectionTitle(title: String, color: Color) = Text(
