@@ -70,7 +70,9 @@ class MoviesViewModel @Inject constructor(db: AppDatabase, private val profiles:
 
     private val showAll = MutableStateFlow(false)
     val filtered = dao.movieCategories().filteredBy(profiles.prefs, showAll).stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), null)
-    val sections = filtered.sections(profiles.pinned).stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), null)
+    /** "Nieuw" first, above the provider's categories (it's on no provider list, so it can't be pinned). */
+    val sections = filtered.sections(profiles.pinned).map { s -> s?.let { listOf(null to listOf(NEW)) + it } }
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), null)
     fun toggleShowAll() { showAll.value = !showAll.value }
     /** Long-press or Menu on a category: pin it to the top for this profile, or unpin it. */
     fun togglePin(id: String) = viewModelScope.launch {
@@ -79,6 +81,7 @@ class MoviesViewModel @Inject constructor(db: AppDatabase, private val profiles:
 
     private val picked = MutableStateFlow<String?>(null)
     val selected = selectedOf(picked, sections).stateIn(viewModelScope, SharingStarted.Eagerly, null)
+    private val prefs = profiles.prefs
     fun select(id: String) {
         if (picked.value != id) genre.value = null // a genre belongs to the category it was picked in
         picked.value = id
@@ -87,7 +90,9 @@ class MoviesViewModel @Inject constructor(db: AppDatabase, private val profiles:
     /** Film genres come from [nl.jordy.iptv.data.repo.MovieEnricher], so chips appear as details arrive. */
     val genre = MutableStateFlow<String?>(null)
     /** Moods ("Licht", "Spannend") lead the genre chips once a category has film details to judge them on. */
-    val genres = selected.filterNotNull().flatMapLatest { id -> dao.movieGenres(id).map { Genres.top(it) } }
+    val genres = selected.filterNotNull().flatMapLatest { id ->
+        if (id == NEW_ID) prefs.flatMapLatest { p -> dao.newMovieGenres(p.preferredCountries.toList(), p.hideAdult) } else dao.movieGenres(id)
+    }.map { Genres.top(it) }
         .map { if (it.isEmpty()) it else FilmFilters.MOODS.keys.toList() + it }
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
 
@@ -96,13 +101,25 @@ class MoviesViewModel @Inject constructor(db: AppDatabase, private val profiles:
     fun nextLength() { maxSecs.value = FilmFilters.nextLength(maxSecs.value) }
 
     /** One tile per film; its language versions are picked on the detail screen. */
-    val items: Flow<PagingData<MovieTile>> = combine(selected.filterNotNull(), genre, maxSecs) { id, g, max -> Triple(id, g, max) }.flatMapLatest { (id, g, max) ->
-        Pager(pagingConfig) {
-            if (g == null && max == 0) dao.movieTilesPaged(id) else FilmFilters.slots(g).let { p ->
-                dao.movieTilesFiltered(id, g != null, p[0], p[1], p[2], p[3], p[4], p[5], max)
-            }
-        }.flow
-    }.cachedIn(viewModelScope)
+    val items: Flow<PagingData<MovieTile>> = combine(selected.filterNotNull(), genre, maxSecs, prefs) { id, g, max, p -> Filter(id, g, max, p.preferredCountries.toList(), p.hideAdult) }
+        .distinctUntilChanged().flatMapLatest { f ->
+            Pager(pagingConfig) {
+                val p = FilmFilters.slots(f.genre)
+                when {
+                    f.category == NEW_ID -> dao.newMovieTiles(f.countries, f.hideAdult, f.genre != null, p[0], p[1], p[2], p[3], p[4], p[5], f.maxSecs)
+                    f.genre == null && f.maxSecs == 0 -> dao.movieTilesPaged(f.category)
+                    else -> dao.movieTilesFiltered(f.category, f.genre != null, p[0], p[1], p[2], p[3], p[4], p[5], f.maxSecs)
+                }
+            }.flow
+        }.cachedIn(viewModelScope)
+
+    private data class Filter(val category: String, val genre: String?, val maxSecs: Int, val countries: List<String>, val hideAdult: Boolean)
+
+    companion object {
+        /** Films › Nieuw: not a provider category, so an id no provider uses. */
+        const val NEW_ID = "\u0000new"
+        val NEW = CategoryEntity(ContentType.MOVIE, NEW_ID, "Nieuw", sortIndex = -1, generation = 0)
+    }
 
     val favorites = library.favoriteIds(ContentType.MOVIE).map { it.toSet() }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptySet())
     /** streamId → fraction watched, for the progress bar on posters. */

@@ -29,6 +29,7 @@ import nl.jordy.iptv.ui.profiles.ProfileEditScreen
 import nl.jordy.iptv.ui.profiles.ProfilePickerScreen
 import nl.jordy.iptv.ui.shell.ShellScreen
 import nl.jordy.iptv.ui.sync.SyncScreen
+import nl.jordy.iptv.ui.taste.TasteScreen
 
 /**
  * Back stack: player → detail → shell (list) → exit dialog. Login, sync and the launch profile
@@ -40,7 +41,7 @@ fun AppNavHost(start: Any) {
     val entry by nav.currentBackStackEntryAsState()
     // Reminders only where someone is watching: not over login, the catalog sync or "Wie kijkt er?".
     val dest = entry?.destination
-    val watching = dest != null && (dest.hasRoute<ShellRoute>() || dest.hasRoute<PlayerRoute>() || dest.hasRoute<MovieDetailRoute>() || dest.hasRoute<SeriesDetailRoute>() || dest.hasRoute<HistoryRoute>() || dest.hasRoute<TvGuideRoute>())
+    val watching = dest != null && (dest.hasRoute<ShellRoute>() || dest.hasRoute<PlayerRoute>() || dest.hasRoute<MovieDetailRoute>() || dest.hasRoute<SeriesDetailRoute>() || dest.hasRoute<HistoryRoute>() || dest.hasRoute<TvGuideRoute>() || dest.hasRoute<TasteRoute>())
     // One card at a time: whichever is up stays until it's answered, the other waits and then opens
     // with focus of its own. Reminders go first when both are due at once.
     val reminders: ReminderViewModel = hiltViewModel()
@@ -89,6 +90,7 @@ fun AppNavHost(start: Any) {
                 onOpenHistory = { nav.navigate(HistoryRoute) },
                 onOpenGuide = { nav.navigate(TvGuideRoute(it)) },
                 onOpenChannelHealth = { nav.navigate(ChannelHealthRoute) },
+                onOpenTaste = { nav.navigate(TasteRoute) },
                 onLoggedOut = { nav.navigate(LoginRoute) { popUpTo(ShellRoute) { inclusive = true } } },
             )
         }
@@ -98,5 +100,6 @@ fun AppNavHost(start: Any) {
         composable<HistoryRoute> { HistoryScreen(onPlay = { nav.navigate(it) }) }
         composable<ChannelHealthRoute> { ChannelHealthScreen() }
         composable<TvGuideRoute> { TvGuideScreen(onPlay = { nav.navigate(it) }) }
+        composable<TasteRoute> { TasteScreen(onDone = { nav.popBackStack() }) }
     }
 }

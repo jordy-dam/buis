@@ -33,8 +33,9 @@ import androidx.sqlite.db.SupportSQLiteDatabase
         GuideChannelEntity::class,
         CalendarEntity::class,
         CalendarEventEntity::class,
+        TasteVoteEntity::class,
     ],
-    version = 28,
+    version = 29,
     exportSchema = true,
     autoMigrations = [
         AutoMigration(from = 1, to = 2, spec = AppDatabase.CatalogResync::class),
@@ -84,6 +85,8 @@ import androidx.sqlite.db.SupportSQLiteDatabase
         AutoMigration(from = 26, to = 27),
         // A car per profile for Garage, the 911 for everyone at first.
         AutoMigration(from = 27, to = 28),
+        // "Voor jou": thumbs per profile and film; a new, empty table.
+        AutoMigration(from = 28, to = 29),
     ],
 )
 abstract class AppDatabase : RoomDatabase() {
@@ -103,6 +106,7 @@ abstract class AppDatabase : RoomDatabase() {
     abstract fun watchLog(): WatchLogDao
     abstract fun channelHealth(): ChannelHealthDao
     abstract fun seriesIntro(): SeriesIntroDao
+    abstract fun taste(): TasteDao
 
     /**
      * The catalog is a cache of the provider: after a schema change it's emptied and the next

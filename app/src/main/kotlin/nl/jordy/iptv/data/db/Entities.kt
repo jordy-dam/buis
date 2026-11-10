@@ -399,3 +399,23 @@ data class SeriesIntroEntity(
     val endMs: Long,
     val learnedAt: Long,
 )
+
+/**
+ * What a profile thought of a film, for "Voor jou": a swipe in "Leer mijn smaak" or a thumb at the
+ * end credits. Keyed by [filmKey] ([FILM_KEY]), so one vote covers every language version.
+ * [vote] is 1 (leuk), -1 (niks) or 0 (ken ik niet: not a taste, only kept out of the next round).
+ */
+@Entity(
+    tableName = "taste_vote",
+    primaryKeys = ["profileId", "filmKey"],
+    foreignKeys = [ForeignKey(ProfileEntity::class, ["id"], ["profileId"], onDelete = ForeignKey.CASCADE)],
+)
+data class TasteVoteEntity(
+    val profileId: Long,
+    val filmKey: String,
+    /** The version that was voted on, for its genre, cast and director in movie_info. */
+    val streamId: Int,
+    val title: String,
+    val vote: Int,
+    val at: Long,
+)

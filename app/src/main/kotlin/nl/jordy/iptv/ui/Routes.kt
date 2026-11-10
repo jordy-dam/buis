@@ -22,6 +22,8 @@ import kotlinx.serialization.Serializable
 @Serializable data class SeriesDetailRoute(val seriesId: Int)
 /** "Gids": the timeline grid of one of the profile's guides. */
 @Serializable data class TvGuideRoute(val guideId: Long)
+/** "Leer mijn smaak": swipe ten films for "Voor jou". */
+@Serializable data object TasteRoute
 
 /** What to play. Live carries its category so up/down can zap through the same list. */
 @Serializable

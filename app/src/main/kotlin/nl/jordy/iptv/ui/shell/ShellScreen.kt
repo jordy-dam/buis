@@ -117,6 +117,7 @@ fun ShellScreen(
     onOpenHistory: () -> Unit,
     onOpenGuide: (Long) -> Unit,
     onOpenChannelHealth: () -> Unit,
+    onOpenTaste: () -> Unit,
     onLoggedOut: () -> Unit,
     vm: ShellViewModel = hiltViewModel(),
 ) {
@@ -232,7 +233,7 @@ fun ShellScreen(
         }
         Box(Modifier.fillMaxSize().padding(top = SafeArea, end = SafeArea, start = 24.dp)) {
             when (tab) {
-                Tab.HOME -> HomeScreen(onPlay = onPlay, onOpenMovie = onOpenMovie)
+                Tab.HOME -> HomeScreen(onPlay = onPlay, onOpenMovie = onOpenMovie, onOpenTaste = onOpenTaste)
                 Tab.LIVE -> LiveScreen(onPlay = onPlay)
                 Tab.MOVIES -> MoviesScreen(onOpenMovie = onOpenMovie)
                 Tab.SERIES -> SeriesScreen(onOpenSeries = onOpenSeries)

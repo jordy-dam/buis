@@ -92,6 +92,31 @@ interface CatalogDao {
     ): PagingSource<Int, MovieTile>
 
     /**
+     * Films › Nieuw: every film in the given countries, newest first, each film once, with the same
+     * genre/mood and length filters as a category. (Was "Recent toegevoegd" on Home.)
+     */
+    @Query(
+        "SELECT m.*, COUNT(*) AS versions, MIN(m.sortIndex) AS firstSort FROM movie m JOIN category c ON c.type = 'MOVIE' AND c.id = m.categoryId " +
+            "LEFT JOIN movie_info i ON i.streamId = m.streamId " +
+            "WHERE c.country IN (:countries) AND (:hideAdult = 0 OR c.adult = 0) AND m.addedAt IS NOT NULL " +
+            "AND (:anyGenre = 0 OR i.genre LIKE :p1 OR i.genre LIKE :p2 OR i.genre LIKE :p3 OR i.genre LIKE :p4 OR i.genre LIKE :p5 OR i.genre LIKE :p6) " +
+            "AND (:maxSecs = 0 OR (i.durationSecs > 0 AND i.durationSecs <= :maxSecs)) " +
+            "GROUP BY $FILM_KEY ORDER BY MAX(m.addedAt) DESC",
+    )
+    fun newMovieTiles(
+        countries: List<String>, hideAdult: Boolean, anyGenre: Boolean,
+        p1: String, p2: String, p3: String, p4: String, p5: String, p6: String,
+        maxSecs: Int,
+    ): PagingSource<Int, MovieTile>
+
+    /** Genres of the newest films, for the chips over Films › Nieuw. */
+    @Query(
+        "SELECT i.genre FROM movie m JOIN category c ON c.type = 'MOVIE' AND c.id = m.categoryId JOIN movie_info i ON i.streamId = m.streamId " +
+            "WHERE c.country IN (:countries) AND (:hideAdult = 0 OR c.adult = 0) AND m.addedAt IS NOT NULL ORDER BY m.addedAt DESC LIMIT 300",
+    )
+    fun newMovieGenres(countries: List<String>, hideAdult: Boolean): Flow<List<String?>>
+
+    /**
      * Every version of a film in the whole catalog: the same TMDB id (from the list or the film's
      * details), or, without one, the same title and year.
      */
@@ -480,4 +505,64 @@ interface ChannelHealthDao {
 interface SeriesIntroDao {
     @Upsert suspend fun upsert(item: SeriesIntroEntity)
     @Query("SELECT endMs FROM series_intro WHERE seriesId = :seriesId") suspend fun end(seriesId: Int): Long?
+}
+
+/** A film as "Voor jou" weighs it: one row per [FILM_KEY], with its details from movie_info. */
+data class TasteFilmRow(
+    val filmKey: String,
+    val streamId: Int,
+    val name: String,
+    val posterUrl: String?,
+    val year: Int?,
+    val rating: Double?,
+    val genre: String?,
+    val cast: String?,
+    val director: String?,
+    val durationSecs: Int?,
+    /** Rows across categories and languages: how widely the provider carries it, a rough "known film". */
+    val versions: Int,
+)
+
+@Dao
+interface TasteDao {
+    @Upsert suspend fun upsert(item: TasteVoteEntity)
+
+    @Query("SELECT * FROM taste_vote WHERE profileId = :profileId ORDER BY at DESC")
+    fun observe(profileId: Long): Flow<List<TasteVoteEntity>>
+
+    @Query("SELECT * FROM taste_vote WHERE profileId = :profileId")
+    suspend fun all(profileId: Long): List<TasteVoteEntity>
+
+    @Query("SELECT COUNT(*) FROM taste_vote WHERE profileId = :profileId AND filmKey = :filmKey")
+    suspend fun count(profileId: Long, filmKey: String): Int
+
+    /** The key one version of a film shares with its other versions. */
+    @Query("SELECT $FILM_KEY FROM movie m LEFT JOIN movie_info i ON i.streamId = m.streamId WHERE m.streamId = :streamId LIMIT 1")
+    suspend fun filmKey(streamId: Int): String?
+
+    /** Films in the given countries whose details have arrived: what can be suggested or swiped. */
+    @Query(
+        "SELECT $FILM_KEY AS filmKey, m.streamId, m.name, m.posterUrl, m.year, COALESCE(i.rating, m.rating) AS rating, " +
+            "i.genre, i.cast, i.director, i.durationSecs, COUNT(*) AS versions " +
+            "FROM movie m JOIN category c ON c.type = 'MOVIE' AND c.id = m.categoryId " +
+            "JOIN movie_info i ON i.streamId = m.streamId AND i.failed = 0 " +
+            "WHERE c.country IN (:countries) AND (:hideAdult = 0 OR c.adult = 0) GROUP BY filmKey",
+    )
+    suspend fun films(countries: List<String>, hideAdult: Boolean): List<TasteFilmRow>
+
+    /** Details of the voted versions, whatever their country. */
+    @Query(
+        "SELECT $FILM_KEY AS filmKey, m.streamId, m.name, m.posterUrl, m.year, COALESCE(i.rating, m.rating) AS rating, " +
+            "i.genre, i.cast, i.director, i.durationSecs, 1 AS versions " +
+            "FROM movie m JOIN movie_info i ON i.streamId = m.streamId WHERE m.streamId IN (:streamIds) GROUP BY m.streamId",
+    )
+    suspend fun filmsById(streamIds: List<Int>): List<TasteFilmRow>
+
+    /** Films the profile watched or started: not suggested again. */
+    @Query(
+        "SELECT DISTINCT $FILM_KEY FROM movie m LEFT JOIN movie_info i ON i.streamId = m.streamId " +
+            "WHERE m.streamId IN (SELECT itemId FROM watch_log WHERE profileId = :profileId AND type = 'MOVIE' " +
+            "UNION SELECT itemId FROM playback_position WHERE profileId = :profileId AND type = 'MOVIE')",
+    )
+    suspend fun watchedKeys(profileId: Long): List<String>
 }

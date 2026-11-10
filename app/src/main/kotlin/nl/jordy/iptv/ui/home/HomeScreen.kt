@@ -81,6 +81,16 @@ import java.time.format.TextStyle
 import java.util.Locale
 import nl.jordy.iptv.ui.components.SecondaryButton
 import nl.jordy.iptv.ui.theme.SurfaceColor
+import androidx.compose.foundation.layout.aspectRatio
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.size
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.ThumbUp
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.text.style.TextAlign
+import androidx.tv.material3.Icon
+import nl.jordy.iptv.data.repo.Taste
+import nl.jordy.iptv.data.repo.TasteRepository
 import javax.inject.Inject
 
 /** A "Verder kijken" tile: a film or an episode, ready to resume. */
@@ -100,9 +110,8 @@ data class HomeState(
     val continueWatching: List<ContinueItem> = emptyList(),
     /** The profile's guides that have channels, one row each. */
     val guides: List<Guide> = emptyList(),
-    val recent: List<MovieEntity> = emptyList(),
 ) {
-    val isEmpty get() = continueWatching.isEmpty() && guides.isEmpty() && recent.isEmpty()
+    val isEmpty get() = continueWatching.isEmpty() && guides.isEmpty()
 }
 
 @HiltViewModel
@@ -110,11 +119,14 @@ class HomeViewModel @Inject constructor(
     private val db: AppDatabase,
     private val library: LibraryRepository,
     guides: GuideRepository,
-    profiles: ProfileRepository,
     private val epg: EpgRepository,
     follows: FollowRepository,
+    taste: TasteRepository,
 ) : ViewModel() {
-    /** "Straks voor jou": what the profile follows, refreshed every minute and whenever a term changes. */
+    /** "Films voor jou": films that share genre, director or actors with what the profile liked. */
+    val forYou = taste.suggestions.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
+
+    /** "Wat je volgt": what the profile follows, refreshed every minute and whenever a term changes. */
     @OptIn(ExperimentalCoroutinesApi::class)
     val upcoming = follows.terms.flatMapLatest {
         flow {
@@ -131,13 +143,8 @@ class HomeViewModel @Inject constructor(
 
     private val continueWatching = library.recentPositions(ROW_SIZE).map { positions -> positions.mapNotNull { resolve(it) } }
 
-    @OptIn(ExperimentalCoroutinesApi::class)
-    private val recent = profiles.prefs.flatMapLatest { p ->
-        db.catalog().recentMovies(p.preferredCountries.toList(), p.hideAdult, ROW_SIZE)
-    }
-
-    val state = combine(continueWatching, guides.guides, recent) { cw, g, rec ->
-        HomeState(cw, g.filter { it.channels.isNotEmpty() }, rec)
+    val state = combine(continueWatching, guides.guides) { cw, g ->
+        HomeState(cw, g.filter { it.channels.isNotEmpty() })
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), null)
 
     /** Null when the item is gone from the catalog, or an episode whose series was never opened here. */
@@ -163,13 +170,15 @@ class HomeViewModel @Inject constructor(
     }
 }
 
-/** The watching profile's start screen: where they left off, a row per guide, and what's new. */
+/** The watching profile's start screen, only what's personal: where they left off, what's coming up, a row per guide, films for them. Browsing (Nieuw too) is at Films. */
 @OptIn(ExperimentalComposeUiApi::class)
 @Composable
-fun HomeScreen(onPlay: (PlayerRoute) -> Unit, onOpenMovie: (Int) -> Unit, vm: HomeViewModel = hiltViewModel()) {
+fun HomeScreen(onPlay: (PlayerRoute) -> Unit, onOpenMovie: (Int) -> Unit, onOpenTaste: () -> Unit, vm: HomeViewModel = hiltViewModel()) {
     val loaded by vm.state.collectAsStateWithLifecycle()
     val s = loaded ?: return
     val upcoming by vm.upcoming.collectAsStateWithLifecycle()
+    val forYou by vm.forYou.collectAsStateWithLifecycle()
+    var focusedSuggestion by remember { mutableStateOf<Taste.Suggestion?>(null) }
     var focusedContinue by remember { mutableStateOf<ContinueItem?>(null) }
     var confirmRemove by remember { mutableStateOf<ContinueItem?>(null) }
     // After a removal the tile is gone: focus moves to its neighbour, or it would be lost.
@@ -198,7 +207,7 @@ fun HomeScreen(onPlay: (PlayerRoute) -> Unit, onOpenMovie: (Int) -> Unit, vm: Ho
         if (s.isEmpty) {
             item {
                 Text(
-                    "Hier komt te staan waar je gebleven was en de zenders uit je gids. Begin bij Live TV of Films.",
+                    "Hier komt te staan waar je gebleven was en de zenders uit je gids. Begin bij Live TV of Films; nieuwe films staan bij Films onder Nieuw.",
                     style = MaterialTheme.typography.bodyLarge,
                     color = TextSecondary,
                 )
@@ -232,13 +241,13 @@ fun HomeScreen(onPlay: (PlayerRoute) -> Unit, onOpenMovie: (Int) -> Unit, vm: Ho
                     color = TextSecondary,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
-                    modifier = Modifier.padding(start = 12.dp),
+                    modifier = Modifier.padding(start = 12.dp, top = 14.dp),
                 )
             }
         }
         if (upcoming.isNotEmpty()) {
             item(key = "upcoming") {
-                Text("Straks voor jou", style = MaterialTheme.typography.titleLarge)
+                Text("Wat je volgt", style = MaterialTheme.typography.titleLarge)
                 LazyRow(
                     contentPadding = Rows.tilePadding,
                     horizontalArrangement = Arrangement.spacedBy(16.dp),
@@ -254,7 +263,11 @@ fun HomeScreen(onPlay: (PlayerRoute) -> Unit, onOpenMovie: (Int) -> Unit, vm: Ho
         }
         s.guides.forEach { guide ->
             item(key = "guide/${guide.id}") {
-                Text(guide.name, style = MaterialTheme.typography.titleLarge)
+                // The guide's own name ("Sport") says little on its own: say it's one of yours.
+                Row(verticalAlignment = Alignment.Bottom, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                    Text(guide.name, style = MaterialTheme.typography.titleLarge)
+                    Text("jouw gids", style = MaterialTheme.typography.bodyLarge, color = TextSecondary, modifier = Modifier.padding(bottom = 2.dp))
+                }
                 LazyRow(
                     contentPadding = Rows.tilePadding,
                     horizontalArrangement = Arrangement.spacedBy(16.dp),
@@ -273,25 +286,41 @@ fun HomeScreen(onPlay: (PlayerRoute) -> Unit, onOpenMovie: (Int) -> Unit, vm: Ho
                 }
             }
         }
-        if (s.recent.isNotEmpty()) {
-            item(key = "recent") {
-                Text("Recent toegevoegd", style = MaterialTheme.typography.titleLarge)
-                LazyRow(
-                    contentPadding = Rows.tilePadding,
-                    horizontalArrangement = Arrangement.spacedBy(Rows.tileGap),
-                    modifier = Modifier.focusRestorer(),
-                ) {
-                    items(s.recent, key = { it.streamId }) { m ->
-                        PosterTile(
-                            title = m.name,
-                            imageUrl = m.posterUrl,
-                            onClick = { onOpenMovie(m.streamId) },
-                            onLongClick = {},
-                            modifier = Modifier.lastInRow(m == s.recent.last()),
-                        )
-                    }
+        item(key = "foryou") {
+            Text("Films voor jou", style = MaterialTheme.typography.titleLarge)
+            LazyRow(
+                contentPadding = Rows.tilePadding,
+                horizontalArrangement = Arrangement.spacedBy(Rows.tileGap),
+                modifier = Modifier.focusRestorer(),
+            ) {
+                item(key = "learn") {
+                    LearnTasteTile(
+                        first = forYou.isEmpty(),
+                        onClick = onOpenTaste,
+                        modifier = Modifier.lastInRow(forYou.isEmpty()).onFocusChanged { if (it.isFocused) focusedSuggestion = null },
+                    )
+                }
+                items(forYou, key = { it.film.key }) { f ->
+                    PosterTile(
+                        title = f.film.title,
+                        imageUrl = f.film.posterUrl,
+                        onClick = { onOpenMovie(f.film.streamId) },
+                        onLongClick = {},
+                        modifier = Modifier.lastInRow(f == forYou.last())
+                            .onFocusChanged { if (it.isFocused) focusedSuggestion = f else if (focusedSuggestion == f) focusedSuggestion = null },
+                    )
                 }
             }
+            // Why the focused film is here; one line high at all times, so nothing jumps.
+            Text(
+                focusedSuggestion?.let { f -> f.because?.let { "${Taste.displayTitle(f.film.title)} · omdat je ${Taste.displayTitle(it)} leuk vond" } ?: Taste.displayTitle(f.film.title) }
+                    ?: if (forYou.isEmpty()) "Zeg van tien films of je ze leuk vindt, dan zoekt BUIS er films bij." else " ",
+                style = MaterialTheme.typography.bodyLarge,
+                color = TextSecondary,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+                modifier = Modifier.padding(start = 12.dp, top = 14.dp),
+            )
         }
     }
 }
@@ -365,4 +394,27 @@ private fun RemoveDialog(title: String, onConfirm: () -> Unit, onDismiss: () -> 
 private fun remaining(ms: Long): String {
     val min = ((ms + 59_999) / 60_000).coerceAtLeast(1)
     return if (min >= 60) "${min / 60} u ${min % 60} min" else "$min min"
+}
+
+/** First in "Voor jou": opens "Leer mijn smaak". The size of a poster, so the row stays one height. */
+@Composable
+private fun LearnTasteTile(first: Boolean, onClick: () -> Unit, modifier: Modifier = Modifier) {
+    androidx.tv.material3.Card(
+        onClick = onClick,
+        modifier = modifier.width(92.dp).aspectRatio(2f / 3f),
+        shape = androidx.tv.material3.CardDefaults.shape(RoundedCornerShape(10.dp)),
+        scale = androidx.tv.material3.CardDefaults.scale(focusedScale = Focus.SCALE),
+        border = androidx.tv.material3.CardDefaults.border(focusedBorder = Focus.border),
+        colors = androidx.tv.material3.CardDefaults.colors(containerColor = SurfaceColor),
+    ) {
+        Column(Modifier.fillMaxSize().padding(8.dp), verticalArrangement = Arrangement.Center, horizontalAlignment = Alignment.CenterHorizontally) {
+            Icon(Icons.Filled.ThumbUp, contentDescription = null, tint = Live, modifier = Modifier.size(26.dp))
+            Text(
+                if (first) "Leer mijn smaak" else "Meer films beoordelen",
+                style = MaterialTheme.typography.labelMedium,
+                textAlign = TextAlign.Center,
+                modifier = Modifier.padding(top = 8.dp),
+            )
+        }
+    }
 }

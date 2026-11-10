@@ -109,6 +109,10 @@ import nl.jordy.iptv.player.PlayerViewModel
 import nl.jordy.iptv.player.TrackOption
 import nl.jordy.iptv.ui.components.BreakIcons
 import nl.jordy.iptv.ui.components.CornerCard
+import androidx.compose.material.icons.filled.ThumbDown
+import androidx.compose.material.icons.filled.ThumbUp
+import nl.jordy.iptv.data.repo.Taste
+import nl.jordy.iptv.player.FilmThumbs
 import nl.jordy.iptv.ui.components.CornerFade
 import nl.jordy.iptv.ui.components.BottomFade
 import nl.jordy.iptv.ui.components.PrimaryButton
@@ -257,6 +261,7 @@ fun PlayerScreen(onExit: () -> Unit, vm: PlayerViewModel = hiltViewModel()) {
         state.breakSecondsLeft != null -> Card.BREAK
         state.nextUp != null -> Card.NEXT
         state.skipIntroTo != null -> Card.INTRO
+        state.thumbsSecondsLeft != null -> Card.THUMBS
         else -> null
     }
     val cardFocus = remember { FocusRequester() }
@@ -329,6 +334,7 @@ fun PlayerScreen(onExit: () -> Unit, vm: PlayerViewModel = hiltViewModel()) {
     // Back on the break card: no break this time, play on.
     BackHandler(enabled = state.breakSecondsLeft != null) { vm.endBreak() }
     BackHandler(enabled = state.skipIntroTo != null) { vm.dismissIntro() }
+    BackHandler(enabled = state.thumbsSecondsLeft != null) { vm.dismissThumbs() }
     // The innermost layer first: the bar with its controls, then the track list above them. Back
     // never leaves while the bar shows. A pop-up keeps its own Back.
     val barUp = overlayVisible && state.error == null && card == null
@@ -565,12 +571,13 @@ fun PlayerScreen(onExit: () -> Unit, vm: PlayerViewModel = hiltViewModel()) {
             Card.BREAK -> BreakCard(state.breakSecondsLeft ?: 0, cardFocus, vm::endBreak, corner)
             Card.NEXT -> state.nextUp?.let { NextEpisodeCard(it, cardFocus, vm::playNextNow, vm::dismissNextUp, corner) }
             Card.INTRO -> state.skipIntroTo?.let { IntroCard(it, cardFocus, vm::skipIntro, vm::dismissIntro, corner) }
+            Card.THUMBS -> state.thumbsSecondsLeft?.let { ThumbsCard(state.title, it, cardFocus, vm::rateFilm, corner) }
             null -> Unit
         }
     }
 }
 
-private enum class Card { SLEEP, BREAK, NEXT, INTRO }
+private enum class Card { SLEEP, BREAK, NEXT, INTRO, THUMBS }
 
 private enum class Panel { INFO, CHANNELS }
 
@@ -1101,4 +1108,18 @@ private fun SleepCard(secondsLeft: Int, main: FocusRequester, onStay: () -> Unit
 internal fun formatTime(ms: Long): String {
     val s = ms / 1000
     return if (s >= 3600) "%d:%02d:%02d".format(s / 3600, s % 3600 / 60, s % 60) else "%d:%02d".format(s / 60, s % 60)
+}
+
+/** Over the end credits of a film: one thumb for "Voor jou". It goes by itself; Back says nothing. */
+@Composable
+private fun ThumbsCard(title: String, secondsLeft: Int, main: FocusRequester, onVote: (Int) -> Unit, modifier: Modifier) {
+    CornerCard(
+        label = "Wat vond je ervan?",
+        title = title,
+        modifier = modifier,
+        timeLeft = { secondsLeft / FilmThumbs.SECONDS.toFloat() },
+    ) {
+        IconButton(Icons.Filled.ThumbUp, "Leuk", { onVote(Taste.LIKE) }, Modifier.focusRequester(main), large = true)
+        IconButton(Icons.Filled.ThumbDown, "Niks", { onVote(Taste.DISLIKE) }, large = true)
+    }
 }

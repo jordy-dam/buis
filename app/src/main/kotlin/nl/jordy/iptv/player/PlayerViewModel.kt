@@ -56,6 +56,7 @@ import nl.jordy.iptv.data.repo.StallDetector
 import nl.jordy.iptv.data.repo.WatchCounter
 import nl.jordy.iptv.data.repo.WatchItem
 import nl.jordy.iptv.data.repo.WatchLog
+import nl.jordy.iptv.data.repo.TasteRepository
 import nl.jordy.iptv.data.xtream.ContentType
 import nl.jordy.iptv.data.xtream.EpgEntry
 import nl.jordy.iptv.data.xtream.StreamUrls
@@ -112,6 +113,8 @@ data class PlayerUiState(
     val versionPlaying: Int? = null,
     /** Live: the version playing is the one this channel always plays. */
     val versionKept: Boolean = true,
+    /** Films: seconds the thumbs at the end credits still show. */
+    val thumbsSecondsLeft: Int? = null,
 )
 
 /** One version of a live channel: "ESPN 1 · FHD · Odido", and how it ran here ("liep goed"). */
@@ -151,6 +154,7 @@ class PlayerViewModel @Inject constructor(
     private val channelHealth: ChannelHealthRepository,
     private val openSubtitles: OpenSubtitles,
     private val liveDelayStore: LiveDelayStore,
+    private val taste: TasteRepository,
 ) : ViewModel() {
 
     val route = savedState.toRoute<PlayerRoute>()
@@ -265,6 +269,7 @@ class PlayerViewModel @Inject constructor(
             PlayerRoute.Kind.MOVIE -> {
                 watching(WatchItem(ContentType.MOVIE, route.id, route.title, containerExtension = route.containerExtension))
                 playVod(StreamUrls.movie(base, c, route.id, route.containerExtension), ContentType.MOVIE)
+                filmVoted = runCatching { taste.hasVoted(route.id) }.getOrDefault(true)
                 db.catalog().movie(route.id)?.let { searchOnline(SubtitleQuery.Film(it.name, it.year, it.tmdbId)) }
                     ?: Log.i("OpenSubtitles", "film ${route.id} not in the catalog")
             }
@@ -668,6 +673,7 @@ class PlayerViewModel @Inject constructor(
             introTick(now)
             nextUpTick(now)
         }
+        if (route.kind == PlayerRoute.Kind.MOVIE) thumbsTick(now)
     }
 
     /** True while the break card shows, so the next-episode card waits. */
@@ -842,6 +848,39 @@ class PlayerViewModel @Inject constructor(
     fun dismissIntro() {
         introDone = true
         _state.update { it.copy(skipIntroTo = null) }
+    }
+
+    // Thumbs at the end credits
+
+    /** Already voted on (swiped or rated before): not asked again. True until known. */
+    private var filmVoted = true
+    private var thumbsAsked = false
+    private var thumbsShownAt: Long? = null
+
+    private fun thumbsTick(now: Long) {
+        val shownAt = thumbsShownAt ?: run {
+            if (thumbsAsked || filmVoted || !playbackStarted) return
+            if (!FilmThumbs.due(player.currentPosition, player.duration.coerceAtLeast(0), player.playbackState == Player.STATE_ENDED)) return
+            thumbsAsked = true
+            thumbsShownAt = now
+            now
+        }
+        val left = FilmThumbs.SECONDS - ((now - shownAt) / 1000).toInt()
+        if (left > 0) {
+            if (_state.value.thumbsSecondsLeft != left) _state.update { it.copy(thumbsSecondsLeft = left) }
+        } else dismissThumbs()
+    }
+
+    /** A thumb on the card: saved for the watching profile, the card goes. */
+    fun rateFilm(vote: Int) {
+        filmVoted = true
+        dismissThumbs()
+        viewModelScope.launch { runCatching { taste.vote(route.id, route.title, vote) } }
+    }
+
+    fun dismissThumbs() {
+        thumbsShownAt = null
+        _state.update { it.copy(thumbsSecondsLeft = null) }
     }
 
     // Kijkgeschiedenis
