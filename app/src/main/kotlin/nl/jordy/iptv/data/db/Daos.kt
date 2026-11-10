@@ -312,6 +312,20 @@ interface PlaybackDao {
     )
     fun completeSeries(profileId: Long): Flow<List<Int>>
 
+    /** "Niet gezien": the film in every version, by stream and by its film key. */
+    @Query(
+        "DELETE FROM watched_film WHERE profileId = :profileId AND (streamId IN (:streamIds) OR filmKey IN " +
+            "(SELECT $FILM_KEY FROM movie m LEFT JOIN movie_info i ON i.streamId = m.streamId WHERE m.streamId IN (:streamIds)))",
+    )
+    suspend fun unmarkWatched(profileId: Long, streamIds: List<Int>)
+    @Query("DELETE FROM watched_episode WHERE profileId = :profileId AND episodeId = :episodeId")
+    suspend fun unmarkEpisodeWatched(profileId: Long, episodeId: Int)
+    /** A whole series seen by hand: every episode BUIS knows of. */
+    @Query("INSERT OR IGNORE INTO watched_episode (profileId, episodeId, seriesId, at) SELECT :profileId, e.episodeId, e.seriesId, :at FROM episode e WHERE e.seriesId = :seriesId")
+    suspend fun markSeriesWatched(profileId: Long, seriesId: Int, at: Long)
+    @Query("DELETE FROM watched_episode WHERE profileId = :profileId AND seriesId = :seriesId")
+    suspend fun unmarkSeriesWatched(profileId: Long, seriesId: Int)
+
     /** For the log line at start: what's marked, with the film's name, newest first. */
     @Query("SELECT w.filmKey AS filmKey, w.at AS at, (SELECT name FROM movie WHERE streamId = w.streamId LIMIT 1) AS name FROM watched_film w WHERE w.profileId = :profileId ORDER BY w.at DESC")
     suspend fun watchedNames(profileId: Long): List<WatchedName>

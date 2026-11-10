@@ -132,6 +132,27 @@ class LibraryRepository @Inject constructor(
         android.util.Log.i("BUIS-watched", "profile $id: ${episodes.size} episodes, series complete: $complete")
     }
 
+    /** The check button on a film: seen or not, for every language version ([streamIds]) at once. */
+    suspend fun setFilmWatched(streamIds: List<Int>, watched: Boolean) {
+        val id = profiles.currentId()
+        if (watched) streamIds.firstOrNull()?.let { db.playback().markWatched(id, it, System.currentTimeMillis()) }
+        else db.playback().unmarkWatched(id, streamIds)
+    }
+
+    /** Long OK on an episode tile. */
+    suspend fun setEpisodeWatched(episodeId: Int, watched: Boolean) {
+        val id = profiles.currentId()
+        if (watched) db.playback().markEpisodeWatched(id, episodeId, System.currentTimeMillis())
+        else db.playback().unmarkEpisodeWatched(id, episodeId)
+    }
+
+    /** The check button on a series: all its episodes seen, or none. */
+    suspend fun setSeriesWatched(seriesId: Int, watched: Boolean) {
+        val id = profiles.currentId()
+        if (watched) db.playback().markSeriesWatched(id, seriesId, System.currentTimeMillis())
+        else db.playback().unmarkSeriesWatched(id, seriesId)
+    }
+
     /** The active profile's watched films, for the check on posters. */
     @OptIn(ExperimentalCoroutinesApi::class)
     val watchedFilms: Flow<WatchedFilms> = profiles.currentId.flatMapLatest { id ->

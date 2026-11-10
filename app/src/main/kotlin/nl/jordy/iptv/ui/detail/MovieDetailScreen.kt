@@ -108,6 +108,12 @@ class MovieDetailViewModel @Inject constructor(
         val m = movie.value ?: return@launch
         library.toggleFavorite(ContentType.MOVIE, selected.value, m.name, m.posterUrl)
     }
+
+    /** The check button: seen or not, for all versions; marking starts from the version shown. */
+    fun setWatched(watched: Boolean) = viewModelScope.launch {
+        val ids = listOf(selected.value) + versions.value.map { it.streamId }.filter { it != selected.value }
+        library.setFilmWatched(ids.ifEmpty { listOf(opened) }, watched)
+    }
 }
 
 @Composable
@@ -150,8 +156,8 @@ fun MovieDetailScreen(onPlay: (PlayerRoute) -> Unit, vm: MovieDetailViewModel = 
                         SecondaryButton("${version.label.language} · ${versions.size} versies", { pickVersion = true })
                     }
                     FavoriteButton(favorite, vm::toggleFavorite)
-                    // Next to the heart and its size, not a button: something BUIS knows, not something to press.
-                    if (watched) nl.jordy.iptv.ui.components.WatchedBadge(Modifier.align(Alignment.CenterVertically), size = 40.dp, iconSize = 22.dp)
+                    // Next to the heart: seen by itself at 70%, or set here by hand.
+                    nl.jordy.iptv.ui.components.WatchedButton(watched, { vm.setWatched(!watched) })
                 }
             }
         },

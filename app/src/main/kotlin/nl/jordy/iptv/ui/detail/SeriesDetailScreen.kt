@@ -96,6 +96,12 @@ class SeriesDetailViewModel @Inject constructor(
         val s = series.value ?: return@launch
         library.toggleFavorite(ContentType.SERIES, s.seriesId, s.name, s.coverUrl)
     }
+
+    /** The check button: every episode seen, or none. */
+    fun setWatched(watched: Boolean) = viewModelScope.launch { library.setSeriesWatched(seriesId, watched) }
+
+    /** Long OK on an episode tile. */
+    fun setEpisodeWatched(episodeId: Int, watched: Boolean) = viewModelScope.launch { library.setEpisodeWatched(episodeId, watched) }
 }
 
 /**
@@ -152,8 +158,11 @@ fun SeriesDetailScreen(onPlay: (PlayerRoute) -> Unit, vm: SeriesDetailViewModel 
                     Text("Geen afleveringen beschikbaar.", style = MaterialTheme.typography.bodyLarge, color = TextSecondary)
                 }
                 FavoriteButton(favorite, vm::toggleFavorite)
-                // The whole series seen: the same check as a film, next to the heart and its size.
-                if (watched.hasSeries(s.seriesId)) nl.jordy.iptv.ui.components.WatchedBadge(Modifier.align(Alignment.CenterVertically), size = 40.dp, iconSize = 22.dp)
+                // Every episode seen, or none; only once BUIS knows the episodes.
+                if (episodes.isNotEmpty()) {
+                    val all = watched.hasSeries(s.seriesId)
+                    nl.jordy.iptv.ui.components.WatchedButton(all, { vm.setWatched(!all) })
+                }
             }
         },
         below = {
@@ -182,18 +191,21 @@ fun SeriesDetailScreen(onPlay: (PlayerRoute) -> Unit, vm: SeriesDetailViewModel 
             ) {
                 val shown = episodes.filter { it.season == shownSeason }
                 items(shown, key = { it.episodeId }) { e ->
-                    EpisodeCard(e, positions[e.episodeId], watched.hasEpisode(e.episodeId), onClick = { play(e) }, isLast = e == shown.last())
+                    val seen = watched.hasEpisode(e.episodeId)
+                    EpisodeCard(e, positions[e.episodeId], seen, onClick = { play(e) }, onLongClick = { vm.setEpisodeWatched(e.episodeId, !seen) }, isLast = e == shown.last())
                 }
             }
         },
     )
 }
 
+/** Long OK marks the episode seen, or not seen again. */
 @Composable
-private fun EpisodeCard(e: EpisodeEntity, position: PlaybackPositionEntity?, watched: Boolean, onClick: () -> Unit, isLast: Boolean) {
+private fun EpisodeCard(e: EpisodeEntity, position: PlaybackPositionEntity?, watched: Boolean, onClick: () -> Unit, onLongClick: () -> Unit, isLast: Boolean) {
     Column(Modifier.width(200.dp)) {
         Card(
             onClick = onClick,
+            onLongClick = onLongClick,
             modifier = Modifier.width(200.dp).lastInRow(isLast).aspectRatio(16f / 9f),
             shape = CardDefaults.shape(RoundedCornerShape(10.dp)),
             scale = CardDefaults.scale(focusedScale = Focus.SCALE),

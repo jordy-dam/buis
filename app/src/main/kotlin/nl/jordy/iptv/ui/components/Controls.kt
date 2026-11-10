@@ -1,5 +1,6 @@
 package nl.jordy.iptv.ui.components
 
+import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Favorite
 import androidx.compose.material.icons.filled.FavoriteBorder
 import androidx.compose.foundation.BorderStroke
@@ -206,8 +207,11 @@ fun IconButton(
     tint: (@Composable () -> androidx.compose.ui.graphics.Color)? = null,
     /** [ChoiceSize], for pop-ups and the player bar. */
     large: Boolean = false,
+    /** A filled button (the check when seen): this colour instead of the outline, a dark icon on it. */
+    fill: (@Composable () -> androidx.compose.ui.graphics.Color)? = null,
 ) {
     val icon = if (large) 26.dp else 20.dp
+    val filled = fill?.invoke()
     Button(
         onClick = onClick,
         // Square, so the circle is a circle; as high as PrimaryButton of the same size.
@@ -216,12 +220,12 @@ fun IconButton(
         contentPadding = androidx.compose.foundation.layout.PaddingValues(0.dp),
         scale = ButtonDefaults.scale(focusedScale = Focus.SCALE),
         border = ButtonDefaults.border(
-            border = Border(BorderStroke(1.dp, TextSecondary), shape = CircleShape),
+            border = if (filled != null) Border.None else Border(BorderStroke(1.dp, TextSecondary), shape = CircleShape),
             focusedBorder = Border.None,
         ),
         colors = ButtonDefaults.colors(
-            containerColor = androidx.compose.ui.graphics.Color.Transparent,
-            contentColor = TextPrimary,
+            containerColor = filled ?: androidx.compose.ui.graphics.Color.Transparent,
+            contentColor = if (filled != null) androidx.compose.ui.graphics.Color.Black.copy(alpha = 0.85f) else TextPrimary,
             focusedContainerColor = FocusBar,
             focusedContentColor = TextOnLight,
         ),
@@ -253,6 +257,16 @@ fun Modifier.ignoreHeldKey(): Modifier {
         }
     }
 }
+
+/** Next to the heart on film and series details: seen or not. Filled with the accent when seen, like the check on posters. */
+@Composable
+fun WatchedButton(watched: Boolean, onToggle: () -> Unit, modifier: Modifier = Modifier) = IconButton(
+    androidx.compose.material.icons.Icons.Filled.Check,
+    if (watched) "Gezien" else "Markeren als gezien",
+    onToggle,
+    modifier,
+    fill = if (watched) ({ nl.jordy.iptv.ui.theme.Live }) else null,
+)
 
 /** The heart: outlined to add, filled in the heart colour when it's a favourite. */
 @Composable

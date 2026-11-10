@@ -44,4 +44,28 @@ class WatchedEpisodesTest {
         assertEquals(2, dao.watchedEpisodes(1).first().size)
         db.close()
     }
+
+    @Test
+    fun `by hand, a whole series on or off, one episode off, a film off in every version`() = runTest {
+        val db = Room.inMemoryDatabaseBuilder(ApplicationProvider.getApplicationContext(), AppDatabase::class.java).allowMainThreadQueries().build()
+        val dao = db.playback()
+        db.episodes().upsert(listOf(ep(1, 10, 1), ep(2, 10, 2)))
+        db.catalog().upsertSeries(listOf(series(10, "Dark")))
+
+        dao.markSeriesWatched(1, 10, 0)
+        assertEquals(listOf(10), dao.completeSeries(1).first())
+        dao.unmarkEpisodeWatched(1, 2)
+        assertEquals("one episode back to unseen: the series is no longer complete", emptyList<Int>(), dao.completeSeries(1).first())
+        dao.unmarkSeriesWatched(1, 10)
+        assertEquals(emptyList<Int>(), dao.watchedEpisodes(1).first())
+
+        // Two language versions of one film share a TMDB id: unmarking one clears the check for both.
+        fun film(id: Int) = nl.jordy.iptv.data.db.MovieEntity("1", id, "Film", null, null, 2001, "mkv", null, id, 1, tmdbId = 77)
+        db.catalog().upsertMovies(listOf(film(100), film(101)))
+        dao.markWatched(1, 100, 0)
+        assertEquals(listOf("77"), dao.watched(1).first().map { it.filmKey })
+        dao.unmarkWatched(1, listOf(101))
+        assertEquals(emptyList<Int>(), dao.watched(1).first().map { it.streamId })
+        db.close()
+    }
 }
