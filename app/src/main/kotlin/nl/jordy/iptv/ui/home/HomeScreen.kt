@@ -418,6 +418,7 @@ private fun TasteRow(title: String, items: List<Taste.Suggestion>, onLearn: () -
             PosterTile(
                 title = f.film.title,
                 imageUrl = f.film.posterUrl,
+                watched = !series && nl.jordy.iptv.ui.components.LocalWatchedFilms.current.has(f.film.streamId, f.film.key),
                 onClick = { onOpen(f.film) },
                 onLongClick = {},
                 modifier = Modifier.lastInRow(f == items.last())

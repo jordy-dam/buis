@@ -26,6 +26,8 @@ import kotlinx.serialization.Serializable
 @Serializable data class TasteRoute(val series: Boolean = false)
 /** Instellingen → Mijn smaak: what the thumbs add up to, and wiping them. */
 @Serializable data object TasteProfileRoute
+/** Zoeken from outside the rail, with a query filled in (a director or actor from Mijn smaak). */
+@Serializable data class SearchRoute(val query: String)
 
 /** What to play. Live carries its category so up/down can zap through the same list. */
 @Serializable

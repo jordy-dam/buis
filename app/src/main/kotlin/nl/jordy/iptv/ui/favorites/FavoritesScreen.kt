@@ -237,6 +237,7 @@ fun FavoritesScreen(
                                 title = NameParser.parse(f.name).title,
                                 imageUrl = f.imageUrl,
                                 favorite = true,
+                                watched = e.type == ContentType.MOVIE && nl.jordy.iptv.ui.components.LocalWatchedFilms.current.has(f.itemId),
                                 onClick = { if (e.type == ContentType.MOVIE) onOpenMovie(f.itemId) else onOpenSeries(f.itemId) },
                                 onLongClick = { vm.remove(f) },
                             )

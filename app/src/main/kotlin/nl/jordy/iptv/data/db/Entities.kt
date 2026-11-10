@@ -204,6 +204,17 @@ data class PlaybackPositionEntity(
     val updatedAt: Long,
 )
 
+/**
+ * A film this profile watched (70% or more played), so its poster gets a check. [filmKey] is [FILM_KEY] at the time: other language versions of the film match too.
+ */
+@Entity(tableName = "watched_film", primaryKeys = ["profileId", "streamId"])
+data class WatchedFilmEntity(
+    val profileId: Long,
+    val streamId: Int,
+    val filmKey: String,
+    val at: Long,
+)
+
 @Entity(tableName = "sync_info")
 data class SyncInfoEntity(
     @PrimaryKey val id: Int = 0,

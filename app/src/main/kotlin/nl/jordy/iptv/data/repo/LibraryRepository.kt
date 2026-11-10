@@ -7,11 +7,13 @@ import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.flatMapLatest
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.launch
 import nl.jordy.iptv.data.auth.CredentialStore
 import nl.jordy.iptv.data.db.AppDatabase
 import nl.jordy.iptv.data.db.EpisodeEntity
 import nl.jordy.iptv.data.db.FavoriteEntity
+import nl.jordy.iptv.data.db.MovieEntity
 import nl.jordy.iptv.data.db.PlaybackPositionEntity
 import nl.jordy.iptv.data.profile.ProfileRepository
 import nl.jordy.iptv.data.xtream.ContentType
@@ -103,6 +105,10 @@ class LibraryRepository @Inject constructor(
     }
 
     suspend fun reportProgress(profileId: Long, type: ContentType, id: Int, positionMs: Long, durationMs: Long) {
+        // 70% in counts as seen, credits or not: the film gets its check on the poster. Once; repeats are ignored.
+        if (type == ContentType.MOVIE && durationMs > 0 && positionMs >= durationMs * WATCHED_FRACTION) {
+            db.playback().markWatched(profileId, id, System.currentTimeMillis())
+        }
         when (val d = ResumePolicy.onProgress(positionMs, durationMs)) {
             is ResumePolicy.Decision.Save ->
                 db.playback().upsert(PlaybackPositionEntity(profileId, type, id, d.positionMs, durationMs, System.currentTimeMillis()))
@@ -110,8 +116,26 @@ class LibraryRepository @Inject constructor(
         }
     }
 
+    /** The active profile's watched films, for the check on posters. */
+    @OptIn(ExperimentalCoroutinesApi::class)
+    val watchedFilms: Flow<WatchedFilms> = profiles.currentId.flatMapLatest { id ->
+        db.playback().watched(id).map { rows -> WatchedFilms(rows.map { it.streamId }.toSet(), rows.map { it.filmKey }.toSet()) }
+    }
+
     /** "Uit Verder kijken": forget where the active profile was; the next play starts at the beginning. */
     suspend fun forgetPosition(type: ContentType, id: Int) = db.playback().delete(profiles.currentId(), type, id)
 
     suspend fun currentProfileId(): Long = profiles.currentId()
 }
+
+/** Share of a film played after which it counts as seen (Jordy, 2026-11-10). */
+const val WATCHED_FRACTION = 0.70
+
+/** Films the profile watched (70% or more): by stream, or by film key so other versions get the check too. */
+data class WatchedFilms(val streamIds: Set<Int> = emptySet(), val keys: Set<String> = emptySet()) {
+    fun has(streamId: Int, key: String? = null) = streamId in streamIds || (key != null && key in keys)
+    fun has(movie: MovieEntity) = has(movie.streamId, movie.filmKey())
+}
+
+/** [nl.jordy.iptv.data.db.FILM_KEY] for a film row, as far as the row knows it (its own TMDB id, else title and year). */
+fun MovieEntity.filmKey(): String = tmdbId?.toString() ?: "${name.lowercase()}|${year ?: ""}"

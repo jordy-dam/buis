@@ -59,8 +59,12 @@ fun SearchScreen(
     onPlay: (PlayerRoute) -> Unit,
     onOpenMovie: (Int) -> Unit,
     onOpenSeries: (Int) -> Unit,
+    /** From Mijn smaak: a director, actor or period to search for straight away. */
+    initialQuery: String? = null,
     vm: SearchViewModel = hiltViewModel(),
 ) {
+    androidx.compose.runtime.LaunchedEffect(initialQuery) { if (initialQuery != null && vm.query.value.isBlank()) vm.query.value = initialQuery }
+    val watched = nl.jordy.iptv.ui.components.LocalWatchedFilms.current
     val query by vm.query.collectAsStateWithLifecycle()
     val results by vm.results.collectAsStateWithLifecycle()
 
@@ -68,7 +72,7 @@ fun SearchScreen(
         item { Text("Zoeken", style = MaterialTheme.typography.headlineMedium) }
         item {
             TvTextField(
-                "Zender, film of serie",
+                "Zender, film, serie, acteur, regisseur of jaar",
                 query,
                 { vm.query.value = it },
                 Modifier.width(560.dp),
@@ -78,7 +82,7 @@ fun SearchScreen(
         val r: SearchResults? = results
         when {
             query.isBlank() -> item {
-                Text("Typ een paar letters van een zender, film of serie. Voorkeurslanden staan bovenaan.", style = MaterialTheme.typography.bodyLarge, color = TextSecondary)
+                Text("Typ een paar letters van een zender, film of serie. Of zoek een acteur of regisseur (\"Tom Hanks\", \"Nolan\"), een jaar (\"1994\") of een periode (\"jaren 90\").", style = MaterialTheme.typography.bodyLarge, color = TextSecondary)
             }
             r == null -> Unit
             r.isEmpty -> item { Text("Niets gevonden voor \"$query\".", style = MaterialTheme.typography.bodyLarge, color = TextSecondary) }
@@ -98,7 +102,20 @@ fun SearchScreen(
                     }
                 }
                 if (r.movies.isNotEmpty()) item(key = "movies") {
-                    PosterRow("Films", r.movies.map { Triple(it.streamId, it.name, it.posterUrl) }, onOpenMovie)
+                    PosterRow("Films", r.movies.map { Triple(it.streamId, it.name, it.posterUrl) }, onOpenMovie) { i -> watched.has(r.movies[i]) }
+                }
+                r.people.forEach { p ->
+                    item(key = "person/${p.name}") {
+                        PosterRow(p.title, p.movies.map { Triple(it.streamId, it.name, it.posterUrl) }, onOpenMovie) { i -> watched.has(p.movies[i]) }
+                    }
+                }
+                r.period?.let { period ->
+                    if (r.periodMovies.isNotEmpty()) item(key = "period/movies") {
+                        PosterRow("Films uit ${period.label}", r.periodMovies.map { Triple(it.streamId, it.name, it.posterUrl) }, onOpenMovie) { i -> watched.has(r.periodMovies[i]) }
+                    }
+                    if (r.periodSeries.isNotEmpty()) item(key = "period/series") {
+                        PosterRow("Series uit ${period.label}", r.periodSeries.map { Triple(it.seriesId, it.name, it.coverUrl) }, onOpenSeries)
+                    }
                 }
                 if (r.series.isNotEmpty()) item(key = "series") {
                     PosterRow("Series", r.series.map { Triple(it.seriesId, it.name, it.coverUrl) }, onOpenSeries)
@@ -110,7 +127,7 @@ fun SearchScreen(
 
 @OptIn(ExperimentalComposeUiApi::class)
 @Composable
-private fun PosterRow(title: String, items: List<Triple<Int, String, String?>>, onOpen: (Int) -> Unit) {
+private fun PosterRow(title: String, items: List<Triple<Int, String, String?>>, onOpen: (Int) -> Unit, watched: (Int) -> Boolean = { false }) {
     Column {
         Text(title, style = MaterialTheme.typography.titleLarge)
         LazyRow(
@@ -119,7 +136,7 @@ private fun PosterRow(title: String, items: List<Triple<Int, String, String?>>, 
             modifier = Modifier.focusRestorer(),
         ) {
             itemsIndexed(items, key = { _, it -> it.first }) { i, (id, name, image) ->
-                PosterTile(name, image, onClick = { onOpen(id) }, onLongClick = {}, modifier = Modifier.lastInRow(i == items.lastIndex))
+                PosterTile(name, image, onClick = { onOpen(id) }, onLongClick = {}, modifier = Modifier.lastInRow(i == items.lastIndex), watched = watched(i))
             }
         }
     }

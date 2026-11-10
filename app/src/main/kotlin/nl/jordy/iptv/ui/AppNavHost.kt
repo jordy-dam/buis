@@ -1,6 +1,11 @@
 package nl.jordy.iptv.ui
 
 import androidx.compose.runtime.getValue
+import androidx.lifecycle.viewModelScope
+import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.padding
+import kotlinx.coroutines.flow.stateIn
 import androidx.navigation.NavDestination.Companion.hasRoute
 import androidx.navigation.compose.currentBackStackEntryAsState
 import nl.jordy.iptv.ui.reminders.BedtimeHost
@@ -42,7 +47,7 @@ fun AppNavHost(start: Any) {
     val entry by nav.currentBackStackEntryAsState()
     // Reminders only where someone is watching: not over login, the catalog sync or "Wie kijkt er?".
     val dest = entry?.destination
-    val watching = dest != null && (dest.hasRoute<ShellRoute>() || dest.hasRoute<PlayerRoute>() || dest.hasRoute<MovieDetailRoute>() || dest.hasRoute<SeriesDetailRoute>() || dest.hasRoute<HistoryRoute>() || dest.hasRoute<TvGuideRoute>() || dest.hasRoute<TasteRoute>())
+    val watching = dest != null && (dest.hasRoute<ShellRoute>() || dest.hasRoute<PlayerRoute>() || dest.hasRoute<MovieDetailRoute>() || dest.hasRoute<SeriesDetailRoute>() || dest.hasRoute<HistoryRoute>() || dest.hasRoute<TvGuideRoute>() || dest.hasRoute<TasteRoute>() || dest.hasRoute<SearchRoute>())
     // One card at a time: whichever is up stays until it's answered, the other waits and then opens
     // with focus of its own. Reminders go first when both are due at once.
     val reminders: ReminderViewModel = hiltViewModel()
@@ -57,6 +62,8 @@ fun AppNavHost(start: Any) {
         nav.navigate(route)
     })
     BedtimeHost(watching && bedtimeOnScreen, vm = bedtime)
+    val watched by hiltViewModel<WatchedViewModel>().films.collectAsStateWithLifecycle()
+    androidx.compose.runtime.CompositionLocalProvider(nl.jordy.iptv.ui.components.LocalWatchedFilms provides watched) {
     NavHost(navController = nav, startDestination = start) {
         composable<LoginRoute> {
             LoginScreen(onLoggedIn = { nav.navigate(SyncRoute) { popUpTo(LoginRoute) { inclusive = true } } })
@@ -103,6 +110,27 @@ fun AppNavHost(start: Any) {
         composable<ChannelHealthRoute> { ChannelHealthScreen() }
         composable<TvGuideRoute> { TvGuideScreen(onPlay = { nav.navigate(it) }) }
         composable<TasteRoute> { TasteScreen(onDone = { nav.popBackStack() }) }
-        composable<TasteProfileRoute> { TasteProfileScreen(onLearn = { nav.navigate(TasteRoute()) }) }
+        composable<TasteProfileRoute> { TasteProfileScreen(onLearn = { nav.navigate(TasteRoute()) }, onSearch = { nav.navigate(SearchRoute(it)) }) }
+        composable<SearchRoute> { entry ->
+            androidx.compose.foundation.layout.Box(
+                androidx.compose.ui.Modifier.fillMaxSize().background(nl.jordy.iptv.ui.theme.Background).padding(nl.jordy.iptv.ui.theme.SafeArea),
+            ) {
+                nl.jordy.iptv.ui.search.SearchScreen(
+                    onPlay = { nav.navigate(it) },
+                    onOpenMovie = { nav.navigate(MovieDetailRoute(it)) },
+                    onOpenSeries = { nav.navigate(SeriesDetailRoute(it)) },
+                    initialQuery = entry.toRoute<SearchRoute>().query,
+                )
+            }
+        }
     }
+    }
+}
+
+/** Watched films for the posters' check, for the whole app. */
+@dagger.hilt.android.lifecycle.HiltViewModel
+class WatchedViewModel @javax.inject.Inject constructor(library: nl.jordy.iptv.data.repo.LibraryRepository) : androidx.lifecycle.ViewModel() {
+    val films = library.watchedFilms.stateIn(
+        viewModelScope, kotlinx.coroutines.flow.SharingStarted.Eagerly, nl.jordy.iptv.data.repo.WatchedFilms(),
+    )
 }

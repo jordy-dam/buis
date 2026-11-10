@@ -53,6 +53,30 @@ interface CatalogDao {
     @Query("SELECT * FROM series WHERE seriesId IN (:ids) GROUP BY seriesId")
     suspend fun seriesByIds(ids: List<Int>): List<SeriesEntity>
 
+    /** Zoeken op mensen: films whose director or cast (from movie_info) holds [pattern]; preferred countries first, best rated first. */
+    @Query(
+        "SELECT m.*, i.`cast` AS people, i.director AS director, c.adult AS adult FROM movie m JOIN movie_info i ON i.streamId = m.streamId " +
+            "LEFT JOIN category c ON c.type = 'MOVIE' AND c.id = m.categoryId " +
+            "WHERE i.director LIKE :pattern OR i.`cast` LIKE :pattern " +
+            "ORDER BY IFNULL(c.country IN (:countries), 0) DESC, m.rating IS NULL, m.rating DESC LIMIT 2000",
+    )
+    suspend fun moviesByPerson(pattern: String, countries: List<String>): List<MoviePeopleRow>
+
+    /** Zoeken op periode: films from [from] to [to]; preferred countries first, best rated first. */
+    @Query(
+        "SELECT m.* FROM movie m LEFT JOIN category c ON c.type = 'MOVIE' AND c.id = m.categoryId " +
+            "WHERE m.year BETWEEN :from AND :to AND (:hideAdult = 0 OR IFNULL(c.adult, 0) = 0) " +
+            "ORDER BY IFNULL(c.country IN (:countries), 0) DESC, m.rating IS NULL, m.rating DESC LIMIT 300",
+    )
+    suspend fun moviesInYears(from: Int, to: Int, countries: List<String>, hideAdult: Boolean): List<MovieEntity>
+
+    @Query(
+        "SELECT s.* FROM series s LEFT JOIN category c ON c.type = 'SERIES' AND c.id = s.categoryId " +
+            "WHERE s.year BETWEEN :from AND :to AND (:hideAdult = 0 OR IFNULL(c.adult, 0) = 0) " +
+            "ORDER BY IFNULL(c.country IN (:countries), 0) DESC, s.rating IS NULL, s.rating DESC LIMIT 300",
+    )
+    suspend fun seriesInYears(from: Int, to: Int, countries: List<String>, hideAdult: Boolean): List<SeriesEntity>
+
     @Query("SELECT * FROM movie WHERE categoryId = :categoryId ORDER BY sortIndex")
     fun moviesPaged(categoryId: String): PagingSource<Int, MovieEntity>
 
@@ -264,6 +288,15 @@ interface PlaybackDao {
     fun observe(profileId: Long, type: ContentType, itemId: Int): Flow<PlaybackPositionEntity?>
     @Query("SELECT * FROM playback_position WHERE profileId = :profileId AND type = :type")
     fun observeAll(profileId: Long, type: ContentType): Flow<List<PlaybackPositionEntity>>
+    /** A film watched to the end; its [FILM_KEY] lets other versions of it match. */
+    @Query(
+        "INSERT OR IGNORE INTO watched_film (profileId, streamId, filmKey, at) " +
+            "SELECT :profileId, m.streamId, $FILM_KEY, :at FROM movie m LEFT JOIN movie_info i ON i.streamId = m.streamId WHERE m.streamId = :streamId LIMIT 1",
+    )
+    suspend fun markWatched(profileId: Long, streamId: Int, at: Long)
+    @Query("SELECT * FROM watched_film WHERE profileId = :profileId")
+    fun watched(profileId: Long): Flow<List<WatchedFilmEntity>>
+
     /** "Verder kijken": finished items are already deleted by the resume policy. */
     @Query("SELECT * FROM playback_position WHERE profileId = :profileId ORDER BY updatedAt DESC LIMIT :limit")
     fun recent(profileId: Long, limit: Int): Flow<List<PlaybackPositionEntity>>
@@ -355,6 +388,9 @@ const val SERIES_KEY = "('series:' || lower(s.name) || '|' || IFNULL(s.year, '')
 
 /** One film across its language versions: the TMDB id when known, else title and year (tables `m` and `i`). */
 const val FILM_KEY = "COALESCE(CAST(m.tmdbId AS TEXT), CAST(i.tmdbId AS TEXT), lower(m.name) || '|' || IFNULL(m.year, ''))"
+
+/** A film with the people from its details, for Zoeken op regisseur of acteur. */
+data class MoviePeopleRow(@Embedded val movie: MovieEntity, val people: String?, val director: String?, val adult: Boolean?)
 
 /** A film tile: the first version of a title in a category, and how many versions it stands for. */
 data class MovieTile(@Embedded val movie: MovieEntity, val versions: Int, val firstSort: Int)

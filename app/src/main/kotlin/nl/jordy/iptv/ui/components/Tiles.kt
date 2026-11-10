@@ -121,6 +121,8 @@ fun PosterTile(
     progress: Float? = null,
     /** A small note in the corner, such as "2 versies". */
     label: String? = null,
+    /** Seen (a film played 70% or more): a check bottom right. */
+    watched: Boolean = false,
 ) {
     Card(
         onClick = onClick,
@@ -145,6 +147,7 @@ fun PosterTile(
                 AsyncImage(model = imageUrl, contentDescription = title, contentScale = ContentScale.Crop, modifier = Modifier.fillMaxSize())
             }
             if (favorite) FavoriteBadge(Modifier.align(Alignment.TopEnd).padding(6.dp))
+            if (watched) WatchedBadge(Modifier.align(Alignment.BottomEnd).padding(6.dp).padding(bottom = if (progress != null) 5.dp else 0.dp))
             if (label != null) {
                 Text(
                     label,
@@ -380,6 +383,17 @@ fun FavoriteBadge(modifier: Modifier = Modifier) {
         androidx.tv.material3.Icon(Icons.Filled.Favorite, contentDescription = "Favoriet", tint = nl.jordy.iptv.ui.theme.OnHeart, modifier = Modifier.size(16.dp))
     }
 }
+
+/** "Gezien": a white check on a dark disc, readable on any poster. */
+@Composable
+fun WatchedBadge(modifier: Modifier = Modifier) {
+    Box(modifier.size(26.dp).background(Color.Black.copy(alpha = 0.7f), RoundedCornerShape(13.dp)), contentAlignment = Alignment.Center) {
+        androidx.tv.material3.Icon(Icons.Filled.Check, contentDescription = "Gezien", tint = Color.White, modifier = Modifier.size(18.dp))
+    }
+}
+
+/** The active profile's watched films, provided once at the top so every poster can show its check. */
+val LocalWatchedFilms = androidx.compose.runtime.staticCompositionLocalOf { nl.jordy.iptv.data.repo.WatchedFilms() }
 
 @Composable
 fun ProgressBar(fraction: Float, modifier: Modifier = Modifier, thickness: Dp = 5.dp) {

@@ -206,6 +206,7 @@ fun MoviesScreen(onOpenMovie: (Int) -> Unit, vm: MoviesViewModel = hiltViewModel
             label = if (tile.versions > 1) "${tile.versions} versies" else null,
             favorite = movie.streamId in favorites,
             progress = progress[movie.streamId],
+            watched = nl.jordy.iptv.ui.components.LocalWatchedFilms.current.has(movie),
             onClick = {
                 vm.focusMemory.opened("$selected/${movie.streamId}")
                 onOpenMovie(movie.streamId)

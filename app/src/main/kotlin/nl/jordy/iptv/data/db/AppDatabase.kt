@@ -34,8 +34,9 @@ import androidx.sqlite.db.SupportSQLiteDatabase
         CalendarEntity::class,
         CalendarEventEntity::class,
         TasteVoteEntity::class,
+        WatchedFilmEntity::class,
     ],
-    version = 30,
+    version = 31,
     exportSchema = true,
     autoMigrations = [
         AutoMigration(from = 1, to = 2, spec = AppDatabase.CatalogResync::class),
@@ -89,6 +90,8 @@ import androidx.sqlite.db.SupportSQLiteDatabase
         AutoMigration(from = 28, to = 29),
         // Series in "Voor jou": a vote says whether it was a film or a series; existing votes are films.
         AutoMigration(from = 29, to = 30),
+        // A check on watched films; filled once from the watch log (40 minutes or more of a film).
+        AutoMigration(from = 30, to = 31, spec = AppDatabase.WatchedFromLog::class),
     ],
 )
 abstract class AppDatabase : RoomDatabase() {
@@ -109,6 +112,27 @@ abstract class AppDatabase : RoomDatabase() {
     abstract fun channelHealth(): ChannelHealthDao
     abstract fun seriesIntro(): SeriesIntroDao
     abstract fun taste(): TasteDao
+
+    /**
+     * Films already watched before the check existed: 70% or more in a saved position, or (no
+     * duration in the log) 40 minutes or more of them in the watch log, 90 days back.
+     */
+    class WatchedFromLog : AutoMigrationSpec {
+        override fun onPostMigrate(db: SupportSQLiteDatabase) {
+            db.execSQL(
+                "INSERT OR IGNORE INTO watched_film (profileId, streamId, filmKey, at) " +
+                    "SELECT w.profileId, w.itemId, (SELECT $FILM_KEY FROM movie m LEFT JOIN movie_info i ON i.streamId = m.streamId WHERE m.streamId = w.itemId LIMIT 1), MAX(w.startedAt) " +
+                    "FROM watch_log w WHERE w.type = 'MOVIE' GROUP BY w.profileId, w.itemId HAVING SUM(w.seconds) >= 2400 " +
+                    "AND EXISTS (SELECT 1 FROM movie m WHERE m.streamId = w.itemId)",
+            )
+            db.execSQL(
+                "INSERT OR IGNORE INTO watched_film (profileId, streamId, filmKey, at) " +
+                    "SELECT p.profileId, p.itemId, (SELECT $FILM_KEY FROM movie m LEFT JOIN movie_info i ON i.streamId = m.streamId WHERE m.streamId = p.itemId LIMIT 1), p.updatedAt " +
+                    "FROM playback_position p WHERE p.type = 'MOVIE' AND p.durationMs > 0 AND p.positionMs >= p.durationMs * 0.7 " +
+                    "AND EXISTS (SELECT 1 FROM movie m WHERE m.streamId = p.itemId)",
+            )
+        }
+    }
 
     /**
      * The catalog is a cache of the provider: after a schema change it's emptied and the next
