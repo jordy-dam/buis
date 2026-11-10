@@ -215,6 +215,15 @@ data class WatchedFilmEntity(
     val at: Long,
 )
 
+/** An episode this profile watched (70% or more played): its tile gets a check, and a series whose every episode has one too. */
+@Entity(tableName = "watched_episode", primaryKeys = ["profileId", "episodeId"], indices = [Index("seriesId")])
+data class WatchedEpisodeEntity(
+    val profileId: Long,
+    val episodeId: Int,
+    val seriesId: Int,
+    val at: Long,
+)
+
 @Entity(tableName = "sync_info")
 data class SyncInfoEntity(
     @PrimaryKey val id: Int = 0,

@@ -35,8 +35,9 @@ import androidx.sqlite.db.SupportSQLiteDatabase
         CalendarEventEntity::class,
         TasteVoteEntity::class,
         WatchedFilmEntity::class,
+        WatchedEpisodeEntity::class,
     ],
-    version = 31,
+    version = 32,
     exportSchema = true,
     autoMigrations = [
         AutoMigration(from = 1, to = 2, spec = AppDatabase.CatalogResync::class),
@@ -92,6 +93,8 @@ import androidx.sqlite.db.SupportSQLiteDatabase
         AutoMigration(from = 29, to = 30),
         // A check on watched films; filled once from the watch log (40 minutes or more of a film).
         AutoMigration(from = 30, to = 31, spec = AppDatabase.WatchedFromLog::class),
+        // The same for episodes, filled once from saved positions and the watch log.
+        AutoMigration(from = 31, to = 32, spec = AppDatabase.WatchedEpisodesFromLog::class),
     ],
 )
 abstract class AppDatabase : RoomDatabase() {
@@ -130,6 +133,27 @@ abstract class AppDatabase : RoomDatabase() {
                     "SELECT p.profileId, p.itemId, (SELECT $FILM_KEY FROM movie m LEFT JOIN movie_info i ON i.streamId = m.streamId WHERE m.streamId = p.itemId LIMIT 1), p.updatedAt " +
                     "FROM playback_position p WHERE p.type = 'MOVIE' AND p.durationMs > 0 AND p.positionMs >= p.durationMs * 0.7 " +
                     "AND EXISTS (SELECT 1 FROM movie m WHERE m.streamId = p.itemId)",
+            )
+        }
+    }
+
+    /**
+     * Episodes already watched before episodes had a check: 70% or more in a saved position, or in
+     * the watch log 70% of the episode's length (20 minutes when the length is unknown). Only
+     * episodes BUIS has seen the list of, which is every series that was opened.
+     */
+    class WatchedEpisodesFromLog : AutoMigrationSpec {
+        override fun onPostMigrate(db: SupportSQLiteDatabase) {
+            db.execSQL(
+                "INSERT OR IGNORE INTO watched_episode (profileId, episodeId, seriesId, at) " +
+                    "SELECT p.profileId, p.itemId, e.seriesId, p.updatedAt FROM playback_position p JOIN episode e ON e.episodeId = p.itemId " +
+                    "WHERE p.type = 'SERIES' AND p.durationMs > 0 AND p.positionMs >= p.durationMs * 0.7",
+            )
+            db.execSQL(
+                "INSERT OR IGNORE INTO watched_episode (profileId, episodeId, seriesId, at) " +
+                    "SELECT w.profileId, w.itemId, e.seriesId, MAX(w.startedAt) FROM watch_log w JOIN episode e ON e.episodeId = w.itemId " +
+                    "WHERE w.type = 'SERIES' GROUP BY w.profileId, w.itemId " +
+                    "HAVING SUM(w.seconds) >= CASE WHEN IFNULL(e.durationSecs, 0) > 0 THEN e.durationSecs * 0.7 ELSE 1200 END",
             )
         }
     }

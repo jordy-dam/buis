@@ -6,6 +6,8 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.launch
@@ -106,8 +108,9 @@ class LibraryRepository @Inject constructor(
 
     suspend fun reportProgress(profileId: Long, type: ContentType, id: Int, positionMs: Long, durationMs: Long) {
         // 70% in counts as seen, credits or not: the film gets its check on the poster. Once; repeats are ignored.
-        if (type == ContentType.MOVIE && durationMs > 0 && positionMs >= durationMs * WATCHED_FRACTION) {
-            db.playback().markWatched(profileId, id, System.currentTimeMillis())
+        if (durationMs > 0 && positionMs >= durationMs * WATCHED_FRACTION) {
+            if (type == ContentType.MOVIE) db.playback().markWatched(profileId, id, System.currentTimeMillis())
+            else db.playback().markEpisodeWatched(profileId, id, System.currentTimeMillis())
         }
         when (val d = ResumePolicy.onProgress(positionMs, durationMs)) {
             is ResumePolicy.Decision.Save ->
@@ -124,12 +127,17 @@ class LibraryRepository @Inject constructor(
         val id = profiles.currentId()
         val rows = db.playback().watchedNames(id)
         android.util.Log.i("BUIS-watched", "profile $id: ${rows.size} films: " + rows.joinToString(" | ") { "${it.name ?: "?"} [${it.filmKey}] ${java.time.Instant.ofEpochMilli(it.at)}" })
+        val episodes = db.playback().watchedEpisodes(id).first()
+        val complete = db.playback().completeSeries(id).first()
+        android.util.Log.i("BUIS-watched", "profile $id: ${episodes.size} episodes, series complete: $complete")
     }
 
     /** The active profile's watched films, for the check on posters. */
     @OptIn(ExperimentalCoroutinesApi::class)
     val watchedFilms: Flow<WatchedFilms> = profiles.currentId.flatMapLatest { id ->
-        db.playback().watched(id).map { rows -> WatchedFilms(rows.map { it.streamId }.toSet(), rows.map { it.filmKey }.toSet()) }
+        combine(db.playback().watched(id), db.playback().watchedEpisodes(id), db.playback().completeSeries(id)) { films, episodes, series ->
+            WatchedFilms(films.map { it.streamId }.toSet(), films.map { it.filmKey }.toSet(), episodes.toSet(), series.toSet())
+        }
     }
 
     /** "Uit Verder kijken": forget where the active profile was; the next play starts at the beginning. */
@@ -141,8 +149,19 @@ class LibraryRepository @Inject constructor(
 /** Share of a film played after which it counts as seen (Jordy, 2026-11-10). */
 const val WATCHED_FRACTION = 0.70
 
-/** Films the profile watched (70% or more): by stream, or by film key so other versions get the check too. */
-data class WatchedFilms(val streamIds: Set<Int> = emptySet(), val keys: Set<String> = emptySet()) {
+/**
+ * What the profile watched (70% or more): films by stream, or by film key so other versions get
+ * the check too; episodes; and series with every known episode watched.
+ */
+data class WatchedFilms(
+    val streamIds: Set<Int> = emptySet(),
+    val keys: Set<String> = emptySet(),
+    val episodes: Set<Int> = emptySet(),
+    /** Series whose every known episode is watched. */
+    val series: Set<Int> = emptySet(),
+) {
+    fun hasEpisode(episodeId: Int) = episodeId in episodes
+    fun hasSeries(seriesId: Int) = seriesId in series
     fun has(streamId: Int, key: String? = null) = streamId in streamIds || (key != null && key in keys)
     fun has(movie: MovieEntity) = has(movie.streamId, movie.filmKey())
 }

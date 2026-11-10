@@ -98,9 +98,14 @@ class SeriesDetailViewModel @Inject constructor(
     }
 }
 
-/** The episode to put behind the main button: the one most recently watched, else the first. */
-internal fun nextUp(episodes: List<EpisodeEntity>, positions: Map<Int, PlaybackPositionEntity>): EpisodeEntity? =
+/**
+ * The episode to put behind the main button: the one you're halfway through (most recent first),
+ * else the first one not seen after the last one seen, else the first. [episodes] is in order.
+ */
+internal fun nextUp(episodes: List<EpisodeEntity>, positions: Map<Int, PlaybackPositionEntity>, watched: Set<Int> = emptySet()): EpisodeEntity? =
     episodes.filter { positions[it.episodeId] != null }.maxByOrNull { positions.getValue(it.episodeId).updatedAt }
+        ?: episodes.indexOfLast { it.episodeId in watched }.takeIf { it >= 0 }
+            ?.let { last -> episodes.drop(last + 1).firstOrNull { it.episodeId !in watched } }
         ?: episodes.firstOrNull()
 
 @OptIn(ExperimentalComposeUiApi::class)
@@ -115,7 +120,8 @@ fun SeriesDetailScreen(onPlay: (PlayerRoute) -> Unit, vm: SeriesDetailViewModel 
     val s = series ?: return
 
     val seasons = episodes.map { it.season }.distinct().sorted()
-    val next = nextUp(episodes, positions)
+    val watched = nl.jordy.iptv.ui.components.LocalWatchedFilms.current
+    val next = nextUp(episodes, positions, watched.episodes)
     var season by rememberSaveable { mutableStateOf<Int?>(null) }
     val shownSeason = season ?: next?.season ?: seasons.firstOrNull()
     val primary = remember { FocusRequester() }
@@ -146,6 +152,8 @@ fun SeriesDetailScreen(onPlay: (PlayerRoute) -> Unit, vm: SeriesDetailViewModel 
                     Text("Geen afleveringen beschikbaar.", style = MaterialTheme.typography.bodyLarge, color = TextSecondary)
                 }
                 FavoriteButton(favorite, vm::toggleFavorite)
+                // The whole series seen: the same check as a film, next to the heart and its size.
+                if (watched.hasSeries(s.seriesId)) nl.jordy.iptv.ui.components.WatchedBadge(Modifier.align(Alignment.CenterVertically), size = 40.dp, iconSize = 22.dp)
             }
         },
         below = {
@@ -174,7 +182,7 @@ fun SeriesDetailScreen(onPlay: (PlayerRoute) -> Unit, vm: SeriesDetailViewModel 
             ) {
                 val shown = episodes.filter { it.season == shownSeason }
                 items(shown, key = { it.episodeId }) { e ->
-                    EpisodeCard(e, positions[e.episodeId], onClick = { play(e) }, isLast = e == shown.last())
+                    EpisodeCard(e, positions[e.episodeId], watched.hasEpisode(e.episodeId), onClick = { play(e) }, isLast = e == shown.last())
                 }
             }
         },
@@ -182,7 +190,7 @@ fun SeriesDetailScreen(onPlay: (PlayerRoute) -> Unit, vm: SeriesDetailViewModel 
 }
 
 @Composable
-private fun EpisodeCard(e: EpisodeEntity, position: PlaybackPositionEntity?, onClick: () -> Unit, isLast: Boolean) {
+private fun EpisodeCard(e: EpisodeEntity, position: PlaybackPositionEntity?, watched: Boolean, onClick: () -> Unit, isLast: Boolean) {
     Column(Modifier.width(200.dp)) {
         Card(
             onClick = onClick,
@@ -195,6 +203,7 @@ private fun EpisodeCard(e: EpisodeEntity, position: PlaybackPositionEntity?, onC
             Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                 Text("${e.number}", style = MaterialTheme.typography.displaySmall, color = TextSecondary)
                 e.imageUrl?.let { AsyncImage(model = it, contentDescription = null, contentScale = ContentScale.Crop, modifier = Modifier.fillMaxSize()) }
+                if (watched) nl.jordy.iptv.ui.components.WatchedBadge(Modifier.align(Alignment.TopEnd).padding(6.dp))
                 if (position != null && position.durationMs > 0) {
                     ProgressBar(position.positionMs.toFloat() / position.durationMs, Modifier.align(Alignment.BottomCenter))
                 }

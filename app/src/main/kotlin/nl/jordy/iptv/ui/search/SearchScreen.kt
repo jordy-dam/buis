@@ -114,11 +114,11 @@ fun SearchScreen(
                         PosterRow("Films uit ${period.label}", r.periodMovies.map { Triple(it.streamId, it.name, it.posterUrl) }, onOpenMovie) { i -> watched.has(r.periodMovies[i]) }
                     }
                     if (r.periodSeries.isNotEmpty()) item(key = "period/series") {
-                        PosterRow("Series uit ${period.label}", r.periodSeries.map { Triple(it.seriesId, it.name, it.coverUrl) }, onOpenSeries)
+                        PosterRow("Series uit ${period.label}", r.periodSeries.map { Triple(it.seriesId, it.name, it.coverUrl) }, onOpenSeries) { i -> watched.hasSeries(r.periodSeries[i].seriesId) }
                     }
                 }
                 if (r.series.isNotEmpty()) item(key = "series") {
-                    PosterRow("Series", r.series.map { Triple(it.seriesId, it.name, it.coverUrl) }, onOpenSeries)
+                    PosterRow("Series", r.series.map { Triple(it.seriesId, it.name, it.coverUrl) }, onOpenSeries) { i -> watched.hasSeries(r.series[i].seriesId) }
                 }
             }
         }

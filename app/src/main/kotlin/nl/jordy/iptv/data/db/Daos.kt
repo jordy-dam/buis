@@ -296,6 +296,22 @@ interface PlaybackDao {
     suspend fun markWatched(profileId: Long, streamId: Int, at: Long)
     @Query("SELECT * FROM watched_film WHERE profileId = :profileId")
     fun watched(profileId: Long): Flow<List<WatchedFilmEntity>>
+    /** An episode watched (70%); its series comes from the episode list, which the player had to load to play it. */
+    @Query("INSERT OR IGNORE INTO watched_episode (profileId, episodeId, seriesId, at) SELECT :profileId, e.episodeId, e.seriesId, :at FROM episode e WHERE e.episodeId = :episodeId")
+    suspend fun markEpisodeWatched(profileId: Long, episodeId: Int, at: Long)
+    @Query("SELECT episodeId FROM watched_episode WHERE profileId = :profileId")
+    fun watchedEpisodes(profileId: Long): Flow<List<Int>>
+    /**
+     * Series whose every known episode is watched, and their other language versions (same title
+     * and year, [SERIES_KEY]): the poster's check.
+     */
+    @Query(
+        "SELECT DISTINCT s.seriesId FROM series s WHERE $SERIES_KEY IN (SELECT $SERIES_KEY FROM series s WHERE s.seriesId IN (" +
+            "SELECT e.seriesId FROM episode e LEFT JOIN watched_episode w ON w.episodeId = e.episodeId AND w.profileId = :profileId " +
+            "GROUP BY e.seriesId HAVING COUNT(w.episodeId) = COUNT(*)))",
+    )
+    fun completeSeries(profileId: Long): Flow<List<Int>>
+
     /** For the log line at start: what's marked, with the film's name, newest first. */
     @Query("SELECT w.filmKey AS filmKey, w.at AS at, (SELECT name FROM movie WHERE streamId = w.streamId LIMIT 1) AS name FROM watched_film w WHERE w.profileId = :profileId ORDER BY w.at DESC")
     suspend fun watchedNames(profileId: Long): List<WatchedName>
@@ -628,7 +644,8 @@ interface TasteDao {
     @Query(
         "SELECT DISTINCT $SERIES_KEY FROM series s WHERE s.seriesId IN (SELECT e.seriesId FROM episode e WHERE e.episodeId IN " +
             "(SELECT itemId FROM watch_log WHERE profileId = :profileId AND type = 'SERIES' " +
-            "UNION SELECT itemId FROM playback_position WHERE profileId = :profileId AND type = 'SERIES'))",
+            "UNION SELECT itemId FROM playback_position WHERE profileId = :profileId AND type = 'SERIES') " +
+            "UNION SELECT seriesId FROM watched_episode WHERE profileId = :profileId)",
     )
     suspend fun watchedSeriesKeys(profileId: Long): List<String>
 

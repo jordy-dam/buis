@@ -234,6 +234,7 @@ fun SeriesScreen(onOpenSeries: (Int) -> Unit, vm: SeriesViewModel = hiltViewMode
                 imageUrl = series.coverUrl,
                 width = GridPosterWidth,
                 favorite = series.seriesId in favorites,
+                watched = nl.jordy.iptv.ui.components.LocalWatchedFilms.current.hasSeries(series.seriesId),
                 onClick = {
                     vm.focusMemory.opened("$selected/${series.seriesId}")
                     onOpenSeries(series.seriesId)
