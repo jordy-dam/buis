@@ -564,14 +564,17 @@ fun PlayerScreen(onExit: () -> Unit, vm: PlayerViewModel = hiltViewModel()) {
             .padding(start = SafeArea, end = SafeArea, top = SafeArea, bottom = maxOf(SafeArea, lift + 16.dp))
             .ignoreHeldKey()
             .stayIn()
+        // The thumbs end the film: nothing left to watch behind them, so they get the middle and a dimmed picture.
+        val middle = Modifier.align(Alignment.Center).ignoreHeldKey().stayIn()
+        if (card == Card.THUMBS) Box(Modifier.fillMaxSize().background(Color.Black.copy(alpha = 0.6f)))
         // The bar's fade behind a card when the bar is hidden; with the bar, its own fade is there already.
-        if (card != null && !barShows) CornerFade()
+        else if (card != null && !barShows) CornerFade()
         when (card) {
             Card.SLEEP -> SleepCard(state.sleepSecondsLeft ?: 0, cardFocus, vm::userActive, corner)
             Card.BREAK -> BreakCard(state.breakSecondsLeft ?: 0, cardFocus, vm::endBreak, corner)
             Card.NEXT -> state.nextUp?.let { NextEpisodeCard(it, cardFocus, vm::playNextNow, vm::dismissNextUp, corner) }
             Card.INTRO -> state.skipIntroTo?.let { IntroCard(it, cardFocus, vm::skipIntro, vm::dismissIntro, corner) }
-            Card.THUMBS -> state.thumbsSecondsLeft?.let { ThumbsCard(state.thumbsTitle, it, cardFocus, vm::rateFilm, corner) }
+            Card.THUMBS -> state.thumbsSecondsLeft?.let { ThumbsCard(state.thumbsTitle, it, cardFocus, vm::rateFilm, middle) }
             null -> Unit
         }
     }

@@ -63,12 +63,14 @@ fun CornerCard(
     // Slides in once when it appears; a new label or moment on the same card doesn't slide again.
     val shown = remember { MutableTransitionState(false).apply { targetState = true } }
     val barColor = Live
-    AnimatedVisibility(shown, enter = slideInVertically(tween(280)) { it } + fadeIn(tween(200))) {
+    // [modifier] goes on the animation, not the card inside it: an align() from the caller only
+    // works on the direct child of its Box. On the card it was ignored and the card sat top left.
+    AnimatedVisibility(shown, modifier, enter = slideInVertically(tween(280)) { it } + fadeIn(tween(200))) {
     Column(
         // As wide as the content needs, within limits: icon actions keep a card compact. (Plain
         // wrap-content: an intrinsic-width pass measured the card twice on every recomposition.)
         // The bar is drawn, not laid out, so it never widens the card.
-        modifier.widthIn(min = 360.dp, max = 560.dp).drawBehind {
+        Modifier.widthIn(min = 360.dp, max = 560.dp).drawBehind {
             val left = timeLeft?.invoke() ?: return@drawBehind
             val inset = 20.dp.toPx()
             val h = 4.dp.toPx()
