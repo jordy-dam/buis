@@ -70,8 +70,21 @@ class MoviesViewModel @Inject constructor(db: AppDatabase, private val profiles:
 
     private val showAll = MutableStateFlow(false)
     val filtered = dao.movieCategories().filteredBy(profiles.prefs, showAll).stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), null)
-    /** "Nieuw" first, above the provider's categories (it's on no provider list, so it can't be pinned). */
-    val sections = filtered.sections(profiles.pinned).map { s -> s?.let { listOf(null to listOf(NEW)) + it } }
+    /**
+     * "Uitgelicht" on top: the provider's Top 100 and Nieuwe films, then Net toegevoegd. Net toegevoegd
+     * is on no provider list, so it can't be pinned.
+     */
+    val sections = filtered.sections(profiles.pinned).map { s ->
+        s?.let {
+            val first = it.firstOrNull()
+            if (first != null && first.first == CategoryGroups.Kind.FEATURED.title) {
+                // Top 100, Nieuwe films (the provider's), then Net toegevoegd (ours), each name once.
+                val picks = first.second.map { c -> CategoryGroups.featured(c) }.sortedBy { p -> p.first }
+                listOf(first.first to picks.filter { p -> p.first < 2 }.map { p -> p.second } + NEW + picks.filter { p -> p.first == 2 }.map { p -> p.second }) + it.drop(1)
+            }
+            else listOf(null to listOf(NEW)) + it
+        }
+    }
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), null)
     fun toggleShowAll() { showAll.value = !showAll.value }
     /** Long-press or Menu on a category: pin it to the top for this profile, or unpin it. */
@@ -116,9 +129,10 @@ class MoviesViewModel @Inject constructor(db: AppDatabase, private val profiles:
     private data class Filter(val category: String, val genre: String?, val maxSecs: Int, val countries: List<String>, val hideAdult: Boolean)
 
     companion object {
-        /** Films › Nieuw: not a provider category, so an id no provider uses. */
+        /** Films › Net toegevoegd: not a provider category, so an id no provider uses. */
         const val NEW_ID = "\u0000new"
-        val NEW = CategoryEntity(ContentType.MOVIE, NEW_ID, "Nieuw", sortIndex = -1, generation = 0)
+        /** Films › Net toegevoegd: newly added to the catalog, old films too (the provider's "New releases" are new titles). */
+        val NEW = CategoryEntity(ContentType.MOVIE, NEW_ID, "Net toegevoegd", sortIndex = -1, generation = 0)
     }
 
     val favorites = library.favoriteIds(ContentType.MOVIE).map { it.toSet() }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptySet())

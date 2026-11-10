@@ -58,6 +58,48 @@ class TasteTest {
     }
 
     @Test
+    fun `one taste for films and series - liking Breaking Bad brings crime films`() {
+        // Series come with genre and year only: no director or cast in the provider's series list.
+        val breakingBad = film("series:breaking bad|2008", listOf("Drama", "Misdaad"), year = 2008)
+        val crimeFilm = film("Crime film", listOf("Misdaad", "Thriller"))
+        val cartoonFilm = film("Cartoon film", listOf("Animatie"))
+        val got = Taste.suggest(listOf(cartoonFilm, crimeFilm), listOf(Taste.Vote(breakingBad, LIKE)), emptySet())
+        assertEquals(listOf("Crime film"), got.map { it.film.key })
+        assertEquals("series:breaking bad|2008", got.first().because)
+    }
+
+    @Test
+    fun `wil ik zien pulls a little, but is never named as liked`() {
+        val wanted = film("Wanted series", listOf("Misdaad"))
+        val crime = film("Crime film", listOf("Misdaad"))
+        val got = Taste.suggest(listOf(crime), listOf(Taste.Vote(wanted, Taste.WANT)), emptySet())
+        assertEquals(listOf("Crime film"), got.map { it.film.key })
+        assertEquals("no 'omdat je Wanted series leuk vond': it wasn't seen", null, got.first().because)
+        val w = Taste.weights(listOf(Taste.Vote(wanted, Taste.WANT), Taste.Vote(inception, LIKE)))
+        assertTrue("a third of a thumb", w.getValue("g:misdaad") < w.getValue("g:sciencefiction"))
+    }
+
+    @Test
+    fun `mijn smaak names what pulls and what pushes away`() {
+        val votes = listOf(
+            Taste.Vote(inception, LIKE),
+            Taste.Vote(interstellar, LIKE),
+            Taste.Vote(notebook, DISLIKE),
+            Taste.Vote(film("Some 90s film", listOf("Thriller"), year = 1995), Taste.WANT),
+        )
+        val s = Taste.summary(votes)
+        assertEquals(2, s.likes); assertEquals(1, s.dislikes); assertEquals(1, s.wants)
+        assertEquals("Sciencefiction", s.genres.first())
+        assertEquals(listOf("Christopher Nolan"), s.directors)
+        assertTrue("Romantiek" in s.avoid)
+        assertEquals("2010–2019", s.period)
+        assertTrue(Taste.summary(emptyList()).empty)
+        val junk = Taste.summary(listOf(Taste.Vote(film("Wrestling", listOf("Smackdown")), DISLIKE), Taste.Vote(notebook, DISLIKE)), realGenres = setOf("romantiek", "drama"))
+        assertFalse("a recording's label isn't a genre to name", "Smackdown" in junk.avoid)
+        assertTrue("Romantiek" in junk.avoid)
+    }
+
+    @Test
     fun `without a single thumb up there is nothing to suggest`() {
         val votes = listOf(Taste.Vote(notebook, DISLIKE), Taste.Vote(inception, UNKNOWN))
         assertTrue(Taste.suggest(all, votes, exclude = emptySet()).isEmpty())
@@ -112,6 +154,17 @@ class TasteTest {
     }
 
     @Test
+    fun `series classics run to 2015 and reality is never a classic`() {
+        val filler = (1..15).map { film("Drama filler $it", listOf("Drama"), rating = 6.0, year = 2012, versions = 1) } +
+            (1..15).map { film("Reality filler $it", listOf("Reality"), rating = 6.0, year = 2012, versions = 1) }
+        val breakingBad = film("Breaking Bad", listOf("Drama", "Misdaad"), rating = 8.9, year = 2008, versions = 30)
+        val realityShow = film("Geer en Goor", listOf("Reality"), rating = 8.0, year = 2005, versions = 40)
+        val got = Taste.probes(filler + breakingBad + realityShow, emptySet(), random = Random(5), thisYear = 2026, classicUntil = Taste.SERIES_CLASSIC_UNTIL)
+        // No hits in this catalog, so the round opens with its classics: Breaking Bad, not the reality show.
+        assertEquals("Breaking Bad", got.first().title)
+    }
+
+    @Test
     fun `recordings and tv shows with a genre of their own stay out of the round`() {
         val films = (1..20).flatMap { i -> listOf("Actie", "Drama").map { g -> film("$g $i", listOf(g), versions = 3, year = 2015) } }
         val race = film("Formule 1 Miami Race", listOf("F10"), versions = 90, year = 2015)
@@ -162,6 +215,14 @@ class TasteTest {
         assertEquals("Raging Bull", Taste.displayTitle("Raging Bull 1980", 1980))
         assertEquals("Blade Runner 2049", Taste.displayTitle("Blade Runner 2049", 2017))
         assertEquals("1917", Taste.displayTitle("1917", 2019))
+    }
+
+    @Test
+    fun `the rating reads the Dutch way and is left out when the provider has none`() {
+        assertEquals("★ 7,8", Taste.ratingLabel(7.83))
+        assertEquals("★ 10,0", Taste.ratingLabel(12.0))
+        assertEquals(null, Taste.ratingLabel(0.0))
+        assertEquals(null, Taste.ratingLabel(null))
     }
 
     @Test

@@ -124,7 +124,9 @@ class HomeViewModel @Inject constructor(
     taste: TasteRepository,
 ) : ViewModel() {
     /** "Films voor jou": films that share genre, director or actors with what the profile liked. */
-    val forYou = taste.suggestions.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
+    val forYou = taste.suggestions(ContentType.MOVIE).stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
+    /** "Series voor jou": the same taste, over the series. */
+    val seriesForYou = taste.suggestions(ContentType.SERIES).stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
 
     /** "Wat je volgt": what the profile follows, refreshed every minute and whenever a term changes. */
     @OptIn(ExperimentalCoroutinesApi::class)
@@ -173,12 +175,12 @@ class HomeViewModel @Inject constructor(
 /** The watching profile's start screen, only what's personal: where they left off, what's coming up, a row per guide, films for them. Browsing (Nieuw too) is at Films. */
 @OptIn(ExperimentalComposeUiApi::class)
 @Composable
-fun HomeScreen(onPlay: (PlayerRoute) -> Unit, onOpenMovie: (Int) -> Unit, onOpenTaste: () -> Unit, vm: HomeViewModel = hiltViewModel()) {
+fun HomeScreen(onPlay: (PlayerRoute) -> Unit, onOpenMovie: (Int) -> Unit, onOpenSeries: (Int) -> Unit, onOpenTaste: (series: Boolean) -> Unit, vm: HomeViewModel = hiltViewModel()) {
     val loaded by vm.state.collectAsStateWithLifecycle()
     val s = loaded ?: return
     val upcoming by vm.upcoming.collectAsStateWithLifecycle()
     val forYou by vm.forYou.collectAsStateWithLifecycle()
-    var focusedSuggestion by remember { mutableStateOf<Taste.Suggestion?>(null) }
+    val seriesForYou by vm.seriesForYou.collectAsStateWithLifecycle()
     var focusedContinue by remember { mutableStateOf<ContinueItem?>(null) }
     var confirmRemove by remember { mutableStateOf<ContinueItem?>(null) }
     // After a removal the tile is gone: focus moves to its neighbour, or it would be lost.
@@ -207,7 +209,7 @@ fun HomeScreen(onPlay: (PlayerRoute) -> Unit, onOpenMovie: (Int) -> Unit, onOpen
         if (s.isEmpty) {
             item {
                 Text(
-                    "Hier komt te staan waar je gebleven was en de zenders uit je gids. Begin bij Live TV of Films; nieuwe films staan bij Films onder Nieuw.",
+                    "Hier komt te staan waar je gebleven was en de zenders uit je gids. Begin bij Live TV of Films; nieuwe films staan bij Films onder Uitgelicht.",
                     style = MaterialTheme.typography.bodyLarge,
                     color = TextSecondary,
                 )
@@ -287,40 +289,10 @@ fun HomeScreen(onPlay: (PlayerRoute) -> Unit, onOpenMovie: (Int) -> Unit, onOpen
             }
         }
         item(key = "foryou") {
-            Text("Films voor jou", style = MaterialTheme.typography.titleLarge)
-            LazyRow(
-                contentPadding = Rows.tilePadding,
-                horizontalArrangement = Arrangement.spacedBy(Rows.tileGap),
-                modifier = Modifier.focusRestorer(),
-            ) {
-                item(key = "learn") {
-                    LearnTasteTile(
-                        first = forYou.isEmpty(),
-                        onClick = onOpenTaste,
-                        modifier = Modifier.lastInRow(forYou.isEmpty()).onFocusChanged { if (it.isFocused) focusedSuggestion = null },
-                    )
-                }
-                items(forYou, key = { it.film.key }) { f ->
-                    PosterTile(
-                        title = f.film.title,
-                        imageUrl = f.film.posterUrl,
-                        onClick = { onOpenMovie(f.film.streamId) },
-                        onLongClick = {},
-                        modifier = Modifier.lastInRow(f == forYou.last())
-                            .onFocusChanged { if (it.isFocused) focusedSuggestion = f else if (focusedSuggestion == f) focusedSuggestion = null },
-                    )
-                }
-            }
-            // Why the focused film is here; one line high at all times, so nothing jumps.
-            Text(
-                focusedSuggestion?.let { f -> f.because?.let { "${Taste.displayTitle(f.film.title)} · omdat je ${Taste.displayTitle(it)} leuk vond" } ?: Taste.displayTitle(f.film.title) }
-                    ?: if (forYou.isEmpty()) "Zeg van tien films of je ze leuk vindt, dan zoekt BUIS er films bij." else " ",
-                style = MaterialTheme.typography.bodyLarge,
-                color = TextSecondary,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
-                modifier = Modifier.padding(start = 12.dp, top = 14.dp),
-            )
+            TasteRow("Films voor jou", forYou, onLearn = { onOpenTaste(false) }, onOpen = { onOpenMovie(it.streamId) })
+        }
+        item(key = "seriesforyou") {
+            TasteRow("Series voor jou", seriesForYou, onLearn = { onOpenTaste(true) }, onOpen = { onOpenSeries(it.streamId) }, series = true)
         }
     }
 }
@@ -398,7 +370,7 @@ private fun remaining(ms: Long): String {
 
 /** First in "Voor jou": opens "Leer mijn smaak". The size of a poster, so the row stays one height. */
 @Composable
-private fun LearnTasteTile(first: Boolean, onClick: () -> Unit, modifier: Modifier = Modifier) {
+private fun LearnTasteTile(first: Boolean, series: Boolean, onClick: () -> Unit, modifier: Modifier = Modifier) {
     androidx.tv.material3.Card(
         onClick = onClick,
         modifier = modifier.width(92.dp).aspectRatio(2f / 3f),
@@ -410,11 +382,62 @@ private fun LearnTasteTile(first: Boolean, onClick: () -> Unit, modifier: Modifi
         Column(Modifier.fillMaxSize().padding(8.dp), verticalArrangement = Arrangement.Center, horizontalAlignment = Alignment.CenterHorizontally) {
             Icon(Icons.Filled.ThumbUp, contentDescription = null, tint = Live, modifier = Modifier.size(26.dp))
             Text(
-                if (first) "Leer mijn smaak" else "Meer films beoordelen",
+                if (first) "Leer mijn smaak" else if (series) "Meer series beoordelen" else "Meer films beoordelen",
                 style = MaterialTheme.typography.labelMedium,
                 textAlign = TextAlign.Center,
                 modifier = Modifier.padding(top = 8.dp),
             )
         }
     }
+}
+
+
+/**
+ * "Films voor jou" or "Series voor jou": "Leer mijn smaak" first, then the suggestions, and under
+ * the row why the focused one is there. The line is always one line high, so nothing jumps.
+ */
+@OptIn(ExperimentalComposeUiApi::class)
+@Composable
+private fun TasteRow(title: String, items: List<Taste.Suggestion>, onLearn: () -> Unit, onOpen: (Taste.Film) -> Unit, series: Boolean = false) {
+    var focused by remember { mutableStateOf<Taste.Suggestion?>(null) }
+    Text(title, style = MaterialTheme.typography.titleLarge)
+    LazyRow(
+        contentPadding = Rows.tilePadding,
+        horizontalArrangement = Arrangement.spacedBy(Rows.tileGap),
+        modifier = Modifier.focusRestorer(),
+    ) {
+        item(key = "learn") {
+            LearnTasteTile(
+                first = items.isEmpty(),
+                series = series,
+                onClick = onLearn,
+                modifier = Modifier.lastInRow(items.isEmpty()).onFocusChanged { if (it.isFocused) focused = null },
+            )
+        }
+        items(items, key = { it.film.key }) { f ->
+            PosterTile(
+                title = f.film.title,
+                imageUrl = f.film.posterUrl,
+                onClick = { onOpen(f.film) },
+                onLongClick = {},
+                modifier = Modifier.lastInRow(f == items.last())
+                    .onFocusChanged { if (it.isFocused) focused = f else if (focused == f) focused = null },
+            )
+        }
+    }
+    Text(
+        focused?.let { f ->
+            listOfNotNull(
+                Taste.displayTitle(f.film.title, f.film.year),
+                Taste.ratingLabel(f.film.rating),
+                f.because?.let { "omdat je ${Taste.displayTitle(it)} leuk vond" },
+            ).joinToString(" · ")
+        }
+            ?: if (items.isEmpty()) "Zeg van tien ${if (series) "series" else "films"} of je ze leuk vindt, dan zoekt BUIS er ${if (series) "series" else "films"} bij." else " ",
+        style = MaterialTheme.typography.bodyLarge,
+        color = TextSecondary,
+        maxLines = 1,
+        overflow = TextOverflow.Ellipsis,
+        modifier = Modifier.padding(start = 12.dp, top = 14.dp),
+    )
 }

@@ -117,7 +117,8 @@ fun ShellScreen(
     onOpenHistory: () -> Unit,
     onOpenGuide: (Long) -> Unit,
     onOpenChannelHealth: () -> Unit,
-    onOpenTaste: () -> Unit,
+    onOpenTaste: (series: Boolean) -> Unit,
+    onOpenTasteProfile: () -> Unit,
     onLoggedOut: () -> Unit,
     vm: ShellViewModel = hiltViewModel(),
 ) {
@@ -233,13 +234,13 @@ fun ShellScreen(
         }
         Box(Modifier.fillMaxSize().padding(top = SafeArea, end = SafeArea, start = 24.dp)) {
             when (tab) {
-                Tab.HOME -> HomeScreen(onPlay = onPlay, onOpenMovie = onOpenMovie, onOpenTaste = onOpenTaste)
+                Tab.HOME -> HomeScreen(onPlay = onPlay, onOpenMovie = onOpenMovie, onOpenSeries = onOpenSeries, onOpenTaste = onOpenTaste)
                 Tab.LIVE -> LiveScreen(onPlay = onPlay)
                 Tab.MOVIES -> MoviesScreen(onOpenMovie = onOpenMovie)
                 Tab.SERIES -> SeriesScreen(onOpenSeries = onOpenSeries)
                 Tab.FAVORITES -> FavoritesScreen(onPlay = onPlay, onOpenMovie = onOpenMovie, onOpenSeries = onOpenSeries, onOpenGuide = onOpenGuide)
                 Tab.SEARCH -> SearchScreen(onPlay = onPlay, onOpenMovie = onOpenMovie, onOpenSeries = onOpenSeries)
-                Tab.SETTINGS -> SettingsScreen(onRefreshCatalog = onRefreshCatalog, onLoggedOut = onLoggedOut, onEditProfile = onEditProfile, onOpenHistory = onOpenHistory, onOpenChannelHealth = onOpenChannelHealth)
+                Tab.SETTINGS -> SettingsScreen(onRefreshCatalog = onRefreshCatalog, onLoggedOut = onLoggedOut, onEditProfile = onEditProfile, onOpenHistory = onOpenHistory, onOpenChannelHealth = onOpenChannelHealth, onOpenTasteProfile = onOpenTasteProfile)
             }
         }
     }

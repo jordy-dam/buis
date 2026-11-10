@@ -92,7 +92,7 @@ interface CatalogDao {
     ): PagingSource<Int, MovieTile>
 
     /**
-     * Films › Nieuw: every film in the given countries, newest first, each film once, with the same
+     * Films › Net toegevoegd: every film in the given countries, newest first, each film once, with the same
      * genre/mood and length filters as a category. (Was "Recent toegevoegd" on Home.)
      */
     @Query(
@@ -109,7 +109,7 @@ interface CatalogDao {
         maxSecs: Int,
     ): PagingSource<Int, MovieTile>
 
-    /** Genres of the newest films, for the chips over Films › Nieuw. */
+    /** Genres of the newest films, for the chips over Films › Net toegevoegd. */
     @Query(
         "SELECT i.genre FROM movie m JOIN category c ON c.type = 'MOVIE' AND c.id = m.categoryId JOIN movie_info i ON i.streamId = m.streamId " +
             "WHERE c.country IN (:countries) AND (:hideAdult = 0 OR c.adult = 0) AND m.addedAt IS NOT NULL ORDER BY m.addedAt DESC LIMIT 300",
@@ -350,6 +350,9 @@ interface MovieInfoDao {
     fun done(countries: List<String>): Flow<Int>
 }
 
+/** One series across its language versions and categories: title and year (table `s`); "series:" keeps it apart from film keys. */
+const val SERIES_KEY = "('series:' || lower(s.name) || '|' || IFNULL(s.year, ''))"
+
 /** One film across its language versions: the TMDB id when known, else title and year (tables `m` and `i`). */
 const val FILM_KEY = "COALESCE(CAST(m.tmdbId AS TEXT), CAST(i.tmdbId AS TEXT), lower(m.name) || '|' || IFNULL(m.year, ''))"
 
@@ -533,6 +536,9 @@ interface TasteDao {
     @Query("SELECT * FROM taste_vote WHERE profileId = :profileId")
     suspend fun all(profileId: Long): List<TasteVoteEntity>
 
+    @Query("DELETE FROM taste_vote WHERE profileId = :profileId")
+    suspend fun clear(profileId: Long)
+
     @Query("SELECT COUNT(*) FROM taste_vote WHERE profileId = :profileId AND filmKey = :filmKey")
     suspend fun count(profileId: Long, filmKey: String): Int
 
@@ -557,6 +563,33 @@ interface TasteDao {
             "FROM movie m JOIN movie_info i ON i.streamId = m.streamId WHERE m.streamId IN (:streamIds) GROUP BY m.streamId",
     )
     suspend fun filmsById(streamIds: List<Int>): List<TasteFilmRow>
+
+    /** Series in the given countries, one row per title and year (language versions merged), as "Voor jou" weighs them. */
+    @Query(
+        "SELECT $SERIES_KEY AS filmKey, s.seriesId AS streamId, s.name, s.coverUrl AS posterUrl, s.year, s.rating, " +
+            "s.genre, NULL AS `cast`, NULL AS director, NULL AS durationSecs, COUNT(*) AS versions " +
+            "FROM series s JOIN category c ON c.type = 'SERIES' AND c.id = s.categoryId " +
+            "WHERE c.country IN (:countries) AND (:hideAdult = 0 OR c.adult = 0) GROUP BY filmKey",
+    )
+    suspend fun series(countries: List<String>, hideAdult: Boolean): List<TasteFilmRow>
+
+    @Query(
+        "SELECT $SERIES_KEY AS filmKey, s.seriesId AS streamId, s.name, s.coverUrl AS posterUrl, s.year, s.rating, " +
+            "s.genre, NULL AS `cast`, NULL AS director, NULL AS durationSecs, 1 AS versions " +
+            "FROM series s WHERE s.seriesId IN (:seriesIds) GROUP BY s.seriesId",
+    )
+    suspend fun seriesById(seriesIds: List<Int>): List<TasteFilmRow>
+
+    @Query("SELECT $SERIES_KEY FROM series s WHERE s.seriesId = :seriesId LIMIT 1")
+    suspend fun seriesKey(seriesId: Int): String?
+
+    /** Series the profile watched an episode of: not suggested again. */
+    @Query(
+        "SELECT DISTINCT $SERIES_KEY FROM series s WHERE s.seriesId IN (SELECT e.seriesId FROM episode e WHERE e.episodeId IN " +
+            "(SELECT itemId FROM watch_log WHERE profileId = :profileId AND type = 'SERIES' " +
+            "UNION SELECT itemId FROM playback_position WHERE profileId = :profileId AND type = 'SERIES'))",
+    )
+    suspend fun watchedSeriesKeys(profileId: Long): List<String>
 
     /** Films the profile watched or started: not suggested again. */
     @Query(

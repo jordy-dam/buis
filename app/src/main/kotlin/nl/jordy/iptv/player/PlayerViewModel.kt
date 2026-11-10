@@ -113,8 +113,10 @@ data class PlayerUiState(
     val versionPlaying: Int? = null,
     /** Live: the version playing is the one this channel always plays. */
     val versionKept: Boolean = true,
-    /** Films: seconds the thumbs at the end credits still show. */
+    /** Films, and a series' last episode: seconds the thumbs at the end credits still show. */
     val thumbsSecondsLeft: Int? = null,
+    /** The film or series the thumbs are for. */
+    val thumbsTitle: String = "",
 )
 
 /** One version of a live channel: "ESPN 1 · FHD · Odido", and how it ran here ("liep goed"). */
@@ -275,6 +277,8 @@ class PlayerViewModel @Inject constructor(
             }
             PlayerRoute.Kind.EPISODE -> {
                 loadSeries()
+                // The series gets a thumb after the last episode there is, unless it already has one.
+                filmVoted = seriesId?.let { id -> runCatching { taste.hasVoted(id, ContentType.SERIES) }.getOrDefault(true) } ?: true
                 val episode = episodes.firstOrNull { it.episodeId == route.id }
                 val title = episode?.let { "$seriesName – ${it.title}" } ?: route.title
                 watching(WatchItem(ContentType.SERIES, route.id, title, containerExtension = route.containerExtension))
@@ -672,6 +676,7 @@ class PlayerViewModel @Inject constructor(
         if (route.kind == PlayerRoute.Kind.EPISODE) {
             introTick(now)
             nextUpTick(now)
+            if (nextEpisode == null) thumbsTick(now)
         }
         if (route.kind == PlayerRoute.Kind.MOVIE) thumbsTick(now)
     }
@@ -867,7 +872,7 @@ class PlayerViewModel @Inject constructor(
         }
         val left = FilmThumbs.SECONDS - ((now - shownAt) / 1000).toInt()
         if (left > 0) {
-            if (_state.value.thumbsSecondsLeft != left) _state.update { it.copy(thumbsSecondsLeft = left) }
+            if (_state.value.thumbsSecondsLeft != left) _state.update { it.copy(thumbsSecondsLeft = left, thumbsTitle = thumbsTitle()) }
         } else dismissThumbs()
     }
 
@@ -875,8 +880,17 @@ class PlayerViewModel @Inject constructor(
     fun rateFilm(vote: Int) {
         filmVoted = true
         dismissThumbs()
-        viewModelScope.launch { runCatching { taste.vote(route.id, route.title, vote) } }
+        viewModelScope.launch {
+            runCatching {
+                val series = seriesId
+                if (route.kind == PlayerRoute.Kind.EPISODE && series != null) taste.vote(series, seriesName, vote, type = ContentType.SERIES)
+                else taste.vote(route.id, route.title, vote)
+            }
+        }
     }
+
+    /** What the thumb is for: the film, or the series rather than its last episode. */
+    private fun thumbsTitle() = if (route.kind == PlayerRoute.Kind.EPISODE) seriesName else route.title
 
     fun dismissThumbs() {
         thumbsShownAt = null

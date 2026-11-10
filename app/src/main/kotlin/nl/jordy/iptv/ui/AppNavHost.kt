@@ -29,6 +29,7 @@ import nl.jordy.iptv.ui.profiles.ProfileEditScreen
 import nl.jordy.iptv.ui.profiles.ProfilePickerScreen
 import nl.jordy.iptv.ui.shell.ShellScreen
 import nl.jordy.iptv.ui.sync.SyncScreen
+import nl.jordy.iptv.ui.taste.TasteProfileScreen
 import nl.jordy.iptv.ui.taste.TasteScreen
 
 /**
@@ -90,7 +91,8 @@ fun AppNavHost(start: Any) {
                 onOpenHistory = { nav.navigate(HistoryRoute) },
                 onOpenGuide = { nav.navigate(TvGuideRoute(it)) },
                 onOpenChannelHealth = { nav.navigate(ChannelHealthRoute) },
-                onOpenTaste = { nav.navigate(TasteRoute) },
+                onOpenTaste = { nav.navigate(TasteRoute(it)) },
+                onOpenTasteProfile = { nav.navigate(TasteProfileRoute) },
                 onLoggedOut = { nav.navigate(LoginRoute) { popUpTo(ShellRoute) { inclusive = true } } },
             )
         }
@@ -101,5 +103,6 @@ fun AppNavHost(start: Any) {
         composable<ChannelHealthRoute> { ChannelHealthScreen() }
         composable<TvGuideRoute> { TvGuideScreen(onPlay = { nav.navigate(it) }) }
         composable<TasteRoute> { TasteScreen(onDone = { nav.popBackStack() }) }
+        composable<TasteProfileRoute> { TasteProfileScreen(onLearn = { nav.navigate(TasteRoute()) }) }
     }
 }

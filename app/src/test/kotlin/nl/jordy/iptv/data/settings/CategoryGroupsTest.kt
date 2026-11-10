@@ -4,6 +4,7 @@ import nl.jordy.iptv.data.db.CategoryEntity
 import nl.jordy.iptv.data.settings.CategoryGroups.Kind
 import nl.jordy.iptv.data.xtream.ContentType
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class CategoryGroupsTest {
@@ -20,6 +21,26 @@ class CategoryGroupsTest {
         assertEquals(listOf("DISNEY+ 4K HDR | SDR", "HBOMAX", "NETFLIX", "NETFLIX DOCUMENTAIRES"), groups[0].categories.map { it.name })
         assertEquals(listOf("ACTIE", "HORROR"), groups[1].categories.map { it.name })
         assertEquals(listOf("BIOSCOOP", "4K HDR | SDR", "GOLDEN CLASSICS"), groups[2].categories.map { it.name })
+    }
+
+    @Test
+    fun `the provider's own picks go on top, even pinned, and look-alikes don't`() {
+        val shown = listOf("NETFLIX", "TOP 100", "ACTIE", "NEW RELEASES", "TOPGEAR SPECIALS", "NEWFAITHNETWORK", "BIOSCOOP").map(::cat)
+        val groups = CategoryGroups.group(shown, pinned = setOf("MOVIE:TOP 100"))
+        assertEquals(Kind.FEATURED, groups.first().kind)
+        assertEquals(listOf("TOP 100", "NEW RELEASES"), groups.first().categories.map { it.name })
+        assertEquals("a channel named New-something is no pick", Kind.OTHER, CategoryGroups.kind("NEWFAITHNETWORK"))
+        assertEquals(Kind.OTHER, CategoryGroups.kind("TOPGEAR SPECIALS"))
+    }
+
+    @Test
+    fun `provider picks read as what they are, top list first`() {
+        val (rankTop, top) = CategoryGroups.featured(cat("TOP 100"))
+        val (rankNew, new) = CategoryGroups.featured(cat("NEW RELEASES"))
+        assertEquals("Top 100", top.name)
+        assertEquals("Nieuwe films", new.name)
+        assertEquals("Nieuwe series", CategoryGroups.featured(cat("NEW RELEASES"), series = true).second.name)
+        assertTrue(rankTop < rankNew)
     }
 
     @Test

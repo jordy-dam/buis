@@ -35,7 +35,7 @@ import androidx.sqlite.db.SupportSQLiteDatabase
         CalendarEventEntity::class,
         TasteVoteEntity::class,
     ],
-    version = 29,
+    version = 30,
     exportSchema = true,
     autoMigrations = [
         AutoMigration(from = 1, to = 2, spec = AppDatabase.CatalogResync::class),
@@ -87,6 +87,8 @@ import androidx.sqlite.db.SupportSQLiteDatabase
         AutoMigration(from = 27, to = 28),
         // "Voor jou": thumbs per profile and film; a new, empty table.
         AutoMigration(from = 28, to = 29),
+        // Series in "Voor jou": a vote says whether it was a film or a series; existing votes are films.
+        AutoMigration(from = 29, to = 30),
     ],
 )
 abstract class AppDatabase : RoomDatabase() {

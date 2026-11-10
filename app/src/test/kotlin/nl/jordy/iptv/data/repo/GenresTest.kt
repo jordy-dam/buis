@@ -10,7 +10,8 @@ class GenresTest {
         assertEquals(listOf("Drama", "Misdaad"), Genres.split("Drama, Misdaad"))
         assertEquals(listOf("Actie", "Avontuur"), Genres.split("Action & Adventure"))
         assertEquals(listOf("Komedie"), Genres.split("Comedy / Komedie"))
-        assertEquals(listOf("Sci-Fi", "Fantasy"), Genres.split("Sci-Fi & Fantasy"))
+        // The same chip (and taste) as films call it: "Sciencefiction", "Fantasie".
+        assertEquals(listOf("Sciencefiction", "Fantasie"), Genres.split("Sci-Fi & Fantasy"))
         assertEquals(emptyList<String>(), Genres.split(null))
         assertEquals("fragments like 'TV' are noise", emptyList<String>(), Genres.split(" , TV"))
     }

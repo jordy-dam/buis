@@ -571,7 +571,7 @@ fun PlayerScreen(onExit: () -> Unit, vm: PlayerViewModel = hiltViewModel()) {
             Card.BREAK -> BreakCard(state.breakSecondsLeft ?: 0, cardFocus, vm::endBreak, corner)
             Card.NEXT -> state.nextUp?.let { NextEpisodeCard(it, cardFocus, vm::playNextNow, vm::dismissNextUp, corner) }
             Card.INTRO -> state.skipIntroTo?.let { IntroCard(it, cardFocus, vm::skipIntro, vm::dismissIntro, corner) }
-            Card.THUMBS -> state.thumbsSecondsLeft?.let { ThumbsCard(state.title, it, cardFocus, vm::rateFilm, corner) }
+            Card.THUMBS -> state.thumbsSecondsLeft?.let { ThumbsCard(state.thumbsTitle, it, cardFocus, vm::rateFilm, corner) }
             null -> Unit
         }
     }
@@ -1110,7 +1110,7 @@ internal fun formatTime(ms: Long): String {
     return if (s >= 3600) "%d:%02d:%02d".format(s / 3600, s % 3600 / 60, s % 60) else "%d:%02d".format(s / 60, s % 60)
 }
 
-/** Over the end credits of a film: one thumb for "Voor jou". It goes by itself; Back says nothing. */
+/** Over the end credits of a film or a series' last episode: one thumb for "Voor jou". It goes by itself; Back says nothing. */
 @Composable
 private fun ThumbsCard(title: String, secondsLeft: Int, main: FocusRequester, onVote: (Int) -> Unit, modifier: Modifier) {
     CornerCard(

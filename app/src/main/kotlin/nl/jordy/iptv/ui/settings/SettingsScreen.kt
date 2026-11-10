@@ -48,6 +48,7 @@ import androidx.compose.material.icons.filled.HourglassEmpty
 import androidx.compose.material.icons.filled.SwitchVideo
 import androidx.compose.material.icons.filled.Visibility
 import androidx.compose.material.icons.filled.History
+import androidx.compose.material.icons.filled.ThumbUp
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.EventNote
 import androidx.compose.material.icons.filled.Movie
@@ -331,7 +332,7 @@ class SettingsViewModel @Inject constructor(
  */
 @OptIn(ExperimentalComposeUiApi::class)
 @Composable
-fun SettingsScreen(onRefreshCatalog: () -> Unit, onLoggedOut: () -> Unit, onEditProfile: (Long) -> Unit, onOpenHistory: () -> Unit, onOpenChannelHealth: () -> Unit, vm: SettingsViewModel = hiltViewModel()) {
+fun SettingsScreen(onRefreshCatalog: () -> Unit, onLoggedOut: () -> Unit, onEditProfile: (Long) -> Unit, onOpenHistory: () -> Unit, onOpenChannelHealth: () -> Unit, onOpenTasteProfile: () -> Unit, vm: SettingsViewModel = hiltViewModel()) {
     val scope = rememberCoroutineScope()
     // PIN checks still to pass before "Profiel bewerken" opens, as in "Wie kijkt er?".
     var gates by remember { mutableStateOf<Pair<Long, List<List<String>>>?>(null) }
@@ -373,7 +374,7 @@ fun SettingsScreen(onRefreshCatalog: () -> Unit, onLoggedOut: () -> Unit, onEdit
     val firstRow = remember { FocusRequester() }
     val top = Modifier.focusRequester(firstRow)
     val summary = mapOf(
-        Section.PROFILE to "Profiel en kijkgeschiedenis",
+        Section.PROFILE to "Profiel, kijkgeschiedenis en smaak",
         Section.WATCHING to "Geluid ${TrackLabels.name(prefs.audioLang, TrackLabels.AUDIO_CHOICES)} · ondertitels ${TrackLabels.name(prefs.subtitleLang, TrackLabels.SUBTITLE_CHOICES)}",
         Section.FOLLOWING to (followTerms + calendars.map { it.name }).distinctBy { it.lowercase() }.joinToString(", ").ifEmpty { "Niets" } + if (prefs.autoSwitch) " · overschakelen aan" else "",
         Section.REST to listOfNotNull(
@@ -418,6 +419,7 @@ fun SettingsScreen(onRefreshCatalog: () -> Unit, onLoggedOut: () -> Unit, onEdit
                 Section.PROFILE -> {
                     SettingRow("Profiel bewerken", "Naam, avatar, pincode en kinderprofiel.", leading = Icons.Filled.Person, onClick = { openEdit() }, modifier = top)
                     SettingRow("Kijkgeschiedenis", "Wat er op dit profiel is gekeken, en het weekoverzicht.", leading = Icons.Filled.History, onClick = onOpenHistory)
+                    SettingRow("Mijn smaak", "Wat BUIS uit je duimen haalt voor Voor jou; hier wis je het ook.", leading = Icons.Filled.ThumbUp, onClick = onOpenTasteProfile)
                     SettingRow("Uiterlijk", leading = Icons.Filled.Palette, value = Look.of(profile?.look ?: 0).label, onClick = vm::cycleLook)
                     // Only Garage has a car behind its screens; each OK shows the next one at once.
                     if (Look.of(profile?.look ?: 0) == Look.GARAGE) {

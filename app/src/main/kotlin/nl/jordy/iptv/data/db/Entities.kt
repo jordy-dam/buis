@@ -413,9 +413,11 @@ data class SeriesIntroEntity(
 data class TasteVoteEntity(
     val profileId: Long,
     val filmKey: String,
-    /** The version that was voted on, for its genre, cast and director in movie_info. */
+    /** The version that was voted on: a film's stream id (details in movie_info) or a series id. */
     val streamId: Int,
     val title: String,
     val vote: Int,
     val at: Long,
+    /** A film or a series; one taste covers both. */
+    @ColumnInfo(defaultValue = "MOVIE") val type: ContentType = ContentType.MOVIE,
 )

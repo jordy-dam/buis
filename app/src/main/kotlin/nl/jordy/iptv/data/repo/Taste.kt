@@ -8,9 +8,11 @@ import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.mapLatest
 import kotlinx.coroutines.withContext
 import nl.jordy.iptv.data.db.AppDatabase
+import nl.jordy.iptv.data.db.FavoriteEntity
 import nl.jordy.iptv.data.db.TasteFilmRow
 import nl.jordy.iptv.data.db.TasteVoteEntity
 import nl.jordy.iptv.data.profile.ProfileRepository
+import nl.jordy.iptv.data.xtream.ContentType
 import nl.jordy.iptv.data.xtream.NameParser
 import javax.inject.Inject
 import javax.inject.Singleton
@@ -32,9 +34,12 @@ object Taste {
     const val LIKE = 1
     const val DISLIKE = -1
     const val UNKNOWN = 0
+    /** "Wil ik zien": heard of it, looks good, can't judge it yet. Goes to Favorieten, weighs a third of a thumb. */
+    const val WANT = 2
 
     private const val LIKE_WEIGHT = 3.0
     private const val DISLIKE_WEIGHT = -2.0
+    private const val WANT_WEIGHT = 1.0
     private const val DIRECTOR = 1.5
     private const val ACTOR = 0.6
     private const val CAST = 4
@@ -98,6 +103,7 @@ object Taste {
             val sign = when (v.vote) {
                 LIKE -> LIKE_WEIGHT
                 DISLIKE -> DISLIKE_WEIGHT
+                WANT -> WANT_WEIGHT
                 else -> continue
             }
             features(v.film).forEach { (k, s) -> w[k] = (w[k] ?: 0.0) + sign * s }
@@ -116,8 +122,9 @@ object Taste {
      * a genre, director or actor the profile liked: with nothing to go on there is no suggestion.
      */
     fun suggest(candidates: List<Film>, votes: List<Vote>, exclude: Set<String>, limit: Int = 20): List<Suggestion> {
+        if (votes.none { it.vote == LIKE || it.vote == WANT }) return emptyList()
+        // Only a real thumb up is named as the reason: "omdat je X leuk vond" isn't true of a "wil ik zien".
         val liked = votes.filter { it.vote == LIKE }.map { it.film }
-        if (liked.isEmpty()) return emptyList()
         val weights = weights(votes)
         val voted = votes.mapTo(HashSet()) { it.film.key }
         return candidates.asSequence()
@@ -144,12 +151,12 @@ object Taste {
 
     /**
      * Ten films for "Leer mijn smaak", already voted ones never again: [HITS] hits (recent and
-     * carried widely), [CLASSICS] classics (rated 7.5 or more, from [CLASSIC_UNTIL] or before) and
+     * carried widely), [CLASSICS] classics (rated 7.5 or more, from [classicUntil] or before) and
      * the rest from genres the round doesn't cover yet, mixed so the kinds take turns. Each kind is
      * a random pick among its best [POOL], so a second round brings other films. A kind the catalog
      * can't fill is filled from the genre spread.
      */
-    fun probes(candidates: List<Film>, votedKeys: Set<String>, count: Int = 10, random: Random = Random.Default, thisYear: Int = java.time.Year.now().value): List<Film> {
+    fun probes(candidates: List<Film>, votedKeys: Set<String>, count: Int = 10, random: Random = Random.Default, thisYear: Int = java.time.Year.now().value, classicUntil: Int = CLASSIC_UNTIL): List<Film> {
         // Real genres only, for every kind: a "genre" with a handful of titles is a recording ("F10",
         // "Kids"), and "TV Film" is mostly shows (wrestling), not films anyone has an opinion about.
         val usable = candidates.filter { it.key !in votedKeys && it.genres.isNotEmpty() && it.posterUrl != null && (it.rating ?: 0.0) >= 6.0 }
@@ -165,7 +172,7 @@ object Taste {
         )
         val classics = best(
             // A classic is a feature film: high-rated documentaries and concert recordings aren't.
-            pool.filter { f -> (f.rating ?: 0.0) >= CLASSIC_RATING && f.year != null && f.year <= CLASSIC_UNTIL && f.genres.none { it.lowercase() in notFeature } },
+            pool.filter { f -> (f.rating ?: 0.0) >= CLASSIC_RATING && f.year != null && f.year <= classicUntil && f.genres.none { it.lowercase() in notFeature } },
             // Widely carried first: the highest rated old films are often obscure ones with few votes.
             compareByDescending<Film> { it.versions }.thenByDescending { it.rating ?: 0.0 }, CLASSICS,
         )
@@ -202,11 +209,63 @@ object Taste {
     private const val HIT_YEARS = 10
     private const val CLASSIC_RATING = 7.5
     const val CLASSIC_UNTIL = 2005
+    /** Series had their great years later (The Wire to Breaking Bad and beyond). */
+    const val SERIES_CLASSIC_UNTIL = 2015
     /** Each kind picks at random among its best few, so rounds differ but stay well known. */
     private const val POOL = 15
     private const val MIN_GENRE_FILMS = 15
+    /** Titles a genre needs in the catalog to be named in "Mijn smaak". */
+    const val REAL_GENRE = 15
     private val notFilms = setOf("tv film", "tv movie", "tv-film")
-    private val notFeature = setOf("documentaire", "documentary", "muziek", "music")
+    private val notFeature = setOf("documentaire", "documentary", "muziek", "music", "reality", "kids", "kinderen", "talk", "news", "nieuws", "soap")
+
+    /** What "Mijn smaak" shows: the strongest pulls and pushes, in words. */
+    data class Summary(
+        val likes: Int,
+        val dislikes: Int,
+        val wants: Int,
+        val genres: List<String>,
+        val avoid: List<String>,
+        val directors: List<String>,
+        val actors: List<String>,
+        val period: String?,
+        val length: String?,
+    ) {
+        val empty get() = likes + dislikes + wants == 0
+    }
+
+    /**
+     * [realGenres]: genres that are more than a label on a few recordings ("Smackdown", a Greek
+     * provider tag); null shows every genre. Weights keep them either way, they're just not worth saying.
+     */
+    fun summary(votes: List<Vote>, realGenres: Set<String>? = null): Summary {
+        val w = weights(votes).filterKeys { k -> !k.startsWith("g:") || realGenres == null || k.removePrefix("g:") in realGenres }
+        fun top(prefix: String, n: Int, positive: Boolean = true) = w.entries
+            .filter { it.key.startsWith(prefix) && if (positive) it.value > 0 else it.value < 0 }
+            .sortedBy { if (positive) -it.value else it.value }
+            .take(n).map { label(it.key.removePrefix(prefix)) }
+        return Summary(
+            likes = votes.count { it.vote == LIKE },
+            dislikes = votes.count { it.vote == DISLIKE },
+            wants = votes.count { it.vote == WANT },
+            genres = top("g:", 5),
+            avoid = top("g:", 3, positive = false),
+            directors = top("d:", 3),
+            actors = top("c:", 3),
+            period = top("p:", 1).firstOrNull()?.let { p ->
+                // "1990" → "jaren 90"; from 2000 on "jaren 10" is ambiguous, so "2010–2019".
+                p.toIntOrNull()?.let { d -> if (d < 2000) "jaren ${d % 100}" else "$d–${d + 9}" } ?: p.lowercase()
+            },
+            length = top("l:", 1).firstOrNull()?.let { if (it == "Kort") "korte films" else "lange films" },
+        )
+    }
+
+    /** "christopher nolan" → "Christopher Nolan"; keys are stored lower case. */
+    private fun label(key: String) = key.split(' ').joinToString(" ") { w -> w.replaceFirstChar { it.uppercase() } }
+
+    /** The provider's rating as people read it here: "★ 7,8"; null when there is none (0 or missing). */
+    fun ratingLabel(rating: Double?): String? =
+        rating?.takeIf { it > 0 }?.coerceAtMost(10.0)?.let { "★ " + "%.1f".format(java.util.Locale.forLanguageTag("nl"), it) }
 
     /** "The Dark Knight 4K - 2008" → "The Dark Knight": the provider's labels and year don't belong in a sentence. */
     fun displayTitle(raw: String, year: Int? = null): String {
@@ -240,40 +299,72 @@ class TasteRepository @Inject constructor(
     @OptIn(ExperimentalCoroutinesApi::class)
     val votes: Flow<List<TasteVoteEntity>> = profiles.currentId.flatMapLatest { dao.observe(it) }
 
-    /** "Voor jou" for the watching profile; recomputed when a vote or the profile's countries change. */
+    /**
+     * "Films voor jou" / "Series voor jou" for the watching profile, recomputed when a vote or the
+     * profile's countries change. One taste: a thumb for a series counts for films too, and back.
+     */
     @OptIn(ExperimentalCoroutinesApi::class)
-    val suggestions: Flow<List<Taste.Suggestion>> = combine(profiles.currentId, profiles.prefs, votes) { id, p, v -> Triple(id, p, v) }
+    fun suggestions(type: ContentType): Flow<List<Taste.Suggestion>> = combine(profiles.currentId, profiles.prefs, votes) { id, p, v -> Triple(id, p, v) }
         .mapLatest { (id, p, v) ->
             withContext(Dispatchers.Default) {
                 if (v.none { it.vote == Taste.LIKE }) return@withContext emptyList()
-                val films = dao.films(p.preferredCountries.toList(), p.hideAdult).map(Taste::film)
-                Taste.suggest(films, voted(v), dao.watchedKeys(id).toSet())
+                Taste.suggest(candidates(type, p.preferredCountries.toList(), p.hideAdult), voted(v), watched(type, id))
             }
         }
 
-    /** Ten films to swipe for the watching profile. */
-    suspend fun probes(count: Int = 10): List<Taste.Film> = withContext(Dispatchers.Default) {
+    /** Ten films or series to swipe for the watching profile. */
+    suspend fun probes(type: ContentType = ContentType.MOVIE, count: Int = 10): List<Taste.Film> = withContext(Dispatchers.Default) {
         val p = profiles.currentPrefs()
         val votedKeys = dao.all(profiles.currentId()).mapTo(HashSet()) { it.filmKey }
-        Taste.probes(dao.films(p.preferredCountries.toList(), p.hideAdult).map(Taste::film), votedKeys, count)
+        Taste.probes(
+            candidates(type, p.preferredCountries.toList(), p.hideAdult), votedKeys, count,
+            classicUntil = if (type == ContentType.SERIES) Taste.SERIES_CLASSIC_UNTIL else Taste.CLASSIC_UNTIL,
+        )
     }
 
-    suspend fun vote(streamId: Int, title: String, vote: Int, key: String? = null) {
+    suspend fun vote(id: Int, title: String, vote: Int, key: String? = null, type: ContentType = ContentType.MOVIE, imageUrl: String? = null) {
         val profile = profiles.currentId()
-        val filmKey = key ?: dao.filmKey(streamId) ?: return
-        dao.upsert(TasteVoteEntity(profile, filmKey, streamId, title, vote, System.currentTimeMillis()))
+        val k = key ?: keyOf(type, id) ?: return
+        dao.upsert(TasteVoteEntity(profile, k, id, title, vote, System.currentTimeMillis(), type))
+        // "Wil ik zien" is a watchlist too: Favorieten is where this household keeps those.
+        if (vote == Taste.WANT) db.favorites().upsert(FavoriteEntity(profile, type, id, title, imageUrl, System.currentTimeMillis()))
     }
 
-    suspend fun hasVoted(streamId: Int): Boolean {
-        val key = dao.filmKey(streamId) ?: return false
+    suspend fun hasVoted(id: Int, type: ContentType = ContentType.MOVIE): Boolean {
+        val key = keyOf(type, id) ?: return false
         return dao.count(profiles.currentId(), key) > 0
     }
 
+    /** "Mijn smaak" for the watching profile. */
+    @OptIn(ExperimentalCoroutinesApi::class)
+    val summary: Flow<Taste.Summary> = votes.mapLatest { v ->
+        withContext(Dispatchers.Default) {
+            val p = profiles.currentPrefs()
+            val all = candidates(ContentType.MOVIE, p.preferredCountries.toList(), p.hideAdult) + candidates(ContentType.SERIES, p.preferredCountries.toList(), p.hideAdult)
+            val real = all.flatMap { it.genres }.groupingBy { it.lowercase() }.eachCount().filterValues { it >= Taste.REAL_GENRE }.keys
+            Taste.summary(voted(v), real)
+        }
+    }
+
+    /** "Smaak wissen": every thumb of the watching profile. Favorieten from "Wil ik zien" stay. */
+    suspend fun reset() = dao.clear(profiles.currentId())
+
+    private suspend fun keyOf(type: ContentType, id: Int) = if (type == ContentType.SERIES) dao.seriesKey(id) else dao.filmKey(id)
+
+    private suspend fun candidates(type: ContentType, countries: List<String>, hideAdult: Boolean) =
+        (if (type == ContentType.SERIES) dao.series(countries, hideAdult) else dao.films(countries, hideAdult)).map(Taste::film)
+
+    private suspend fun watched(type: ContentType, profile: Long) =
+        (if (type == ContentType.SERIES) dao.watchedSeriesKeys(profile) else dao.watchedKeys(profile)).toSet()
+
     private suspend fun voted(v: List<TasteVoteEntity>): List<Taste.Vote> {
-        val byId = dao.filmsById(v.map { it.streamId }).associateBy { it.streamId }
-        return v.mapNotNull { e ->
-            // A film whose details never came still counts as voted, so it isn't suggested or swiped again.
-            val film = byId[e.streamId]?.let(Taste::film)?.copy(key = e.filmKey)
+        val (series, films) = v.partition { it.type == ContentType.SERIES }
+        val byId = dao.filmsById(films.map { it.streamId }).associateBy { "m${it.streamId}" } +
+            dao.seriesById(series.map { it.streamId }).associateBy { "s${it.streamId}" }
+        return v.map { e ->
+            // Details that never came still count as voted, so it isn't suggested or swiped again.
+            val row = byId[(if (e.type == ContentType.SERIES) "s" else "m") + e.streamId]
+            val film = row?.let(Taste::film)?.copy(key = e.filmKey)
                 ?: Taste.Film(e.filmKey, e.streamId, e.title, null, null, null, emptyList(), emptyList(), emptyList())
             Taste.Vote(film, e.vote)
         }

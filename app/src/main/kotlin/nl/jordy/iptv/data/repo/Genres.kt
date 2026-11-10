@@ -10,6 +10,8 @@ object Genres {
         "comedy" to "Komedie", "crime" to "Misdaad", "mystery" to "Mysterie", "documentary" to "Documentaire",
         "animation" to "Animatie", "family" to "Familie", "action" to "Actie", "adventure" to "Avontuur",
         "war" to "Oorlog", "romance" to "Romantiek", "dram" to "Drama",
+        // Series use TMDB's TV names ("Sci-Fi & Fantasy", "War & Politics"); the same chip as films.
+        "sci-fi" to "Sciencefiction", "fantasy" to "Fantasie", "politics" to "Politiek", "history" to "Historisch",
     )
 
     /** One raw genre field → clean, distinct Dutch names. */
