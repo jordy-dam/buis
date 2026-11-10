@@ -4,7 +4,9 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.flatMapLatest
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.mapLatest
 import kotlinx.coroutines.withContext
 import nl.jordy.iptv.data.db.AppDatabase
@@ -300,11 +302,17 @@ class TasteRepository @Inject constructor(
     val votes: Flow<List<TasteVoteEntity>> = profiles.currentId.flatMapLatest { dao.observe(it) }
 
     /**
-     * "Films voor jou" / "Series voor jou" for the watching profile, recomputed when a vote or the
-     * profile's countries change. One taste: a thumb for a series counts for films too, and back.
+     * "Films voor jou" / "Series voor jou" for the watching profile, recomputed when a vote, the
+     * profile's countries or what it watched change (a film seen leaves the row at once). One taste:
+     * a thumb for a series counts for films too, and back.
      */
     @OptIn(ExperimentalCoroutinesApi::class)
-    fun suggestions(type: ContentType): Flow<List<Taste.Suggestion>> = combine(profiles.currentId, profiles.prefs, votes) { id, p, v -> Triple(id, p, v) }
+    fun suggestions(type: ContentType): Flow<List<Taste.Suggestion>> = combine(
+        profiles.currentId, profiles.prefs, votes,
+        profiles.currentId.flatMapLatest { db.playback().watched(it) },
+        // Live zapping writes the log too: only a film or episode started counts, so the row isn't redone per zap.
+        profiles.currentId.flatMapLatest { db.watchLog().since(it, 0) }.map { rows -> rows.count { it.type != ContentType.LIVE } }.distinctUntilChanged(),
+    ) { id, p, v, _, _ -> Triple(id, p, v) }
         .mapLatest { (id, p, v) ->
             withContext(Dispatchers.Default) {
                 if (v.none { it.vote == Taste.LIKE }) return@withContext emptyList()

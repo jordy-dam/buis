@@ -632,11 +632,13 @@ interface TasteDao {
     )
     suspend fun watchedSeriesKeys(profileId: Long): List<String>
 
-    /** Films the profile watched or started: not suggested again. */
+    /** Films the profile watched (the check, kept for good) or started: not suggested again. */
     @Query(
         "SELECT DISTINCT $FILM_KEY FROM movie m LEFT JOIN movie_info i ON i.streamId = m.streamId " +
             "WHERE m.streamId IN (SELECT itemId FROM watch_log WHERE profileId = :profileId AND type = 'MOVIE' " +
-            "UNION SELECT itemId FROM playback_position WHERE profileId = :profileId AND type = 'MOVIE')",
+            "UNION SELECT itemId FROM playback_position WHERE profileId = :profileId AND type = 'MOVIE' " +
+            "UNION SELECT streamId FROM watched_film WHERE profileId = :profileId) " +
+            "UNION SELECT filmKey FROM watched_film WHERE profileId = :profileId",
     )
     suspend fun watchedKeys(profileId: Long): List<String>
 }

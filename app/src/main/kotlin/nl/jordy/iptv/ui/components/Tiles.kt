@@ -393,9 +393,9 @@ fun FavoriteBadge(modifier: Modifier = Modifier) {
  * that vanished on light posters and looked like the focus.
  */
 @Composable
-fun WatchedBadge(modifier: Modifier = Modifier, size: Dp = 28.dp) {
+fun WatchedBadge(modifier: Modifier = Modifier, size: Dp = 28.dp, iconSize: Dp = size * 0.65f) {
     Box(modifier.size(size).background(nl.jordy.iptv.ui.theme.Live, CircleShape), contentAlignment = Alignment.Center) {
-        androidx.tv.material3.Icon(Icons.Filled.Check, contentDescription = "Gezien", tint = Color.Black.copy(alpha = 0.85f), modifier = Modifier.size(size * 0.65f))
+        androidx.tv.material3.Icon(Icons.Filled.Check, contentDescription = "Gezien", tint = Color.Black.copy(alpha = 0.85f), modifier = Modifier.size(iconSize))
     }
 }
 

@@ -150,11 +150,8 @@ fun MovieDetailScreen(onPlay: (PlayerRoute) -> Unit, vm: MovieDetailViewModel = 
                         SecondaryButton("${version.label.language} · ${versions.size} versies", { pickVersion = true })
                     }
                     FavoriteButton(favorite, vm::toggleFavorite)
-                    // Next to the heart, not a button: something BUIS knows, not something to press.
-                    if (watched) Row(Modifier.align(Alignment.CenterVertically), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                        nl.jordy.iptv.ui.components.WatchedBadge(size = 32.dp)
-                        Text("Gezien", style = MaterialTheme.typography.titleMedium, color = TextSecondary)
-                    }
+                    // Next to the heart and its size, not a button: something BUIS knows, not something to press.
+                    if (watched) nl.jordy.iptv.ui.components.WatchedBadge(Modifier.align(Alignment.CenterVertically), size = 40.dp, iconSize = 22.dp)
                 }
             }
         },
