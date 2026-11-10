@@ -296,6 +296,9 @@ interface PlaybackDao {
     suspend fun markWatched(profileId: Long, streamId: Int, at: Long)
     @Query("SELECT * FROM watched_film WHERE profileId = :profileId")
     fun watched(profileId: Long): Flow<List<WatchedFilmEntity>>
+    /** For the log line at start: what's marked, with the film's name, newest first. */
+    @Query("SELECT w.filmKey AS filmKey, w.at AS at, (SELECT name FROM movie WHERE streamId = w.streamId LIMIT 1) AS name FROM watched_film w WHERE w.profileId = :profileId ORDER BY w.at DESC")
+    suspend fun watchedNames(profileId: Long): List<WatchedName>
 
     /** "Verder kijken": finished items are already deleted by the resume policy. */
     @Query("SELECT * FROM playback_position WHERE profileId = :profileId ORDER BY updatedAt DESC LIMIT :limit")
@@ -388,6 +391,8 @@ const val SERIES_KEY = "('series:' || lower(s.name) || '|' || IFNULL(s.year, '')
 
 /** One film across its language versions: the TMDB id when known, else title and year (tables `m` and `i`). */
 const val FILM_KEY = "COALESCE(CAST(m.tmdbId AS TEXT), CAST(i.tmdbId AS TEXT), lower(m.name) || '|' || IFNULL(m.year, ''))"
+
+data class WatchedName(val filmKey: String, val at: Long, val name: String?)
 
 /** A film with the people from its details, for Zoeken op regisseur of acteur. */
 data class MoviePeopleRow(@Embedded val movie: MovieEntity, val people: String?, val director: String?, val adult: Boolean?)

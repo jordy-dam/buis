@@ -6,6 +6,7 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import kotlinx.coroutines.flow.stateIn
+import kotlinx.coroutines.flow.onEach
 import androidx.navigation.NavDestination.Companion.hasRoute
 import androidx.navigation.compose.currentBackStackEntryAsState
 import nl.jordy.iptv.ui.reminders.BedtimeHost
@@ -130,7 +131,8 @@ fun AppNavHost(start: Any) {
 /** Watched films for the posters' check, for the whole app. */
 @dagger.hilt.android.lifecycle.HiltViewModel
 class WatchedViewModel @javax.inject.Inject constructor(library: nl.jordy.iptv.data.repo.LibraryRepository) : androidx.lifecycle.ViewModel() {
-    val films = library.watchedFilms.stateIn(
-        viewModelScope, kotlinx.coroutines.flow.SharingStarted.Eagerly, nl.jordy.iptv.data.repo.WatchedFilms(),
-    )
+    val films = library.watchedFilms
+        // Each new set (start, profile switch, a film just watched) goes to the log, see logWatched.
+        .onEach { runCatching { library.logWatched() } }
+        .stateIn(viewModelScope, kotlinx.coroutines.flow.SharingStarted.Eagerly, nl.jordy.iptv.data.repo.WatchedFilms())
 }

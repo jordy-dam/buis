@@ -116,6 +116,16 @@ class LibraryRepository @Inject constructor(
         }
     }
 
+    /**
+     * What watched_film holds for the active profile, as one log line: the release build's database
+     * can't be read over adb, its log can (`adb logcat -s BUIS-watched`).
+     */
+    suspend fun logWatched() {
+        val id = profiles.currentId()
+        val rows = db.playback().watchedNames(id)
+        android.util.Log.i("BUIS-watched", "profile $id: ${rows.size} films: " + rows.joinToString(" | ") { "${it.name ?: "?"} [${it.filmKey}] ${java.time.Instant.ofEpochMilli(it.at)}" })
+    }
+
     /** The active profile's watched films, for the check on posters. */
     @OptIn(ExperimentalCoroutinesApi::class)
     val watchedFilms: Flow<WatchedFilms> = profiles.currentId.flatMapLatest { id ->

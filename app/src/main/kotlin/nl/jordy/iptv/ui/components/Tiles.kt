@@ -8,6 +8,7 @@ import androidx.compose.material.icons.filled.History
 import android.view.KeyEvent
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.ui.focus.FocusRequester
@@ -146,8 +147,11 @@ fun PosterTile(
             if (imageUrl != null) {
                 AsyncImage(model = imageUrl, contentDescription = title, contentScale = ContentScale.Crop, modifier = Modifier.fillMaxSize())
             }
-            if (favorite) FavoriteBadge(Modifier.align(Alignment.TopEnd).padding(6.dp))
-            if (watched) WatchedBadge(Modifier.align(Alignment.BottomEnd).padding(6.dp).padding(bottom = if (progress != null) 5.dp else 0.dp))
+            // Top right, like the heart and next to it: one corner for what's yours about a title.
+            if (favorite || watched) Row(Modifier.align(Alignment.TopEnd).padding(6.dp), horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                if (watched) WatchedBadge()
+                if (favorite) FavoriteBadge()
+            }
             if (label != null) {
                 Text(
                     label,
@@ -384,11 +388,14 @@ fun FavoriteBadge(modifier: Modifier = Modifier) {
     }
 }
 
-/** "Gezien": a white check on a dark disc, readable on any poster. */
+/**
+ * "Gezien": a disc filled with the profile's accent and a dark check, the heart's size. Not white:
+ * that vanished on light posters and looked like the focus.
+ */
 @Composable
-fun WatchedBadge(modifier: Modifier = Modifier) {
-    Box(modifier.size(26.dp).background(Color.Black.copy(alpha = 0.7f), RoundedCornerShape(13.dp)), contentAlignment = Alignment.Center) {
-        androidx.tv.material3.Icon(Icons.Filled.Check, contentDescription = "Gezien", tint = Color.White, modifier = Modifier.size(18.dp))
+fun WatchedBadge(modifier: Modifier = Modifier, size: Dp = 28.dp) {
+    Box(modifier.size(size).background(nl.jordy.iptv.ui.theme.Live, CircleShape), contentAlignment = Alignment.Center) {
+        androidx.tv.material3.Icon(Icons.Filled.Check, contentDescription = "Gezien", tint = Color.Black.copy(alpha = 0.85f), modifier = Modifier.size(size * 0.65f))
     }
 }
 

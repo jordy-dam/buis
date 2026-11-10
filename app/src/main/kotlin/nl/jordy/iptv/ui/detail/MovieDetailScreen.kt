@@ -48,6 +48,7 @@ import androidx.navigation.toRoute
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
+import nl.jordy.iptv.data.repo.filmKey
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import nl.jordy.iptv.data.db.AppDatabase
@@ -125,6 +126,8 @@ fun MovieDetailScreen(onPlay: (PlayerRoute) -> Unit, vm: MovieDetailViewModel = 
     val resumeAt = position?.let { ResumePolicy.startPosition(it.positionMs, it.durationMs) } ?: 0
     val version = versions.firstOrNull { it.streamId == selected }
     val ext = version?.containerExtension ?: info?.containerExtension ?: m.containerExtension
+    // Any version counts: the check is for the film, not the language.
+    val watched = nl.jordy.iptv.ui.components.LocalWatchedFilms.current.let { w -> w.has(selected, m.filmKey()) || versions.any { w.has(it.streamId) } }
     fun play(fromStart: Boolean) = onPlay(PlayerRoute(PlayerRoute.Kind.MOVIE, selected, m.name, ext, fromStart = fromStart))
 
     DetailScaffold(
@@ -147,6 +150,11 @@ fun MovieDetailScreen(onPlay: (PlayerRoute) -> Unit, vm: MovieDetailViewModel = 
                         SecondaryButton("${version.label.language} · ${versions.size} versies", { pickVersion = true })
                     }
                     FavoriteButton(favorite, vm::toggleFavorite)
+                    // Next to the heart, not a button: something BUIS knows, not something to press.
+                    if (watched) Row(Modifier.align(Alignment.CenterVertically), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        nl.jordy.iptv.ui.components.WatchedBadge(size = 32.dp)
+                        Text("Gezien", style = MaterialTheme.typography.titleMedium, color = TextSecondary)
+                    }
                 }
             }
         },
