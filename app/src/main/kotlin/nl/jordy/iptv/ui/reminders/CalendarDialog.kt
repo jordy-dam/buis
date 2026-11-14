@@ -104,7 +104,7 @@ internal fun CalendarDialog(
 
     Dialog(onDismissRequest = { if (step == Step.List) onDismiss() else step = Step.List }) {
         Column(
-            Modifier.ignoreHeldKey().background(SurfaceColor, RoundedCornerShape(16.dp)).padding(24.dp).width(560.dp).heightIn(max = 600.dp),
+            Modifier.ignoreHeldKey().background(SurfaceColor, RoundedCornerShape(16.dp)).padding(32.dp).width(560.dp).heightIn(max = 600.dp),
             verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {
             when (val s = step) {
@@ -112,7 +112,7 @@ internal fun CalendarDialog(
                     Text("Agenda's", style = MaterialTheme.typography.headlineMedium)
                     Text(
                         "Voor sport zonder gids, zoals Viaplay F1 of F1 TV Pro. Elke afspraak in de agenda geeft een melding op de zender die je kiest.",
-                        style = MaterialTheme.typography.bodyMedium,
+                        style = MaterialTheme.typography.bodyLarge,
                         color = TextSecondary,
                     )
                     LazyColumn(Modifier.weight(1f, fill = false), verticalArrangement = Arrangement.spacedBy(4.dp)) {

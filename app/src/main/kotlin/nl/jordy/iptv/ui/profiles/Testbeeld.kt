@@ -5,6 +5,10 @@ import android.media.AudioFormat
 import android.media.AudioTrack
 import android.view.KeyEvent
 import androidx.compose.animation.core.Animatable
+import androidx.compose.animation.core.LinearEasing
+import androidx.compose.animation.core.animateFloat
+import androidx.compose.animation.core.infiniteRepeatable
+import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
@@ -28,7 +32,9 @@ import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.input.key.KeyEventType
 import androidx.compose.ui.input.key.key
@@ -44,6 +50,7 @@ import kotlinx.coroutines.launch
 import java.time.LocalTime
 import java.time.format.DateTimeFormatter
 import kotlin.math.PI
+import kotlin.math.cos
 import kotlin.math.sin
 
 /** ↑ ↑ ↓ ↓ ← → ← → OK, the classic code. Keys in between that don't fit start it over. */
@@ -81,12 +88,14 @@ private val bars = listOf(
 private val clock = DateTimeFormatter.ofPattern("HH:mm:ss")
 
 /**
- * The easter egg: the picture switches off like an old tube (it collapses into a line, then a dot),
- * comes back as a testbeeld with the real time and a soft 1 kHz tone, and any key warms the tube
- * up again into the app.
+ * The picture switches off like an old tube (it collapses into a line, then a dot), comes back as a
+ * testbeeld with the real time, and any key warms the tube up again into the app. A faint
+ * interference band rolls down now and then, and the whole picture wanders a few pixels over the
+ * minutes so nothing burns in. As the easter egg it hums a soft 1 kHz tone; when it comes up on its
+ * own because nobody touched the remote ([idle]) it stays quiet.
  */
 @Composable
-fun TestbeeldOverlay(onDone: () -> Unit) {
+fun TestbeeldOverlay(idle: Boolean = false, onDone: () -> Unit) {
     // 1 = full picture, towards 0 the tube switches off: first the height, then the width.
     val height = remember { Animatable(1f) }
     val width = remember { Animatable(1f) }
@@ -104,7 +113,12 @@ fun TestbeeldOverlay(onDone: () -> Unit) {
         width.animateTo(1f, tween(200))
         height.animateTo(1f, tween(320))
     }
-    if (showBars && !leaving) Tone()
+    if (showBars && !leaving && !idle) Tone()
+    val motion = rememberInfiniteTransition(label = "testbeeld")
+    // 0..1 over 9 s: the band crosses in the first 3 s and then waits below the picture.
+    val roll by motion.animateFloat(0f, 1f, infiniteRepeatable(tween(9_000, easing = LinearEasing)), label = "roll")
+    // One slow circle every 4 minutes, at most 10 px from the middle: against burn-in.
+    val drift by motion.animateFloat(0f, (2 * PI).toFloat(), infiniteRepeatable(tween(240_000, easing = LinearEasing)), label = "drift")
 
     Box(
         Modifier
@@ -127,7 +141,7 @@ fun TestbeeldOverlay(onDone: () -> Unit) {
             .focusable(),
         contentAlignment = Alignment.Center,
     ) {
-        Canvas(Modifier.fillMaxSize()) {
+        Canvas(Modifier.fillMaxSize().graphicsLayer { translationX = 10f * cos(drift); translationY = 10f * sin(drift) }) {
             val w = size.width * width.value.coerceAtLeast(0.006f)
             val h = size.height * height.value
             val left = (size.width - w) / 2
@@ -149,6 +163,16 @@ fun TestbeeldOverlay(onDone: () -> Unit) {
             drawCircle(Color.White, radius = h * 0.36f, center = Offset(size.width / 2, size.height / 2), style = Stroke(width = 4f))
             drawLine(Color.White, Offset(size.width / 2, top), Offset(size.width / 2, top + h), strokeWidth = 2f)
             drawLine(Color.White, Offset(left, size.height / 2), Offset(left + w, size.height / 2), strokeWidth = 2f)
+            // The interference band: a soft light smear with a few dark scan lines through it.
+            if (height.value > 0.9f && !leaving) {
+                val bandH = h * 0.09f
+                val y = top - bandH + (roll * 3f).coerceAtMost(1f) * (h + bandH)
+                drawRect(
+                    Brush.verticalGradient(listOf(Color.Transparent, Color.White.copy(alpha = 0.10f), Color.Transparent), startY = y, endY = y + bandH),
+                    Offset(left, y), Size(w, bandH),
+                )
+                for (i in 1..3) drawRect(Color.Black.copy(alpha = 0.12f), Offset(left, y + bandH * i / 4f), Size(w, 2f))
+            }
         }
         if (showBars && height.value > 0.9f && !leaving) {
             val now by produceState(LocalTime.now()) {
@@ -157,14 +181,14 @@ fun TestbeeldOverlay(onDone: () -> Unit) {
                     delay(1_000)
                 }
             }
-            Column(horizontalAlignment = Alignment.CenterHorizontally) {
+            Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.graphicsLayer { translationX = 10f * cos(drift); translationY = 10f * sin(drift) }) {
                 Text("BUIS", fontSize = 64.sp, fontWeight = FontWeight.Bold, color = Color.White, modifier = Modifier.background(Color.Black).padding(horizontal = 28.dp, vertical = 4.dp))
                 Text(clock.format(now), fontSize = 28.sp, color = Color.White, modifier = Modifier.background(Color.Black).padding(horizontal = 16.dp, vertical = 2.dp).padding(top = 0.dp))
             }
             Text(
                 "Beste Unieke IPTV Stream",
                 fontSize = 22.sp, color = Color.White,
-                modifier = Modifier.align(Alignment.BottomCenter).padding(bottom = 36.dp).background(Color.Black).padding(horizontal = 18.dp, vertical = 4.dp),
+                modifier = Modifier.align(Alignment.BottomCenter).graphicsLayer { translationX = 10f * cos(drift); translationY = 10f * sin(drift) }.padding(bottom = 36.dp).background(Color.Black).padding(horizontal = 18.dp, vertical = 4.dp),
             )
         }
     }

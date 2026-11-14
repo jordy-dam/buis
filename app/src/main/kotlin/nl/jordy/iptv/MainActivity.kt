@@ -58,9 +58,16 @@ class MainActivity : ComponentActivity() {
         }
     }
 
+    // Every key counts as someone being there, for the idle testbeeld.
+    override fun dispatchKeyEvent(event: android.view.KeyEvent): Boolean {
+        nl.jordy.iptv.data.settings.IdleClock.touch()
+        return super.dispatchKeyEvent(event)
+    }
+
     // Every return to the app is a chance to pick up a newer guide and calendars, in the background.
     override fun onStart() {
         super.onStart()
+        nl.jordy.iptv.data.settings.IdleClock.touch()
         guide.refreshIfStale()
         calendars.refreshIfStale()
     }

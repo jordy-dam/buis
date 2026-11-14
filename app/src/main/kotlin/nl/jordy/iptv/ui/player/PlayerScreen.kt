@@ -107,12 +107,10 @@ import nl.jordy.iptv.player.NextUpCard
 import nl.jordy.iptv.player.PlayerUiState
 import nl.jordy.iptv.player.PlayerViewModel
 import nl.jordy.iptv.player.TrackOption
-import nl.jordy.iptv.ui.components.BreakIcons
 import nl.jordy.iptv.ui.components.CornerCard
 import androidx.compose.material.icons.filled.ThumbDown
 import androidx.compose.material.icons.filled.ThumbUp
 import nl.jordy.iptv.data.repo.Taste
-import nl.jordy.iptv.player.FilmThumbs
 import nl.jordy.iptv.ui.components.CornerFade
 import nl.jordy.iptv.ui.components.BottomFade
 import nl.jordy.iptv.ui.components.PrimaryButton
@@ -566,7 +564,7 @@ fun PlayerScreen(onExit: () -> Unit, vm: PlayerViewModel = hiltViewModel()) {
             .stayIn()
         // The thumbs end the film: nothing left to watch behind them, so they get the middle and a dimmed picture.
         val middle = Modifier.align(Alignment.Center).ignoreHeldKey().stayIn()
-        if (card == Card.THUMBS) Box(Modifier.fillMaxSize().background(Color.Black.copy(alpha = 0.6f)))
+        if (card == Card.THUMBS) Box(Modifier.fillMaxSize().background(Color.Black.copy(alpha = 0.8f)))
         // The bar's fade behind a card when the bar is hidden; with the bar, its own fade is there already.
         else if (card != null && !barShows) CornerFade()
         when (card) {
@@ -574,7 +572,7 @@ fun PlayerScreen(onExit: () -> Unit, vm: PlayerViewModel = hiltViewModel()) {
             Card.BREAK -> BreakCard(state.breakSecondsLeft ?: 0, cardFocus, vm::endBreak, corner)
             Card.NEXT -> state.nextUp?.let { NextEpisodeCard(it, cardFocus, vm::playNextNow, vm::dismissNextUp, corner) }
             Card.INTRO -> state.skipIntroTo?.let { IntroCard(it, cardFocus, vm::skipIntro, vm::dismissIntro, corner) }
-            Card.THUMBS -> state.thumbsSecondsLeft?.let { ThumbsCard(state.thumbsTitle, it, cardFocus, vm::rateFilm, middle) }
+            Card.THUMBS -> state.thumbsSecondsLeft?.let { ThumbsCard(cardFocus, vm::rateFilm, middle) }
             null -> Unit
         }
     }
@@ -934,7 +932,7 @@ private fun NextEpisodeCard(card: NextUpCard, main: FocusRequester, onPlay: () -
         label = card.secondsLeft?.let { "Volgende aflevering over $it s" } ?: "Kijk je nog?",
         title = card.title,
         modifier = modifier,
-        visual = { Text(card.code, style = MaterialTheme.typography.titleMedium, color = TextSecondary) },
+        // The same amber countdown as every other card that goes on by itself.
     ) {
         PrimaryButton(if (card.secondsLeft == null) "Volgende aflevering" else "Nu kijken", onPlay, Modifier.focusRequester(main), large = true)
         IconButton(Icons.Filled.Stop, "Stoppen", onStop, large = true)
@@ -948,13 +946,6 @@ private fun BreakCard(secondsLeft: Int, main: FocusRequester, onEnd: () -> Unit,
         label = "Pauze · verder over ${formatTime(secondsLeft * 1000L)}",
         title = "Even plassen, drinken of iets pakken",
         modifier = modifier,
-        visual = {
-            Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                BreakIcons.all.forEach {
-                    Image(it, contentDescription = null, colorFilter = ColorFilter.tint(TextSecondary), modifier = Modifier.size(28.dp))
-                }
-            }
-        },
     ) {
         PrimaryButton("Verder", onEnd, Modifier.focusRequester(main), large = true)
         IconButton(Icons.Filled.SkipNext, "Overslaan", onEnd, large = true)
@@ -1113,16 +1104,18 @@ internal fun formatTime(ms: Long): String {
     return if (s >= 3600) "%d:%02d:%02d".format(s / 3600, s % 3600 / 60, s % 60) else "%d:%02d".format(s / 60, s % 60)
 }
 
-/** Over the end credits of a film or a series' last episode: one thumb for "Voor jou". It goes by itself; Back says nothing. */
+/**
+ * Over the end credits of a film or a series' last episode: one thumb for "Voor jou", in the
+ * middle of the dimmed picture with the question underneath. No corner card and no bar: the film
+ * is over, so this is the only thing on screen. It goes by itself; Back says nothing.
+ */
 @Composable
-private fun ThumbsCard(title: String, secondsLeft: Int, main: FocusRequester, onVote: (Int) -> Unit, modifier: Modifier) {
-    CornerCard(
-        label = "Wat vond je ervan?",
-        title = title,
-        modifier = modifier,
-        timeLeft = { secondsLeft / FilmThumbs.SECONDS.toFloat() },
-    ) {
-        IconButton(Icons.Filled.ThumbUp, "Leuk", { onVote(Taste.LIKE) }, Modifier.focusRequester(main), large = true)
-        IconButton(Icons.Filled.ThumbDown, "Niks", { onVote(Taste.DISLIKE) }, large = true)
+private fun ThumbsCard(main: FocusRequester, onVote: (Int) -> Unit, modifier: Modifier) {
+    Column(modifier, horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(20.dp)) {
+        Row(horizontalArrangement = Arrangement.spacedBy(24.dp)) {
+            IconButton(Icons.Filled.ThumbUp, "Leuk", { onVote(Taste.LIKE) }, Modifier.focusRequester(main), large = true)
+            IconButton(Icons.Filled.ThumbDown, "Niks", { onVote(Taste.DISLIKE) }, large = true)
+        }
+        Text("Wat vond jij?", style = MaterialTheme.typography.headlineMedium)
     }
 }

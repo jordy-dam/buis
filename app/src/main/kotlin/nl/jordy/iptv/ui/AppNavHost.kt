@@ -63,6 +63,8 @@ fun AppNavHost(start: Any) {
         nav.navigate(route)
     })
     BedtimeHost(watching && bedtimeOnScreen, vm = bedtime)
+    // Everywhere but the player, login and the catalog sync.
+    nl.jordy.iptv.ui.profiles.IdleTestbeeldHost(dest != null && !dest.hasRoute<PlayerRoute>() && !dest.hasRoute<LoginRoute>() && !dest.hasRoute<SyncRoute>())
     val watched by hiltViewModel<WatchedViewModel>().films.collectAsStateWithLifecycle()
     androidx.compose.runtime.CompositionLocalProvider(nl.jordy.iptv.ui.components.LocalWatchedFilms provides watched) {
     NavHost(navController = nav, startDestination = start) {

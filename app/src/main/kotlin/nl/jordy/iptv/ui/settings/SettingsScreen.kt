@@ -173,6 +173,7 @@ class SettingsViewModel @Inject constructor(
     private val calendarRepo: CalendarRepository,
     private val openSubtitles: OpenSubtitles,
     private val liveDelayStore: LiveDelayStore,
+    private val idleStore: nl.jordy.iptv.data.settings.IdleTestbeeldStore,
 ) : ViewModel() {
     /** Debug builds: the screensaver's posters, for its preview. */
     suspend fun dreamPosters() = posters.load()
@@ -197,6 +198,9 @@ class SettingsViewModel @Inject constructor(
     val liveDelay = liveDelayStore.delay.stateIn(viewModelScope, SharingStarted.Eagerly, LiveDelay.DEFAULT)
     val liveDelaySummary = liveDelayStore.summary.stateIn(viewModelScope, SharingStarted.Eagerly, null)
     fun cycleLiveDelay() = viewModelScope.launch { liveDelayStore.set(liveDelay.value.next()) }
+
+    val idleMinutes = idleStore.minutes.stateIn(viewModelScope, SharingStarted.Eagerly, nl.jordy.iptv.data.settings.IdleTestbeeldStore.DEFAULT)
+    fun cycleIdleMinutes() = viewModelScope.launch { idleStore.set(nl.jordy.iptv.data.settings.IdleTestbeeldStore.next(idleMinutes.value)) }
 
     val openSubtitlesLogin = openSubtitles.login.stateIn(viewModelScope, SharingStarted.Eagerly, null)
     /** Null when it signed in and is saved; else what went wrong. */
@@ -266,7 +270,7 @@ class SettingsViewModel @Inject constructor(
         val now = profile.value?.car ?: 0
         profiles.setCar((now + 1) % GarageCar.entries.size)
     }
-    fun cycleSleepTimer() = viewModelScope.launch { profiles.setSleepMinutes(SleepTimer.nextChoice(prefs.value.sleepMinutes)) }
+    fun cycleSleepTimer() = viewModelScope.launch { profiles.setSleepMinutes(SleepTimer.nextChoice(prefs.value.sleepMinutes, if (BuildConfig.DEBUG) SleepTimer.DEBUG_CHOICES else SleepTimer.CHOICES)) }
     fun cycleBreak() = viewModelScope.launch {
         // Debug builds add a 1-minute choice, to see the break without watching for an hour.
         val choices = if (BuildConfig.DEBUG) BreakTimer.DEBUG_CHOICES else BreakTimer.CHOICES
@@ -363,6 +367,7 @@ fun SettingsScreen(onRefreshCatalog: () -> Unit, onLoggedOut: () -> Unit, onEdit
     val openSubtitlesLogin by vm.openSubtitlesLogin.collectAsStateWithLifecycle()
     val liveDelay by vm.liveDelay.collectAsStateWithLifecycle()
     val liveDelaySummary by vm.liveDelaySummary.collectAsStateWithLifecycle()
+    val idleMinutes by vm.idleMinutes.collectAsStateWithLifecycle()
 
     // Two panes, like the tv's own settings: the sections on the left, each with a line saying how
     // it's set, and the focused section's settings on the right. Entering from the rail lands on
@@ -452,6 +457,13 @@ fun SettingsScreen(onRefreshCatalog: () -> Unit, onLoggedOut: () -> Unit, onEdit
                         onClick = { pickCountries = true },
                     )
                     SettingRow("Alleen voorkeurslanden", leading = Icons.Filled.FilterAlt, toggle = prefs.onlyPreferred, onClick = vm::toggleOnlyPreferred)
+                    SettingRow(
+                        "Testbeeld",
+                        "Als niemand de afstandsbediening aanraakt, behalve tijdens het kijken. Voor iedereen in huis.",
+                        leading = Icons.Filled.Tv,
+                        value = nl.jordy.iptv.data.settings.IdleTestbeeldStore.label(idleMinutes),
+                        onClick = vm::cycleIdleMinutes,
+                    )
                 }
                 Section.FOLLOWING -> {
                     SettingRow("Volgen", "Zoektermen voor de gids; BUIS meldt het als iets bijna begint.", leading = Icons.Filled.Visibility, value = followTerms.joinToString(", ").ifEmpty { "Niets" }, onClick = { editFollows = true }, modifier = top)
@@ -763,7 +775,7 @@ private fun CountryDialog(countries: List<String>, selected: Set<String>, onTogg
     val first = remember { FocusRequester() }
     Dialog(onDismissRequest = onDismiss) {
         Column(
-            Modifier.background(SurfaceColor, RoundedCornerShape(16.dp)).padding(24.dp).width(420.dp).heightIn(max = 460.dp),
+            Modifier.background(SurfaceColor, RoundedCornerShape(16.dp)).padding(32.dp).width(420.dp).heightIn(max = 460.dp),
             verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {
             Text("Voorkeurslanden", style = MaterialTheme.typography.headlineMedium)

@@ -33,7 +33,9 @@ class SleepTimer(private val minutes: Int, startedAtMs: Long) {
         const val WARNING_MS = 60_000L
         /** What Instellingen offers, in minutes; 0 is "Uit". */
         val CHOICES = listOf(0, 30, 60, 90, 120)
+        /** Debug builds add 2 minutes, so the warning shows after one minute without waiting half an hour. */
+        val DEBUG_CHOICES = listOf(0, 2, 30, 60, 90, 120)
 
-        fun nextChoice(current: Int): Int = CHOICES[(CHOICES.indexOf(current).coerceAtLeast(0) + 1) % CHOICES.size]
+        fun nextChoice(current: Int, choices: List<Int> = CHOICES): Int = choices[(choices.indexOf(current).coerceAtLeast(0) + 1) % choices.size]
     }
 }

@@ -1,5 +1,7 @@
 package nl.jordy.iptv.ui.reminders
 
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Close
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.LinearEasing
 import androidx.compose.animation.core.tween
@@ -42,6 +44,7 @@ import nl.jordy.iptv.data.repo.WatchLog
 import nl.jordy.iptv.data.profile.ProfileRepository
 import nl.jordy.iptv.ui.PlayerRoute
 import nl.jordy.iptv.ui.components.CornerCard
+import nl.jordy.iptv.ui.components.IconButton
 import nl.jordy.iptv.ui.components.CornerFade
 import nl.jordy.iptv.ui.components.PrimaryButton
 import nl.jordy.iptv.ui.components.ignoreHeldKey
@@ -143,12 +146,6 @@ fun ReminderHost(active: Boolean, onWatch: (PlayerRoute) -> Unit, vm: ReminderVi
         delay(HIDE_AFTER_MS)
         vm.dismiss(FollowMatches.Outcome.TIMED_OUT)
     }
-    // The wait as a bar running out: the hide timer (back to full on a key), or the auto-switch countdown.
-    val bar = remember(m.key, d.moment) { Animatable(1f) }
-    LaunchedEffect(m.key, d.moment, counting, if (counting) 0 else touched) {
-        bar.snapTo(1f)
-        bar.animateTo(0f, tween(if (counting) AUTO_SWITCH_SEC * 1000 else HIDE_AFTER_MS.toInt(), easing = LinearEasing))
-    }
     // A card in the corner over the undimmed screen, like a tv notification, not a dialog in the middle.
     Dialog(onDismissRequest = { vm.dismiss(FollowMatches.Outcome.REFUSED) }, properties = DialogProperties(usePlatformDefaultWidth = false)) {
         (LocalView.current.parent as? DialogWindowProvider)?.window?.setDimAmount(0f)
@@ -165,19 +162,14 @@ fun ReminderHost(active: Boolean, onWatch: (PlayerRoute) -> Unit, vm: ReminderVi
             title = m.title,
             subtitle = m.channelName,
             modifier = Modifier.padding(SafeArea).ignoreHeldKey().onPreviewKeyEvent { touched++; false },
-            timeLeft = { bar.value },
-            inlineActions = true,
-            // Logo plate like the channel rows: logos are often transparent PNGs.
-            visual = {
-                Text(m.channelName.take(2).uppercase(), style = MaterialTheme.typography.titleMedium, color = TextSecondary)
-                if (m.logoUrl != null) AsyncImage(model = m.logoUrl, contentDescription = null, contentScale = ContentScale.Fit, modifier = Modifier.fillMaxSize().padding(6.dp))
-            },
         ) {
-            // One choice only: OK watches, Back skips. Following is changed in Instellingen.
+            // OK watches; the X (or Back) says no and stays where you are, also during the countdown.
+            // Following itself is changed in Instellingen.
             PrimaryButton("Kijken", {
                 vm.dismiss(FollowMatches.Outcome.WATCHED)
                 onWatch(live)
             }, Modifier.focusRequester(watch), large = true)
+            IconButton(Icons.Filled.Close, "Niet kijken", { vm.dismiss(FollowMatches.Outcome.REFUSED) }, large = true)
         }
         }
     }

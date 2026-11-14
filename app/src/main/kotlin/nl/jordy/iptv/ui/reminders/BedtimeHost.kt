@@ -31,10 +31,12 @@ import kotlinx.coroutines.launch
 import nl.jordy.iptv.data.profile.Bedtime
 import nl.jordy.iptv.data.profile.ProfileRepository
 import nl.jordy.iptv.data.profile.prefs
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.PowerSettingsNew
 import nl.jordy.iptv.ui.components.CornerCard
+import nl.jordy.iptv.ui.components.IconButton
 import nl.jordy.iptv.ui.components.CornerFade
 import nl.jordy.iptv.ui.components.PrimaryButton
-import nl.jordy.iptv.ui.components.SecondaryButton
 import nl.jordy.iptv.ui.components.ignoreHeldKey
 import nl.jordy.iptv.ui.theme.SafeArea
 import java.time.LocalDate
@@ -94,7 +96,8 @@ fun BedtimeHost(active: Boolean, vm: BedtimeViewModel = hiltViewModel()) {
                 modifier = Modifier.padding(SafeArea).ignoreHeldKey(),
             ) {
                 PrimaryButton("Doorkijken", vm::dismiss, Modifier.focusRequester(stay), large = true)
-                SecondaryButton("Naar bed", {
+                // Like every card: the main choice a word, the other a round icon. Off, as in "BUIS uit".
+                IconButton(Icons.Filled.PowerSettingsNew, "Naar bed", {
                     vm.dismiss()
                     activity?.finish()
                 }, large = true)

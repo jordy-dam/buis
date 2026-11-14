@@ -157,7 +157,8 @@ fun GuidePickDialog(channelName: String, guides: List<Guide>, streamId: Int, onT
                     )
                 }
             }
-            SecondaryButton("Klaar", onDismiss)
+            // The only button, so the main one, like Klaar in Volgen and Voorkeurslanden.
+            PrimaryButton("Klaar", onDismiss)
         }
     }
     LaunchedEffect(Unit) { runCatching { first.requestFocus() } }

@@ -48,13 +48,13 @@ internal fun FollowDialog(
     var draft by remember { mutableStateOf("") }
     Dialog(onDismissRequest = onDismiss) {
         Column(
-            Modifier.background(SurfaceColor, RoundedCornerShape(16.dp)).padding(24.dp).width(520.dp).heightIn(max = 560.dp),
+            Modifier.background(SurfaceColor, RoundedCornerShape(16.dp)).padding(32.dp).width(520.dp).heightIn(max = 560.dp),
             verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {
             Text("Volgen", style = MaterialTheme.typography.headlineMedium)
             Text(
                 "Bijvoorbeeld \"Formule 1\" of \"FC Utrecht\". BUIS zoekt in titels en omschrijvingen van de gids (zo'n anderhalve dag vooruit) en meldt het als het bijna begint.",
-                style = MaterialTheme.typography.bodyMedium,
+                style = MaterialTheme.typography.bodyLarge,
                 color = TextSecondary,
             )
             TvTextField(
