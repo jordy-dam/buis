@@ -1,12 +1,12 @@
 #!/usr/bin/env bash
-# Turns the round BUIS logo (buis-logo-source.jpg: the ring logo on a dark textured square) into
+# Turns the round BUIS logo (buis-logo-source.jpg: the ring logo on a flat dark square) into
 # the logo, the launcher icon and the launcher banner. Needs ImageMagick. Re-run after replacing
 # the source; if the ring moves, re-measure CX/CY/R (the outer edge of the metal ring, in pixels).
 set -euo pipefail
 ROOT="$(cd "$(dirname "$0")/../.." && pwd)"
 BRAND="$ROOT/docs/brand"; RES="$ROOT/app/src/main/res"
 SRC="$BRAND/buis-logo-source.jpg"
-CX=1006; CY=1000; R=806
+CX=1000; CY=997; R=797
 TMP="$(mktemp -d)"; trap 'rm -rf "$TMP"' EXIT
 mkdir -p "$RES/drawable-xhdpi" "$RES/drawable-xxxhdpi"
 
@@ -20,9 +20,10 @@ magick "$TMP/square.png" "$TMP/mask.png" -alpha off -compose CopyOpacity -compos
 magick "$BRAND/buis-logo.png" -resize 216x216 "$RES/drawable-xhdpi/ic_buis.png"
 magick "$BRAND/buis-logo.png" -resize 432x432 "$RES/drawable-xxxhdpi/ic_buis.png"
 
-# 3. Banner (320x180dp): the round logo filling the height, on the source's own dark texture,
-#    blurred and darkened so the logo stays the thing you see.
-magick "$SRC" -resize 1280x1280 -gravity center -crop 1280x720+0+0 +repage -blur 0x12 -brightness-contrast -25x0 \
+# 3. Banner (320x180dp): the round logo filling the height, on the source's flat background colour
+#    (picked from its top-left corner).
+BG="$(magick "$SRC" -crop 1x1+20+20 -format '#%[hex:p{0,0}]' info:)"
+magick -size 1280x720 "xc:$BG" \
   \( "$BRAND/buis-logo.png" -resize 690x690 \) -gravity center -composite "$RES/drawable-xxxhdpi/banner.png"
 magick "$RES/drawable-xxxhdpi/banner.png" -resize 640x360 "$RES/drawable-xhdpi/banner.png"
 cp "$RES/drawable-xxxhdpi/banner.png" "$BRAND/buis-banner.png"
