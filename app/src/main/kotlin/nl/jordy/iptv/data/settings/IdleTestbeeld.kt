@@ -26,6 +26,11 @@ class IdleTestbeeldStore @Inject constructor(@ApplicationContext private val con
         context.idle.edit { it[MINUTES] = minutes }
     }
 
+    /** The next choice after what is stored, read and written in one edit, so fast presses all count. */
+    suspend fun cycle() {
+        context.idle.edit { it[MINUTES] = next(it[MINUTES] ?: DEFAULT) }
+    }
+
     companion object {
         const val DEFAULT = 10
         val CHOICES = if (BuildConfig.DEBUG) listOf(0, 1, 5, 10, 15, 30) else listOf(0, 5, 10, 15, 30)

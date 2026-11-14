@@ -13,6 +13,8 @@ import kotlinx.coroutines.flow.filterNotNull
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import nl.jordy.iptv.data.db.AppDatabase
 import nl.jordy.iptv.data.db.ProfileEntity
 import nl.jordy.iptv.data.settings.SettingsStore
@@ -146,9 +148,19 @@ class ProfileRepository @Inject constructor(
 
     private fun ProfileEntity.pinnedSet() = pinnedCategories.split(',').filter { it.isNotBlank() }.toSet()
 
-    private suspend fun updateCurrent(change: (ProfileEntity) -> ProfileEntity) = dao.update(change(fresh()))
+    private suspend fun updateCurrent(change: (ProfileEntity) -> ProfileEntity) = update(change)
 
-    private suspend fun fresh(): ProfileEntity = dao.get(currentId()) ?: current.filterNotNull().first()
+    /**
+     * Changes the current profile from what is stored, one change at a time. A settings row that
+     * cycles (Slaaptimer, Bedtijd) must work from here, not from the value on screen: pressed fast,
+     * the second OK came before the first was saved, both stepped from the same value and a press
+     * was lost.
+     */
+    suspend fun update(change: (ProfileEntity) -> ProfileEntity) = writes.withLock { dao.update(change(fresh())) }
+
+    private val writes = Mutex()
+
+    internal suspend fun fresh(): ProfileEntity = dao.get(currentId()) ?: current.filterNotNull().first()
 
     companion object {
         const val MAX_PROFILES = 8

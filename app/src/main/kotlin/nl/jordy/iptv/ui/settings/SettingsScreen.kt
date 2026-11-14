@@ -27,6 +27,7 @@ import nl.jordy.iptv.data.epg.XmltvProbe
 import nl.jordy.iptv.data.settings.CountryFilter
 import nl.jordy.iptv.data.profile.Pin
 import nl.jordy.iptv.data.profile.ProfileRepository
+import nl.jordy.iptv.data.profile.prefs
 import nl.jordy.iptv.player.BreakTimer
 import nl.jordy.iptv.player.SleepTimer
 import androidx.compose.material.icons.Icons
@@ -197,10 +198,10 @@ class SettingsViewModel @Inject constructor(
 
     val liveDelay = liveDelayStore.delay.stateIn(viewModelScope, SharingStarted.Eagerly, LiveDelay.DEFAULT)
     val liveDelaySummary = liveDelayStore.summary.stateIn(viewModelScope, SharingStarted.Eagerly, null)
-    fun cycleLiveDelay() = viewModelScope.launch { liveDelayStore.set(liveDelay.value.next()) }
+    fun cycleLiveDelay() = viewModelScope.launch { liveDelayStore.cycle() }
 
     val idleMinutes = idleStore.minutes.stateIn(viewModelScope, SharingStarted.Eagerly, nl.jordy.iptv.data.settings.IdleTestbeeldStore.DEFAULT)
-    fun cycleIdleMinutes() = viewModelScope.launch { idleStore.set(nl.jordy.iptv.data.settings.IdleTestbeeldStore.next(idleMinutes.value)) }
+    fun cycleIdleMinutes() = viewModelScope.launch { idleStore.cycle() }
 
     val openSubtitlesLogin = openSubtitles.login.stateIn(viewModelScope, SharingStarted.Eagerly, null)
     /** Null when it signed in and is saved; else what went wrong. */
@@ -245,11 +246,15 @@ class SettingsViewModel @Inject constructor(
     /** Countries this provider actually has, for the picker. */
     val countries = MutableStateFlow<List<String>>(emptyList())
 
+    // Every row that steps or flips works from the stored profile (profiles.update), not from the
+    // value on screen: pressed fast, that value is one press behind and a press got lost.
     fun toggleCountry(code: String) = viewModelScope.launch {
-        val now = prefs.value.preferredCountries
-        // Never empty: with no preferred country the filter would show nothing useful.
-        val next = if (code in now) (now - code).ifEmpty { now } else now + code
-        profiles.setPreferredCountries(next)
+        profiles.update {
+            val now = it.prefs.preferredCountries
+            // Never empty: with no preferred country the filter would show nothing useful.
+            val next = if (code in now) (now - code).ifEmpty { now } else now + code
+            it.copy(preferredCountries = next.sorted().joinToString(","))
+        }
     }
 
     /** Debug builds only: how much of the provider's full guide covers the preferred channels. */
@@ -260,29 +265,25 @@ class SettingsViewModel @Inject constructor(
         epgCheck.value = xmltvProbe.run(prefs.value.preferredCountries).also { android.util.Log.i("EpgCheck", it) }
     }
 
-    fun toggleOnlyPreferred() = viewModelScope.launch { profiles.setOnlyPreferred(!prefs.value.onlyPreferred) }
-    fun toggleAutoSwitch() = viewModelScope.launch { profiles.setAutoSwitch(!prefs.value.autoSwitch) }
-    fun cycleLook() = viewModelScope.launch {
-        val now = profile.value?.look ?: 0
-        profiles.setLook((now + 1) % Look.entries.size)
+    fun toggleOnlyPreferred() = viewModelScope.launch { profiles.update { it.copy(onlyPreferred = !it.onlyPreferred) } }
+    fun toggleAutoSwitch() = viewModelScope.launch { profiles.update { it.copy(autoSwitch = !it.autoSwitch) } }
+    fun cycleLook() = viewModelScope.launch { profiles.update { it.copy(look = (it.look + 1) % Look.entries.size) } }
+    fun cycleCar() = viewModelScope.launch { profiles.update { it.copy(car = (it.car + 1) % GarageCar.entries.size) } }
+    fun cycleSleepTimer() = viewModelScope.launch {
+        // Debug builds add 2 minutes, to see the warning without waiting half an hour.
+        val choices = if (BuildConfig.DEBUG) SleepTimer.DEBUG_CHOICES else SleepTimer.CHOICES
+        profiles.update { it.copy(sleepMinutes = SleepTimer.nextChoice(it.sleepMinutes, choices)) }
     }
-    fun cycleCar() = viewModelScope.launch {
-        val now = profile.value?.car ?: 0
-        profiles.setCar((now + 1) % GarageCar.entries.size)
-    }
-    fun cycleSleepTimer() = viewModelScope.launch { profiles.setSleepMinutes(SleepTimer.nextChoice(prefs.value.sleepMinutes, if (BuildConfig.DEBUG) SleepTimer.DEBUG_CHOICES else SleepTimer.CHOICES)) }
     fun cycleBreak() = viewModelScope.launch {
         // Debug builds add a 1-minute choice, to see the break without watching for an hour.
         val choices = if (BuildConfig.DEBUG) BreakTimer.DEBUG_CHOICES else BreakTimer.CHOICES
-        profiles.setBreakMinutes(BreakTimer.nextChoice(prefs.value.breakMinutes, choices))
+        profiles.update { it.copy(breakMinutes = BreakTimer.nextChoice(it.breakMinutes, choices)) }
     }
-    fun cycleAudioLang() = viewModelScope.launch { profiles.setAudioLang(TrackLabels.next(prefs.value.audioLang, TrackLabels.AUDIO_CHOICES)) }
-    fun cycleSubtitleLang() = viewModelScope.launch { profiles.setSubtitleLang(TrackLabels.next(prefs.value.subtitleLang, TrackLabels.SUBTITLE_CHOICES)) }
-    fun cycleBedtime() = viewModelScope.launch { profiles.setBedtime(Bedtime.nextTime(prefs.value.bedtime)) }
-    fun cycleBedtimeDays() = viewModelScope.launch { profiles.setBedtimeDays(Bedtime.nextDays(prefs.value.bedtimeDays)) }
-    fun cycleBreakLength() = viewModelScope.launch {
-        profiles.setBreakLength(BreakTimer.nextChoice(prefs.value.breakLength, BreakTimer.LENGTHS))
-    }
+    fun cycleAudioLang() = viewModelScope.launch { profiles.update { it.copy(audioLang = TrackLabels.next(it.audioLang, TrackLabels.AUDIO_CHOICES)) } }
+    fun cycleSubtitleLang() = viewModelScope.launch { profiles.update { it.copy(subtitleLang = TrackLabels.next(it.subtitleLang, TrackLabels.SUBTITLE_CHOICES)) } }
+    fun cycleBedtime() = viewModelScope.launch { profiles.update { it.copy(bedtime = Bedtime.nextTime(it.bedtime)) } }
+    fun cycleBedtimeDays() = viewModelScope.launch { profiles.update { it.copy(bedtimeDays = Bedtime.nextDays(it.bedtimeDays)) } }
+    fun cycleBreakLength() = viewModelScope.launch { profiles.update { it.copy(breakLength = BreakTimer.nextChoice(it.breakLength, BreakTimer.LENGTHS)) } }
 
     init {
         viewModelScope.launch {

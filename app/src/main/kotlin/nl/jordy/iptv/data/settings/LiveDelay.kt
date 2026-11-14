@@ -142,6 +142,11 @@ class LiveDelayStore @Inject constructor(@ApplicationContext private val context
         context.live.edit { it[DELAY] = delay.name }
     }
 
+    /** The next choice after what is stored, read and written in one edit, so fast presses all count. */
+    suspend fun cycle() {
+        context.live.edit { it[DELAY] = LiveDelay.of(it[DELAY]).next().name }
+    }
+
     /** Survives the player closing, like the watch log: a session ends while its screen goes away. */
     fun record(delay: LiveDelay, playedMs: Long, stalls: Int) {
         if (playedMs < 10_000) return
