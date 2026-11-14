@@ -636,17 +636,19 @@ class PlayerViewModel @Inject constructor(
 
     private suspend fun movieInfo(id: Int): VodInfo? {
         val m = runCatching { db.catalog().movie(id) }.getOrNull()
-        val info = runCatching { db.movieInfo().get(id) }.getOrNull()
-        if (m == null && info == null) return null
+        val stored = runCatching { db.movieInfo().get(id) }.getOrNull()
+        // Not fetched yet for this version (another language, started from Home): ask the provider, like the film's page does.
+        val fetched = if (stored?.plot.isNullOrBlank()) runCatching { library.movieInfo(id) }.getOrNull() else null
+        if (m == null && stored == null && fetched == null) return null
         return VodInfo(
             heading = null,
-            year = m?.year,
-            rating = (info?.rating ?: m?.rating)?.takeIf { it > 0 },
-            genre = info?.genre?.ifBlank { null },
-            plot = info?.plot?.ifBlank { null },
+            year = m?.year ?: fetched?.year,
+            rating = (stored?.rating ?: fetched?.rating ?: m?.rating)?.takeIf { it > 0 },
+            genre = (stored?.genre ?: fetched?.genre)?.ifBlank { null },
+            plot = (stored?.plot?.ifBlank { null } ?: fetched?.plot)?.ifBlank { null },
             // The provider lists the whole crew; the first few say enough.
-            cast = info?.cast?.firstNames(4),
-            director = info?.director?.firstNames(2),
+            cast = (stored?.cast?.ifBlank { null } ?: fetched?.cast)?.firstNames(4),
+            director = (stored?.director?.ifBlank { null } ?: fetched?.director)?.firstNames(2),
         )
     }
 

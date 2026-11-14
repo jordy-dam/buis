@@ -225,7 +225,7 @@ fun PlayerScreen(onExit: () -> Unit, vm: PlayerViewModel = hiltViewModel()) {
         overlayVisible = false
     }
     // A Back seen going down while the bar was up: its release hides the bar.
-    var backDown by remember { mutableStateOf(false) }
+    var backFor by remember { mutableStateOf<BackFor?>(null) }
 
     LaunchedEffect(overlayTick, paused, choice, panel) {
         overlayVisible = true
@@ -340,8 +340,8 @@ fun PlayerScreen(onExit: () -> Unit, vm: PlayerViewModel = hiltViewModel()) {
     // never leaves while the bar shows. A pop-up keeps its own Back.
     val barUp = overlayVisible && state.error == null && card == null
     val backHidesBar = (controls || barUp) && choice == null && panel == null
-    BackHandler(enabled = controls || barUp) { hideBar() }
-    BackHandler(enabled = choice != null) {
+    // A list or panel closes back onto the button that opened it.
+    fun closeChoice() {
         val from = choice
         choice = null
         focusTarget = when (from) {
@@ -350,11 +350,14 @@ fun PlayerScreen(onExit: () -> Unit, vm: PlayerViewModel = hiltViewModel()) {
             else -> buttons.subtitles
         }
     }
-    BackHandler(enabled = panel != null) {
+    fun closePanel() {
         val from = panel
         panel = null
         focusTarget = if (from == Panel.CHANNELS) buttons.channels else buttons.info
     }
+    BackHandler(enabled = controls || barUp) { hideBar() }
+    BackHandler(enabled = choice != null) { closeChoice() }
+    BackHandler(enabled = panel != null) { closePanel() }
     LaunchedEffect(state.finished) { if (state.finished) onExit() }
 
     val live = vm.isLive && state.catchup == null
@@ -367,12 +370,24 @@ fun PlayerScreen(onExit: () -> Unit, vm: PlayerViewModel = hiltViewModel()) {
             .onPreviewKeyEvent { e ->
                 // Where Back comes as a key (Android 14 on the tv), focus would spend the first press
                 // stepping out of the buttons. Taken here, before focus sees it, it hides the bar at once.
+                // The same for an open panel or list: unhandled, Back cleared the focus and left the buttons
+                // with none lit. What Back closes is decided on the press and done on the release, once:
+                // newer Android also calls the BackHandlers on the press, and then there's nothing left to do.
                 if (e.key.nativeKeyCode == KeyEvent.KEYCODE_BACK) {
-                    if (e.type == KeyEventType.KeyDown && backHidesBar) backDown = true
-                    if (!backDown) return@onPreviewKeyEvent false
+                    if (e.type == KeyEventType.KeyDown && backFor == null) backFor = when {
+                        panel != null -> BackFor.PANEL
+                        choice != null -> BackFor.CHOICE
+                        backHidesBar -> BackFor.BAR
+                        else -> null
+                    }
+                    val target = backFor ?: return@onPreviewKeyEvent false
                     if (e.type == KeyEventType.KeyUp) {
-                        backDown = false
-                        hideBar()
+                        backFor = null
+                        when (target) {
+                            BackFor.PANEL -> if (panel != null) closePanel()
+                            BackFor.CHOICE -> if (choice != null) closeChoice()
+                            BackFor.BAR -> if (controls || overlayVisible) hideBar()
+                        }
                     }
                     return@onPreviewKeyEvent true
                 }
@@ -733,15 +748,16 @@ private fun PlayerBar(
 
         // Without the controls the arrows steer the picture, so no buttons show. The icons speak for
         // themselves; only the long OK can't be seen, so live says it, buttons or not.
-        if (controls) Row(
+        if (controls) BarRow(
             Modifier.fillMaxWidth().stopsSideways().ignoreHeldKey(),
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
+            left = {
             // The far left: back to live when behind it, else from the start (a film always can).
-            Box(Modifier.weight(1f)) {
+            Box {
                 if (state.replaying || catchup != null) ControlButton(Icons.Filled.LiveTv, "Terug naar live", actions.toLive)
                 else ControlButton(Icons.Filled.RestartAlt, "Vanaf begin", actions.restart, available = !live || state.canRestart)
             }
+            },
+            middle = {
             // The middle: back, play/pause, forward, with play/pause bigger and in the centre of the screen.
             Row(horizontalArrangement = Arrangement.spacedBy(GroupGap), verticalAlignment = Alignment.CenterVertically) {
                 ControlButton(Icons.Filled.Replay10, "10 seconden terug", actions.back, Modifier.focusRequester(buttons.back))
@@ -752,8 +768,10 @@ private fun PlayerBar(
                 // Live, forward only exists behind live.
                 ControlButton(Icons.Filled.Forward10, "10 seconden vooruit", actions.forward, Modifier.focusRequester(buttons.forward), available = !live || state.replaying)
             }
+            },
+            right = {
             // The right: what's on, how it sounds, the text, and the channel's logo at the far end.
-            Row(Modifier.weight(1f), horizontalArrangement = Arrangement.spacedBy(GroupGap, Alignment.End), verticalAlignment = Alignment.CenterVertically) {
+            Row(horizontalArrangement = Arrangement.spacedBy(GroupGap), verticalAlignment = Alignment.CenterVertically) {
                 ControlButton(
                     Icons.Filled.Info, "Programma-info", { onPanel(Panel.INFO) },
                     Modifier.focusRequester(buttons.info), active = panel == Panel.INFO, available = live || state.vodInfo != null,
@@ -779,12 +797,43 @@ private fun PlayerBar(
                 if (live) ChannelButton(state.logoUrl, state.title, { onPanel(Panel.CHANNELS) }, Modifier.focusRequester(buttons.channels))
                 else Spacer(Modifier.width(ChoiceSize * 16 / 9))
             }
-        }
+            },
+        )
         if (live) Hints(Hint(text = "Lang OK  Zenderlijst"))
         state.replayHint?.let { Text(it, style = MaterialTheme.typography.bodyMedium, color = Live) }
         state.subtitleNote?.let { Text(it, style = MaterialTheme.typography.bodyMedium) }
     }
 }
+
+/**
+ * The bar's three groups: [left] at the start, [right] at the end, [middle] in the centre of the
+ * screen. When the right group is too wide for that (live, with versions and the logo), the middle
+ * moves left so there's always [GroupsGap] between the groups; they never overlap.
+ */
+@Composable
+private fun BarRow(modifier: Modifier, left: @Composable () -> Unit, middle: @Composable () -> Unit, right: @Composable () -> Unit) {
+    androidx.compose.ui.layout.Layout(contents = listOf(left, middle, right), modifier = modifier) { (l, m, r), constraints ->
+        val loose = constraints.copy(minWidth = 0, minHeight = 0)
+        val lp = l.map { it.measure(loose) }
+        val mp = m.map { it.measure(loose) }
+        val rp = r.map { it.measure(loose) }
+        val lw = lp.maxOfOrNull { it.width } ?: 0
+        val mw = mp.maxOfOrNull { it.width } ?: 0
+        val rw = rp.maxOfOrNull { it.width } ?: 0
+        val width = constraints.maxWidth
+        val height = (lp + mp + rp).maxOfOrNull { it.height } ?: 0
+        val gap = GroupsGap.roundToPx()
+        val mx = ((width - mw) / 2).coerceAtMost(width - rw - gap - mw).coerceAtLeast(lw + gap)
+        layout(width, height) {
+            lp.forEach { it.place(0, (height - it.height) / 2) }
+            mp.forEach { it.place(mx, (height - it.height) / 2) }
+            rp.forEach { it.place(width - rw, (height - it.height) / 2) }
+        }
+    }
+}
+
+/** What a Back press closes: the open panel, the open list, or the bar. */
+private enum class BackFor { PANEL, CHOICE, BAR }
 
 /** Space between buttons of one group, and between the groups, so the row reads as its groups. */
 private val GroupGap = 12.dp
