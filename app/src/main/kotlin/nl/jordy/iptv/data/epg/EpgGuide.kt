@@ -52,6 +52,13 @@ object XmltvGuide {
             val keep = channel != null && channel in wanted && start != null && stop != null && stop > start && stop > from && start < to
             var title: String? = null
             var desc: String? = null
+            var subtitle: String? = null
+            var episode: String? = null
+            var year: String? = null
+            var country: String? = null
+            var director: String? = null
+            val genres = ArrayList<String>()
+            val cast = ArrayList<String>()
             // Read (or skip) the children up to </programme>.
             while (!(parser.next() == XmlPullParser.END_TAG && parser.name == "programme")) {
                 if (parser.eventType == XmlPullParser.END_DOCUMENT) break
@@ -59,13 +66,58 @@ object XmltvGuide {
                     when (parser.name) {
                         "title" -> if (title == null) title = parser.nextText().trim()
                         "desc" -> if (desc == null) desc = parser.nextText().trim()
+                        "sub-title" -> if (subtitle == null) subtitle = parser.nextText().trim()
+                        "episode-num" -> {
+                            val system = parser.getAttributeValue(null, "system")
+                            val found = episodeLabel(system, parser.nextText())
+                            // "onscreen" says it as people do; xmltv_ns only when that's all there is.
+                            if (found != null && (episode == null || system == "onscreen")) episode = found
+                        }
+                        "date" -> if (year == null) year = parser.nextText().trim().take(4).takeIf { it.length == 4 && it.all(Char::isDigit) }
+                        "country" -> if (country == null) country = parser.nextText().trim()
+                        "category" -> parser.nextText().trim().let { g -> if (g.isNotEmpty() && genres.size < 2 && genres.none { it.equals(g, true) }) genres += g }
+                        "director" -> if (director == null) director = parser.nextText().trim().trim('"')
+                        "actor", "presenter" -> parser.nextText().trim().trim('"').let { if (it.isNotEmpty() && cast.size < 4 && it !in cast) cast += it }
                     }
                 }
             }
-            if (keep && !title.isNullOrBlank()) out += EpgProgrammeEntity(channel!!, start!!, stop!!, title, desc?.ifBlank { null })
+            if (keep && !title.isNullOrBlank()) {
+                val t: String = title
+                val d = desc?.ifBlank { null }
+                // Some guides put the episode title in the description: say it once.
+                val sub = subtitle?.ifBlank { null }?.takeUnless { it.equals(t, true) }
+                out += EpgProgrammeEntity(
+                    channel!!, start!!, stop!!, t, d?.takeUnless { it.equals(t, true) || it.equals(sub, true) },
+                    subtitle = sub,
+                    episode = episode,
+                    year = year,
+                    genres = genres.joinToString(", ").ifEmpty { null },
+                    country = country?.ifBlank { null },
+                    director = director?.ifBlank { null },
+                    cast = cast.joinToString(", ").ifEmpty { null },
+                )
+            }
         }
         // Some guides list a programme twice; the table's key is (channel, start).
         return out.distinctBy { it.channelId to it.start }
+    }
+
+    /**
+     * "S16 E13" from an XMLTV episode number: "onscreen" as written ("S16 E13", "S1"), xmltv_ns
+     * counted from zero ("15.12.0" -> "S16 E13", "0.19/20.0" -> "S1 E20"). Anything else: null.
+     */
+    fun episodeLabel(system: String?, raw: String): String? {
+        val text = raw.trim()
+        if (text.isEmpty()) return null
+        if (system == "xmltv_ns") {
+            val parts = text.split('.')
+            fun part(i: Int) = parts.getOrNull(i)?.substringBefore('/')?.trim()?.toIntOrNull()?.plus(1)
+            val season = part(0)
+            val ep = part(1)
+            return listOfNotNull(season?.let { "S$it" }, ep?.let { "E$it" }).joinToString(" ").ifEmpty { null }
+        }
+        // onscreen and unnamed systems: only what reads like an episode, not a production code.
+        return text.takeIf { Regex("""^S\d+(\s*E\d+)?$""", RegexOption.IGNORE_CASE).matches(it) }?.uppercase()
     }
 
     /**

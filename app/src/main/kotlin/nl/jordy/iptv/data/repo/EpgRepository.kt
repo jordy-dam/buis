@@ -8,7 +8,9 @@ import kotlinx.coroutines.sync.Semaphore
 import kotlinx.coroutines.sync.withPermit
 import nl.jordy.iptv.data.auth.CredentialStore
 import nl.jordy.iptv.data.db.AppDatabase
+import nl.jordy.iptv.data.db.EpgProgrammeEntity
 import nl.jordy.iptv.data.xtream.EpgEntry
+import nl.jordy.iptv.data.xtream.ProgrammeExtra
 import nl.jordy.iptv.data.xtream.XtreamClient
 import nl.jordy.iptv.data.xtream.XtreamParser
 import javax.inject.Inject
@@ -32,7 +34,7 @@ class EpgRepository @Inject constructor(
     private val limiter = Semaphore(4)
 
     suspend fun nowAndNext(streamId: Int, nowSec: Long = System.currentTimeMillis() / 1000): Pair<EpgEntry?, EpgEntry?> {
-        val guide = db.epg().upcoming(streamId, nowSec).map { EpgEntry(it.title, it.description, it.start, it.stop) }
+        val guide = db.epg().upcoming(streamId, nowSec).map { it.toEntry() }
         val entries = guide.ifEmpty { entries(streamId) }
         val nowIndex = entries.indexOfFirst { nowSec in it.start until it.stop }
         if (nowIndex < 0) return null to entries.firstOrNull { it.start > nowSec }
@@ -46,7 +48,7 @@ class EpgRepository @Inject constructor(
      * short EPG (up to [limit] entries) for channels the guide doesn't cover.
      */
     suspend fun schedule(streamId: Int, nowSec: Long = System.currentTimeMillis() / 1000, limit: Int = 40): List<EpgEntry> {
-        val guide = db.epg().upcoming(streamId, nowSec, limit = 200).map { EpgEntry(it.title, it.description, it.start, it.stop) }
+        val guide = db.epg().upcoming(streamId, nowSec, limit = 200).map { it.toEntry() }
         if (guide.isNotEmpty()) return guide
         val c = credentials.current() ?: return emptyList()
         return limiter.withPermit {
@@ -60,7 +62,9 @@ class EpgRepository @Inject constructor(
      * provider's short EPG (from now on) for the streams it doesn't cover. Streams with neither are absent.
      */
     suspend fun window(streamIds: List<Int>, from: Long, to: Long): Map<Int, List<EpgEntry>> {
-        val stored = db.epg().between(streamIds, from, to).groupBy({ it.streamId }) { EpgEntry(it.title, it.description, it.start, it.stop) }
+        val stored = db.epg().between(streamIds, from, to).groupBy({ it.streamId }) {
+            EpgEntry(it.title, it.description, it.start, it.stop, extraOf(it.subtitle, it.episode, it.year, it.genres, it.country, it.director, it.cast))
+        }
         val missing = streamIds.filter { it !in stored }
         if (missing.isEmpty()) return stored
         val fetched = coroutineScope {
@@ -84,3 +88,11 @@ class EpgRepository @Inject constructor(
         const val TTL_MS = 5 * 60 * 1000L
     }
 }
+
+private fun EpgProgrammeEntity.toEntry() =
+    EpgEntry(title, description, start, stop, extraOf(subtitle, episode, year, genres, country, director, cast))
+
+/** Null when the guide had none of it, so screens can skip the lines at once. */
+private fun extraOf(subtitle: String?, episode: String?, year: String?, genres: String?, country: String?, director: String?, cast: String?): ProgrammeExtra? =
+    if (listOf(subtitle, episode, year, genres, country, director, cast).all { it == null }) null
+    else ProgrammeExtra(subtitle, episode, year, genres, country, director, cast)

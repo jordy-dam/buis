@@ -257,6 +257,18 @@ data class EpgProgrammeEntity(
     val stop: Long,
     val title: String,
     val description: String?,
+    /** The episode's own title ("Holy Macau!"). The rest below is for the "i" in the player; open guides fill it, the provider's rarely. */
+    val subtitle: String? = null,
+    /** "S16 E13", or "S1" for a whole season. */
+    val episode: String? = null,
+    val year: String? = null,
+    /** Up to two genres, comma-separated: "Culinair, Reality-competitie". */
+    val genres: String? = null,
+    /** ISO country code of the production: "US". */
+    val country: String? = null,
+    val director: String? = null,
+    /** Up to four actors or presenters, comma-separated. */
+    val cast: String? = null,
 )
 
 /**

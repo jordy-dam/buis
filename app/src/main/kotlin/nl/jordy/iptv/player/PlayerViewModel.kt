@@ -117,6 +117,19 @@ data class PlayerUiState(
     val thumbsSecondsLeft: Int? = null,
     /** The film or series the thumbs are for. */
     val thumbsTitle: String = "",
+    /** Films and episodes: what the "i" shows; null when the catalog knows nothing about it. */
+    val vodInfo: VodInfo? = null,
+)
+
+/** A film's or episode's details for the "i": [heading] is "S2 E5 · <episode>", null for a film. */
+data class VodInfo(
+    val heading: String?,
+    val year: Int?,
+    val rating: Double?,
+    val genre: String?,
+    val plot: String?,
+    val cast: String?,
+    val director: String?,
 )
 
 /** One version of a live channel: "ESPN 1 · FHD · Odido", and how it ran here ("liep goed"). */
@@ -271,6 +284,7 @@ class PlayerViewModel @Inject constructor(
             PlayerRoute.Kind.MOVIE -> {
                 watching(WatchItem(ContentType.MOVIE, route.id, route.title, containerExtension = route.containerExtension))
                 playVod(StreamUrls.movie(base, c, route.id, route.containerExtension), ContentType.MOVIE)
+                _state.update { it.copy(vodInfo = movieInfo(route.id)) }
                 filmVoted = runCatching { taste.hasVoted(route.id) }.getOrDefault(true)
                 db.catalog().movie(route.id)?.let { searchOnline(SubtitleQuery.Film(it.name, it.year, it.tmdbId)) }
                     ?: Log.i("OpenSubtitles", "film ${route.id} not in the catalog")
@@ -283,6 +297,7 @@ class PlayerViewModel @Inject constructor(
                 val title = episode?.let { "$seriesName – ${it.title}" } ?: route.title
                 watching(WatchItem(ContentType.SERIES, route.id, title, containerExtension = route.containerExtension))
                 playVod(StreamUrls.episode(base, c, route.id, route.containerExtension), ContentType.SERIES)
+                episode?.let { e -> episodeInfo(e).let { info -> _state.update { it.copy(vodInfo = info) } } }
                 episode?.let { searchOnline(SubtitleQuery.Episode(seriesName, it.season, it.number)) }
             }
         }
@@ -619,6 +634,38 @@ class PlayerViewModel @Inject constructor(
     /** The break took the place of the next-episode card: when it ends, the next episode starts. */
     private var breakThenNext = false
 
+    private suspend fun movieInfo(id: Int): VodInfo? {
+        val m = runCatching { db.catalog().movie(id) }.getOrNull()
+        val info = runCatching { db.movieInfo().get(id) }.getOrNull()
+        if (m == null && info == null) return null
+        return VodInfo(
+            heading = null,
+            year = m?.year,
+            rating = (info?.rating ?: m?.rating)?.takeIf { it > 0 },
+            genre = info?.genre?.ifBlank { null },
+            plot = info?.plot?.ifBlank { null },
+            // The provider lists the whole crew; the first few say enough.
+            cast = info?.cast?.firstNames(4),
+            director = info?.director?.firstNames(2),
+        )
+    }
+
+    private fun String.firstNames(n: Int) = split(',').map { it.trim() }.filter { it.isNotEmpty() }.take(n).joinToString(", ").ifEmpty { null }
+
+    /** The episode's own plot, else the series'; year, rating and genre are the series'. */
+    private suspend fun episodeInfo(e: EpisodeEntity): VodInfo {
+        val series = runCatching { db.catalog().series(e.seriesId) }.getOrNull()
+        return VodInfo(
+            heading = "S${e.season} E${e.number} · ${e.title}",
+            year = series?.year,
+            rating = series?.rating?.takeIf { it > 0 },
+            genre = series?.genre?.ifBlank { null },
+            plot = e.plot?.ifBlank { null } ?: series?.plot?.ifBlank { null },
+            cast = null,
+            director = null,
+        )
+    }
+
     private suspend fun loadSeries() {
         val ep = db.episodes().episode(route.id) ?: return
         episodes = db.episodes().forSeries(ep.seriesId).first()
@@ -771,6 +818,7 @@ class PlayerViewModel @Inject constructor(
         applyProfileTracks()
         viewModelScope.launch {
             playVod(StreamUrls.episode(base, c, e.episodeId, e.containerExtension), ContentType.SERIES, fromStart = false)
+            episodeInfo(e).let { info -> _state.update { it.copy(vodInfo = info) } }
             searchOnline(SubtitleQuery.Episode(seriesName, e.season, e.number))
         }
     }

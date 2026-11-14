@@ -355,7 +355,11 @@ interface SyncInfoDao {
     @Query("SELECT * FROM sync_info WHERE id = 0") suspend fun get(): SyncInfoEntity?
 }
 
-data class StreamProgramme(val streamId: Int, val start: Long, val stop: Long, val title: String, val description: String?)
+data class StreamProgramme(
+    val streamId: Int, val start: Long, val stop: Long, val title: String, val description: String?,
+    val subtitle: String? = null, val episode: String? = null, val year: String? = null, val genres: String? = null,
+    val country: String? = null, val director: String? = null, val cast: String? = null,
+)
 
 data class LiveGuideRow(val streamId: Int, val name: String, val epgChannelId: String?, val country: String?)
 
@@ -380,7 +384,8 @@ interface EpgDao {
 
     /** Programmes of several streams that overlap [from, to), for the guide grid. */
     @Query(
-        "SELECT c.streamId AS streamId, p.start AS start, p.stop AS stop, p.title AS title, p.description AS description " +
+        "SELECT c.streamId AS streamId, p.start AS start, p.stop AS stop, p.title AS title, p.description AS description, " +
+            "p.subtitle AS subtitle, p.episode AS episode, p.year AS year, p.genres AS genres, p.country AS country, p.director AS director, p.`cast` AS `cast` " +
             "FROM epg_programme p JOIN epg_channel c ON c.channelId = p.channelId " +
             "WHERE c.streamId IN (:streamIds) AND p.stop > :from AND p.start < :to ORDER BY p.start",
     )

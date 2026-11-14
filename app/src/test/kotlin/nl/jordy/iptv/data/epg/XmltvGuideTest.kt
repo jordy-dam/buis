@@ -98,4 +98,37 @@ class XmltvGuideTest {
         assertTrue("kept only wanted channels", got.all { it.channelId in wanted })
         assertTrue("took ${ms}ms", ms < 5_000)
     }
+
+    @Test
+    fun `keeps episode, genres, year, country and credits, and drops a description that only repeats the episode title`() {
+        val rich = """
+            <tv>
+              <programme start="20261028190000 +0100" stop="20261028200000 +0100" channel="24kitchen">
+                <title lang="nl">Top Chef</title><sub-title lang="nl">Holy Macau!</sub-title><desc>Holy Macau!</desc>
+                <credits><director>"Jan Regisseur</director><actor>A</actor><actor>B</actor><presenter>C</presenter><actor>D</actor><actor>E</actor><producer>P</producer></credits>
+                <date>20180412</date><category>Culinair</category><category>culinair</category><category>Reality</category><category>Drie</category>
+                <country>US</country><episode-num system="xmltv_ns">15.12.0</episode-num><episode-num system="onscreen">S16 E13</episode-num>
+              </programme>
+            </tv>
+        """.trimIndent()
+        val p = XmltvGuide.read(rich.byteInputStream(), setOf("24kitchen"), from, to).single()
+        assertEquals("Holy Macau!", p.subtitle)
+        assertNull("the description was only the episode title", p.description)
+        assertEquals("S16 E13", p.episode)
+        assertEquals("2018", p.year)
+        assertEquals("Culinair, Reality", p.genres)
+        assertEquals("US", p.country)
+        assertEquals("Jan Regisseur", p.director)
+        assertEquals("A, B, C, D", p.cast)
+    }
+
+    @Test
+    fun `episode numbers read as people say them`() {
+        assertEquals("S16 E13", XmltvGuide.episodeLabel("xmltv_ns", "15.12.0"))
+        assertEquals("S1 E20", XmltvGuide.episodeLabel("xmltv_ns", "0.19/20.0"))
+        assertEquals("E4", XmltvGuide.episodeLabel("xmltv_ns", ".3."))
+        assertEquals("S1", XmltvGuide.episodeLabel("onscreen", "S1"))
+        assertEquals("S2 E5", XmltvGuide.episodeLabel("onscreen", "s2 e5"))
+        assertNull("a production code is not an episode", XmltvGuide.episodeLabel("dd_progid", "EP012345"))
+    }
 }

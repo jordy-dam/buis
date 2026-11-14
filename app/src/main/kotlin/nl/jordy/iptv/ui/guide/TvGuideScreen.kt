@@ -1,5 +1,8 @@
 package nl.jordy.iptv.ui.guide
 
+import nl.jordy.iptv.ui.components.creditsLine
+import nl.jordy.iptv.ui.components.episodeLine
+import nl.jordy.iptv.ui.components.factsLine
 import android.view.KeyEvent
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.tween
@@ -554,9 +557,13 @@ private fun ProgrammeDialog(c: GridChannel, p: EpgEntry, onDismiss: () -> Unit, 
         ) {
             Text("${c.name}  ·  ${dayLabel(p.start)} ${p.slot()}", style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.SemiBold, color = Live)
             Text(p.title, style = MaterialTheme.typography.headlineMedium, maxLines = 2, overflow = TextOverflow.Ellipsis)
+            // The same lines as the player's "i": episode, kind of programme, description, who's in it.
+            p.extra?.episodeLine()?.let { Text(it, style = MaterialTheme.typography.titleMedium, maxLines = 1, overflow = TextOverflow.Ellipsis) }
+            p.extra?.factsLine()?.let { Text(it, style = MaterialTheme.typography.bodySmall, color = TextSecondary, maxLines = 1, overflow = TextOverflow.Ellipsis) }
             p.description?.takeIf { it.isNotBlank() }?.let {
-                Text(it, style = MaterialTheme.typography.bodyMedium, color = TextSecondary, maxLines = 4, overflow = TextOverflow.Ellipsis)
+                Text(it, style = MaterialTheme.typography.bodyMedium, color = TextSecondary, maxLines = 5, overflow = TextOverflow.Ellipsis)
             }
+            p.extra?.creditsLine()?.let { Text(it, style = MaterialTheme.typography.bodySmall, color = TextSecondary, maxLines = 2, overflow = TextOverflow.Ellipsis) }
             note?.let { Text(it, style = MaterialTheme.typography.bodyMedium, color = TextSecondary) }
             Row(Modifier.padding(top = 8.dp), horizontalArrangement = Arrangement.spacedBy(16.dp)) { buttons(first) }
         }

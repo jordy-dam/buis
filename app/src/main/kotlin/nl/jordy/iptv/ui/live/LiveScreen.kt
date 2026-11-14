@@ -14,6 +14,9 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.ui.text.style.TextOverflow
 import nl.jordy.iptv.data.xtream.EpgEntry
 import nl.jordy.iptv.ui.components.CategoryList
+import nl.jordy.iptv.ui.components.creditsLine
+import nl.jordy.iptv.ui.components.episodeLine
+import nl.jordy.iptv.ui.components.factsLine
 import nl.jordy.iptv.ui.components.bestQuality
 import nl.jordy.iptv.ui.components.rememberNowAndNext
 import androidx.compose.foundation.layout.PaddingValues
@@ -493,8 +496,20 @@ private fun GuideRow(
                 }
             }
             if (focused) {
+                // What the player's "i" says too: episode, kind of programme, description, who's in it.
+                val quiet = LocalContentColor.current.copy(alpha = 0.7f)
+                val indent = Modifier.padding(start = 64.dp, top = 6.dp)
+                p.extra?.episodeLine()?.let {
+                    Text(it, style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.SemiBold, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = indent)
+                }
+                p.extra?.factsLine()?.let {
+                    Text(it, style = MaterialTheme.typography.bodySmall, color = quiet, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = indent)
+                }
                 p.description?.takeIf { it.isNotBlank() }?.let {
-                    Text(it, style = MaterialTheme.typography.bodyMedium, color = LocalContentColor.current.copy(alpha = 0.7f), maxLines = 3, overflow = TextOverflow.Ellipsis, modifier = Modifier.padding(start = 64.dp, top = 6.dp))
+                    Text(it, style = MaterialTheme.typography.bodyMedium, color = quiet, maxLines = 4, overflow = TextOverflow.Ellipsis, modifier = indent)
+                }
+                p.extra?.creditsLine()?.let {
+                    Text(it, style = MaterialTheme.typography.bodySmall, color = quiet, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = indent)
                 }
             }
         }

@@ -35,6 +35,27 @@ class GuideSourcesTest {
     }
 
     @Test
+    fun `a programme the first guide already has takes the second guide's details and longer description`() {
+        // Top Chef, 2026-11-14: open-epg had only the episode title as description, epgshare01 the rest.
+        val open = listOf(EpgProgrammeEntity("24kitchen", 50, 100, "Top Chef", "Holy Macau!"))
+        val share = listOf(
+            EpgProgrammeEntity(
+                "24kitchen", 50, 100, "Top Chef", "De laatste vijf chefs reizen naar Macau.",
+                subtitle = "Holy Macau!", episode = "S16 E13", year = "2018", genres = "Culinair", country = "US", cast = "Padma Lakshmi",
+            ),
+            EpgProgrammeEntity("24kitchen", 100, 150, "Iets anders", null, genres = "Reizen"),
+        )
+        val got = GuideSources.merge(listOf(open, share)).sortedBy { it.start }
+        assertEquals(listOf("Top Chef", "Iets anders"), got.map { it.title })
+        val chef = got.first()
+        assertEquals("De laatste vijf chefs reizen naar Macau.", chef.description)
+        assertEquals("Holy Macau!", chef.subtitle)
+        assertEquals("S16 E13", chef.episode)
+        assertEquals("Padma Lakshmi", chef.cast)
+        assertEquals("the first guide's times stay", 50L, chef.start)
+    }
+
+    @Test
     fun `source channels match by id ignoring case, else by name, and names only for Dutch streams`() {
         val rows = listOf(
             LiveGuideRow(1, "SBS 6", "sbs6.nl", "NL"),

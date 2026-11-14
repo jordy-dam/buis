@@ -84,4 +84,15 @@ data class SeriesInfo(
     val episodes: List<Episode>,
 )
 
-data class EpgEntry(val title: String, val description: String?, val start: Long, val stop: Long)
+data class EpgEntry(val title: String, val description: String?, val start: Long, val stop: Long, val extra: ProgrammeExtra? = null)
+
+/** What the full guide knows beyond title and description; the short EPG has none of it. */
+data class ProgrammeExtra(
+    val subtitle: String?,
+    val episode: String?,
+    val year: String?,
+    val genres: String?,
+    val country: String?,
+    val director: String?,
+    val cast: String?,
+)

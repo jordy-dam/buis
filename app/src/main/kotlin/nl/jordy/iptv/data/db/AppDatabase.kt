@@ -37,7 +37,7 @@ import androidx.sqlite.db.SupportSQLiteDatabase
         WatchedFilmEntity::class,
         WatchedEpisodeEntity::class,
     ],
-    version = 32,
+    version = 33,
     exportSchema = true,
     autoMigrations = [
         AutoMigration(from = 1, to = 2, spec = AppDatabase.CatalogResync::class),
@@ -95,6 +95,8 @@ import androidx.sqlite.db.SupportSQLiteDatabase
         AutoMigration(from = 30, to = 31, spec = AppDatabase.WatchedFromLog::class),
         // The same for episodes, filled once from saved positions and the watch log.
         AutoMigration(from = 31, to = 32, spec = AppDatabase.WatchedEpisodesFromLog::class),
+        // Episode, genres, year, country and credits per guide programme; the next guide refresh fills them.
+        AutoMigration(from = 32, to = 33),
     ],
 )
 abstract class AppDatabase : RoomDatabase() {

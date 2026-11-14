@@ -70,6 +70,13 @@ object GuideSources {
             val added = programmes.groupBy { it.channelId }
             for ((key, list) in added) {
                 val earlier = kept[key].orEmpty().toList()
+                // A programme an earlier source already has still lends its details: episode, genres, cast, a longer description.
+                kept[key]?.let { target ->
+                    for (p in list) {
+                        val i = target.indexOfFirst { it.sameAs(p) }
+                        if (i >= 0) target[i] = target[i].enrichedWith(p)
+                    }
+                }
                 val fresh = list.sortedBy { it.start }.filter { p -> earlier.none { it.start < p.stop && p.start < it.stop } }
                 // Within one source, the first of two overlapping programmes wins.
                 val target = kept.getOrPut(key) { ArrayList() }
@@ -78,6 +85,30 @@ object GuideSources {
             }
         }
         return kept.values.flatten().distinctBy { it.channelId to it.start }
+    }
+
+    /** The same broadcast in two guides: within five minutes of each other, under the same title give or take punctuation. */
+    private fun EpgProgrammeEntity.sameAs(o: EpgProgrammeEntity): Boolean {
+        fun norm(t: String) = t.lowercase().filter(Char::isLetterOrDigit)
+        return kotlin.math.abs(start - o.start) <= 300 && norm(title) == norm(o.title)
+    }
+
+    /** This programme with what [o] adds: empty fields filled, and the longer description. */
+    private fun EpgProgrammeEntity.enrichedWith(o: EpgProgrammeEntity): EpgProgrammeEntity {
+        val sub = subtitle ?: o.subtitle
+        val desc = listOfNotNull(description, o.description)
+            .filterNot { it.equals(sub, true) }
+            .maxByOrNull { it.length }
+        return copy(
+            description = desc,
+            subtitle = sub,
+            episode = episode ?: o.episode,
+            year = year ?: o.year,
+            genres = genres ?: o.genres,
+            country = country ?: o.country,
+            director = director ?: o.director,
+            cast = cast ?: o.cast,
+        )
     }
 
     /** A source's channels with their display names. Channels come first in XMLTV, so this stops at the first programme. */

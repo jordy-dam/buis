@@ -107,6 +107,9 @@ import nl.jordy.iptv.player.NextUpCard
 import nl.jordy.iptv.player.PlayerUiState
 import nl.jordy.iptv.player.PlayerViewModel
 import nl.jordy.iptv.player.TrackOption
+import nl.jordy.iptv.ui.components.creditsLine
+import nl.jordy.iptv.ui.components.episodeLine
+import nl.jordy.iptv.ui.components.factsLine
 import nl.jordy.iptv.ui.components.CornerCard
 import androidx.compose.material.icons.filled.ThumbDown
 import androidx.compose.material.icons.filled.ThumbUp
@@ -458,7 +461,8 @@ fun PlayerScreen(onExit: () -> Unit, vm: PlayerViewModel = hiltViewModel()) {
                         true
                     }
                     KeyEvent.KEYCODE_DPAD_UP, KeyEvent.KEYCODE_DPAD_DOWN -> { openControls(buttons.play); true }
-                    KeyEvent.KEYCODE_INFO -> true
+                    // Films and episodes: their details, like the programme info on live.
+                    KeyEvent.KEYCODE_INFO -> { if (state.vodInfo != null) { panel = Panel.INFO; openControls(buttons.info) }; true }
                     else -> false
                 }
                 if (handled) overlayTick++
@@ -752,7 +756,7 @@ private fun PlayerBar(
             Row(Modifier.weight(1f), horizontalArrangement = Arrangement.spacedBy(GroupGap, Alignment.End), verticalAlignment = Alignment.CenterVertically) {
                 ControlButton(
                     Icons.Filled.Info, "Programma-info", { onPanel(Panel.INFO) },
-                    Modifier.focusRequester(buttons.info), active = panel == Panel.INFO, available = live,
+                    Modifier.focusRequester(buttons.info), active = panel == Panel.INFO, available = live || state.vodInfo != null,
                 )
                 // The same channel from another category or in another quality, for when this one hiccups.
                 if (live) ControlButton(
@@ -1003,27 +1007,57 @@ private fun ChannelButton(
 
 /**
  * NLZiet's "i", at the top of the bar: what the rest of the bar doesn't say. The bar already has the programme, its times and
- * the progress, so this is the time left, what's next and the description. Only to read; Back or the
- * button again closes it.
+ * the progress, so this is the time left, the episode, what kind of programme it is, the description, who's in it and
+ * what's next. Lines the guide has nothing for are left out. Only to read; Back or the button again closes it.
  */
 @Composable
 private fun ProgrammeInfo(state: PlayerUiState, modifier: Modifier) {
     Column(
-        modifier.width(720.dp),
+        modifier.width(760.dp),
         verticalArrangement = Arrangement.spacedBy(8.dp),
     ) {
+        state.vodInfo?.let { info ->
+            VodInfoLines(info)
+            return@Column
+        }
         val now = state.now
         if (now == null) {
             Text("Geen gids voor deze zender.", style = MaterialTheme.typography.bodyLarge, color = TextSecondary)
             return@Column
         }
+        val extra = now.extra
         val left = ((now.stop - System.currentTimeMillis() / 1000) / 60).coerceAtLeast(0)
         Text("Nog $left min · ${(now.stop - now.start) / 60} min in totaal", style = MaterialTheme.typography.bodyLarge, color = Live)
-        state.next?.let { Text("Straks ${clock.format(Instant.ofEpochSecond(it.start))}  ${it.title}", style = MaterialTheme.typography.bodyLarge) }
-        Text(
-            now.description?.takeIf { it.isNotBlank() } ?: "Geen beschrijving in de gids.",
-            style = MaterialTheme.typography.bodyLarge, color = TextSecondary, maxLines = 8, overflow = TextOverflow.Ellipsis,
-        )
+        extra?.episodeLine()?.let {
+            Text(it, style = MaterialTheme.typography.titleMedium, maxLines = 1, overflow = TextOverflow.Ellipsis)
+        }
+        extra?.factsLine()?.let { Text(it, style = MaterialTheme.typography.bodyMedium, color = TextSecondary) }
+        val description = now.description?.takeIf { it.isNotBlank() }
+        when {
+            description != null -> Text(description, style = MaterialTheme.typography.bodyLarge, maxLines = 7, overflow = TextOverflow.Ellipsis)
+            extra?.subtitle == null -> Text("Geen beschrijving in de gids.", style = MaterialTheme.typography.bodyLarge, color = TextSecondary)
+        }
+        extra?.creditsLine()?.let {
+            Text(it, style = MaterialTheme.typography.bodyMedium, color = TextSecondary, maxLines = 2, overflow = TextOverflow.Ellipsis)
+        }
+        state.next?.let { Text("Straks ${clock.format(Instant.ofEpochSecond(it.start))}  ${it.title}", style = MaterialTheme.typography.bodyLarge, color = TextSecondary) }
+    }
+}
+
+/** A film's or episode's "i": the episode, year · rating · genre, the plot, who's in it. */
+@Composable
+private fun VodInfoLines(info: nl.jordy.iptv.player.VodInfo) {
+    info.heading?.let { Text(it, style = MaterialTheme.typography.titleMedium, maxLines = 1, overflow = TextOverflow.Ellipsis) }
+    nl.jordy.iptv.ui.detail.facts(info.year, info.rating, info.genre, null).joinToString(" · ")
+        .replace(nl.jordy.iptv.ui.detail.RATING_MARK, "★ ").ifEmpty { null }
+        ?.let { Text(it, style = MaterialTheme.typography.bodyMedium, color = Live) }
+    Text(
+        info.plot ?: "Geen beschrijving bekend.",
+        style = MaterialTheme.typography.bodyLarge, color = if (info.plot == null) TextSecondary else Color.Unspecified,
+        maxLines = 7, overflow = TextOverflow.Ellipsis,
+    )
+    listOfNotNull(info.cast?.let { "Met $it" }, info.director?.let { "Regie $it" }).joinToString(" · ").ifEmpty { null }?.let {
+        Text(it, style = MaterialTheme.typography.bodyMedium, color = TextSecondary, maxLines = 2, overflow = TextOverflow.Ellipsis)
     }
 }
 
