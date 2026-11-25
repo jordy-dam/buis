@@ -46,6 +46,8 @@ data class LiveChannelEntity(
     @ColumnInfo(defaultValue = "0") val catchup: Boolean = false,
     /** Days the panel keeps for "vanaf begin" (`tv_archive_duration`); 0 = none, see [hasArchive]. */
     @ColumnInfo(defaultValue = "0") val archiveDays: Int = 0,
+    /** Fingerprint of the provider's entry; the next sync skips the row when it is unchanged. */
+    @ColumnInfo(defaultValue = "0") val hash: Long = 0,
 ) {
     /** The `⏺` mark alone also counts: some panels mark catch-up in the name and leave `tv_archive` at 0. */
     val hasArchive get() = archiveDays > 0 || catchup
@@ -66,6 +68,8 @@ data class MovieEntity(
     @ColumnInfo(defaultValue = "") val badges: String = "",
     /** TMDB id from the film list, when the panel sends it. Language versions share it. */
     val tmdbId: Int? = null,
+    /** Fingerprint of the provider's entry; the next sync skips the row when it is unchanged. */
+    @ColumnInfo(defaultValue = "0") val hash: Long = 0,
 )
 
 @Entity(tableName = "series", primaryKeys = ["categoryId", "seriesId"], indices = [Index("seriesId")])
@@ -82,6 +86,8 @@ data class SeriesEntity(
     val sortIndex: Int,
     val generation: Long,
     @ColumnInfo(defaultValue = "") val badges: String = "",
+    /** Fingerprint of the provider's entry; the next sync skips the row when it is unchanged. */
+    @ColumnInfo(defaultValue = "0") val hash: Long = 0,
 )
 
 /** Fetched on demand when a series is opened, not during the catalog sync. */
@@ -229,6 +235,8 @@ data class SyncInfoEntity(
     @PrimaryKey val id: Int = 0,
     val lastSyncAt: Long,
     val generation: Long,
+    /** The app install that wrote the catalog; a new install cleans every name again. */
+    @ColumnInfo(defaultValue = "0") val salt: Long = 0,
 )
 
 /**

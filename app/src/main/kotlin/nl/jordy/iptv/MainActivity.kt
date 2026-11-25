@@ -42,6 +42,7 @@ class MainActivity : ComponentActivity() {
     private val vm: StartViewModel by viewModels()
     @Inject lateinit var guide: EpgGuide
     @Inject lateinit var calendars: CalendarRepository
+    @Inject lateinit var catalog: nl.jordy.iptv.data.sync.CatalogRefresh
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -65,17 +66,20 @@ class MainActivity : ComponentActivity() {
     }
 
     // Every return to the app is a chance to pick up a newer guide and calendars, in the background.
+    // The catalog too, as a safety net: normally the screensaver already did it.
     override fun onStart() {
         super.onStart()
         nl.jordy.iptv.data.settings.IdleClock.touch()
         guide.refreshIfStale()
         calendars.refreshIfStale()
+        catalog.refreshIfStale()
     }
 }
 
 /**
  * Picks the first screen: login when there are no credentials, then "Wie kijkt er?" when there is
- * more than one profile, then sync when the catalog is missing or a day old.
+ * more than one profile, then sync only when there is no catalog yet. A day-old catalog is
+ * refreshed in the background ([nl.jordy.iptv.data.sync.CatalogRefresh]).
  */
 @HiltViewModel
 class StartViewModel @Inject constructor(
@@ -94,18 +98,14 @@ class StartViewModel @Inject constructor(
         viewModelScope.launch {
             val creds = runCatching { credentials.current() }.getOrNull()
             profiles.ensureOne()
-            val lastSync = db.syncInfo().get()?.lastSyncAt ?: 0
-            val stale = System.currentTimeMillis() - lastSync > RESYNC_AFTER_MS
+            val noCatalog = db.syncInfo().get() == null
             _start.value = when {
                 creds == null -> LoginRoute
-                profiles.all().size > 1 -> ProfilesRoute(atLaunch = true, syncAfter = stale)
-                stale -> SyncRoute
+                profiles.all().size > 1 -> ProfilesRoute(atLaunch = true, syncAfter = noCatalog)
+                noCatalog -> SyncRoute
                 else -> ShellRoute
             }
         }
     }
 
-    private companion object {
-        const val RESYNC_AFTER_MS = 24 * 60 * 60 * 1000L
-    }
 }

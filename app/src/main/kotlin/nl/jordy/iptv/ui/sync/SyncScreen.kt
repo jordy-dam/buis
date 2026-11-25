@@ -96,7 +96,7 @@ fun SyncScreen(onDone: () -> Unit, onLogout: () -> Unit, vm: SyncViewModel = hil
     Box(Modifier.fillMaxSize().padding(SafeArea), contentAlignment = Alignment.Center) {
         Column(Modifier.width(560.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
             Text("Catalogus ophalen", style = MaterialTheme.typography.displaySmall)
-            Text("Dit gebeurt na het inloggen en daarna eens per dag.", style = MaterialTheme.typography.bodyLarge, color = TextSecondary)
+            Text("Dit gebeurt na het inloggen. Daarna houdt BUIS de catalogus zelf bij, als niemand kijkt.", style = MaterialTheme.typography.bodyLarge, color = TextSecondary)
             listOf(ContentType.LIVE to "Zenders", ContentType.MOVIE to "Films", ContentType.SERIES to "Series").forEach { (type, label) ->
                 val count = state.counts[type]
                 val active = state.current == type

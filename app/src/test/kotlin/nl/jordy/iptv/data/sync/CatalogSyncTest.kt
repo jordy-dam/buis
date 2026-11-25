@@ -45,7 +45,7 @@ class CatalogSyncTest {
         db = Room.inMemoryDatabaseBuilder(ApplicationProvider.getApplicationContext(), AppDatabase::class.java)
             .allowMainThreadQueries()
             .build()
-        sync = CatalogSync(XtreamClient(OkHttpClient()), db)
+        sync = CatalogSync(XtreamClient(OkHttpClient()), db, ApplicationProvider.getApplicationContext())
         creds = XtreamCredentials(server.url("/").toString(), "u", "p")
     }
 
@@ -150,5 +150,84 @@ class CatalogSyncTest {
         sync.run(creds)
         assertEquals(50, db.catalog().movieCount())
         assertEquals(1, db.catalog().movieCategories().first().size)
+    }
+
+    // The diff: the provider sends the whole list every day, but only what changed may cost work,
+    // and what changed must still end up right in the lists and in search.
+
+    @Test
+    fun `an unchanged list writes nothing on the next sync`() = runTest {
+        responses["get_vod_categories"] = categories("c0")
+        responses["get_vod_streams"] = movies(1_200) { "c0" }
+        assertEquals(1_200, sync.run(creds).changed[ContentType.MOVIE])
+
+        val again = sync.run(creds)
+
+        assertEquals(0, again.changed[ContentType.MOVIE])
+        assertEquals(0, again.removed[ContentType.MOVIE])
+        assertEquals(1_200, db.catalog().movieCount())
+        assertEquals(1, db.search().match("\"film 7\"", emptyList(), 10).count { it.itemId == 7 })
+    }
+
+    @Test
+    fun `a renamed film is rewritten and found under its new name only`() = runTest {
+        responses["get_vod_categories"] = categories("a", "b")
+        responses["get_vod_streams"] = """[{"stream_id":1,"name":"Oldname","category_id":"a"},{"stream_id":1,"name":"Oldname","category_id":"b"},{"stream_id":2,"name":"Other","category_id":"a"}]"""
+        sync.run(creds)
+
+        // Only the entry in "a" changes; its twin in "b" keeps its own search entry.
+        responses["get_vod_streams"] = """[{"stream_id":1,"name":"Newname","category_id":"a"},{"stream_id":1,"name":"Oldname","category_id":"b"},{"stream_id":2,"name":"Other","category_id":"a"}]"""
+        val r = sync.run(creds)
+
+        assertEquals(1, r.changed[ContentType.MOVIE])
+        assertEquals(listOf("a"), db.search().match("newname", emptyList(), 10).map { it.categoryId })
+        assertEquals(listOf("b"), db.search().match("oldname", emptyList(), 10).map { it.categoryId })
+        assertEquals(1, db.search().match("other", emptyList(), 10).size)
+    }
+
+    @Test
+    fun `a new film at the top is the only write, and the order follows the provider`() = runTest {
+        responses["get_vod_categories"] = categories("c0")
+        responses["get_vod_streams"] = movies(10, firstId = 2) { "c0" }
+        sync.run(creds)
+
+        // Panels renumber `num` for everything after an insert; that alone is no change.
+        val withNew = """[{"stream_id":1,"name":"Brand new","category_id":"c0","num":1},""" + movies(10, firstId = 2) { "c0" }.drop(1)
+        responses["get_vod_streams"] = withNew
+        val r = sync.run(creds)
+
+        assertEquals(1, r.changed[ContentType.MOVIE])
+        assertEquals(0, db.catalog().movie(1)?.sortIndex)
+        assertEquals(1, db.catalog().movie(2)?.sortIndex)
+        assertEquals(10, db.catalog().movie(11)?.sortIndex)
+    }
+
+    @Test
+    fun `a film gone at the provider leaves the list and search`() = runTest {
+        responses["get_vod_categories"] = categories("c0")
+        responses["get_vod_streams"] = """[{"stream_id":1,"name":"Stays","category_id":"c0"},{"stream_id":2,"name":"Leaves","category_id":"c0"}]"""
+        sync.run(creds)
+
+        responses["get_vod_streams"] = """[{"stream_id":1,"name":"Stays","category_id":"c0"}]"""
+        val r = sync.run(creds)
+
+        assertEquals(1 to 0, r.removed[ContentType.MOVIE] to r.changed[ContentType.MOVIE])
+        assertEquals(null, db.catalog().movie(2))
+        assertEquals(0, db.search().match("leaves", emptyList(), 10).size)
+        assertEquals(1, db.search().match("stays", emptyList(), 10).size)
+    }
+
+    @Test
+    fun `a film moving category is in the new one only`() = runTest {
+        responses["get_vod_categories"] = categories("a", "b")
+        responses["get_vod_streams"] = """[{"stream_id":1,"name":"Mover","category_id":"a"}]"""
+        sync.run(creds)
+
+        responses["get_vod_streams"] = """[{"stream_id":1,"name":"Mover","category_id":"b"}]"""
+        sync.run(creds)
+
+        assertEquals(listOf("b"), db.search().match("mover", emptyList(), 10).map { it.categoryId })
+        assertEquals("b", db.catalog().movie(1)?.categoryId)
+        assertEquals(1, db.catalog().movieCount())
     }
 }

@@ -65,6 +65,7 @@ import javax.inject.Singleton
 class BuisDream : DreamService(), LifecycleOwner, SavedStateRegistryOwner {
     @Inject lateinit var posters: DreamPosters
     @Inject lateinit var guide: EpgGuide
+    @Inject lateinit var catalog: nl.jordy.iptv.data.sync.CatalogRefresh
 
     // A DreamService is no LifecycleOwner, but Compose needs one (and a saved-state owner) on its view.
     private val registry = LifecycleRegistry(this)
@@ -94,8 +95,9 @@ class BuisDream : DreamService(), LifecycleOwner, SavedStateRegistryOwner {
     override fun onDreamingStarted() {
         super.onDreamingStarted()
         registry.currentState = Lifecycle.State.RESUMED
-        // Nobody is watching: a good moment for the guide.
+        // Nobody is watching: a good moment for the guide and the catalog.
         guide.refreshIfStale()
+        catalog.refreshIfStale()
     }
 
     override fun onDreamingStopped() {

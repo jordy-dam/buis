@@ -22,9 +22,19 @@ interface CatalogDao {
 
     @Query("DELETE FROM category WHERE type = :type AND generation < :generation")
     suspend fun deleteOldCategories(type: ContentType, generation: Long)
-    @Query("DELETE FROM live_channel WHERE generation < :generation") suspend fun deleteOldLive(generation: Long)
-    @Query("DELETE FROM movie WHERE generation < :generation") suspend fun deleteOldMovies(generation: Long)
-    @Query("DELETE FROM series WHERE generation < :generation") suspend fun deleteOldSeries(generation: Long)
+    // What the catalog holds per row, for the sync's diff: unchanged rows are skipped or only moved.
+    @Query("SELECT categoryId, streamId AS id, hash, sortIndex FROM live_channel") suspend fun liveKeys(): List<CatalogKey>
+    @Query("SELECT categoryId, streamId AS id, hash, sortIndex FROM movie") suspend fun movieKeys(): List<CatalogKey>
+    @Query("SELECT categoryId, seriesId AS id, hash, sortIndex FROM series") suspend fun seriesKeys(): List<CatalogKey>
+    @Query("UPDATE live_channel SET sortIndex = :sortIndex WHERE categoryId = :categoryId AND streamId = :id")
+    suspend fun moveLive(categoryId: String, id: Int, sortIndex: Int)
+    @Query("UPDATE movie SET sortIndex = :sortIndex WHERE categoryId = :categoryId AND streamId = :id")
+    suspend fun moveMovie(categoryId: String, id: Int, sortIndex: Int)
+    @Query("UPDATE series SET sortIndex = :sortIndex WHERE categoryId = :categoryId AND seriesId = :id")
+    suspend fun moveSeries(categoryId: String, id: Int, sortIndex: Int)
+    @Query("DELETE FROM live_channel WHERE categoryId = :categoryId AND streamId = :id") suspend fun deleteLive(categoryId: String, id: Int)
+    @Query("DELETE FROM movie WHERE categoryId = :categoryId AND streamId = :id") suspend fun deleteMovie(categoryId: String, id: Int)
+    @Query("DELETE FROM series WHERE categoryId = :categoryId AND seriesId = :id") suspend fun deleteSeries(categoryId: String, id: Int)
 
     // Only categories that actually contain something: providers ship many empty ones.
     @Query("SELECT * FROM category c WHERE c.type = 'LIVE' AND EXISTS (SELECT 1 FROM live_channel x WHERE x.categoryId = c.id) ORDER BY c.sortIndex")
@@ -339,6 +349,10 @@ interface PlaybackDao {
 interface SearchDao {
     @Insert suspend fun insert(items: List<SearchEntity>)
     @Query("DELETE FROM search WHERE type = :type") suspend fun deleteType(type: String)
+    /** Where [ids] sit in the index: one scan of the type, then [deleteRows] by rowid. */
+    @Query("SELECT rowid, itemId, categoryId FROM search WHERE type = :type AND itemId IN (:ids)")
+    suspend fun refs(type: String, ids: List<Int>): List<SearchRef>
+    @Query("DELETE FROM search WHERE rowid IN (:rowids)") suspend fun deleteRows(rowids: List<Long>)
 
     /**
      * [match] is an FTS4 MATCH expression, built by the search repository from the user's words.
@@ -348,6 +362,9 @@ interface SearchDao {
     @Query("SELECT * FROM search WHERE search MATCH :match ORDER BY (country IN (:preferred)) DESC LIMIT :limit")
     suspend fun match(match: String, preferred: List<String>, limit: Int): List<SearchEntity>
 }
+
+data class CatalogKey(val categoryId: String, val id: Int, val hash: Long, val sortIndex: Int)
+data class SearchRef(val rowid: Long, val itemId: Int, val categoryId: String)
 
 @Dao
 interface SyncInfoDao {

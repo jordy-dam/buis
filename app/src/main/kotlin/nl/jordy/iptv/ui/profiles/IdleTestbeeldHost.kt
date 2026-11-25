@@ -21,8 +21,14 @@ import nl.jordy.iptv.data.settings.IdleTestbeeldStore
 import javax.inject.Inject
 
 @HiltViewModel
-class IdleTestbeeldViewModel @Inject constructor(store: IdleTestbeeldStore) : ViewModel() {
+class IdleTestbeeldViewModel @Inject constructor(
+    store: IdleTestbeeldStore,
+    private val catalog: nl.jordy.iptv.data.sync.CatalogRefresh,
+) : ViewModel() {
     val minutes = store.minutes.stateIn(viewModelScope, SharingStarted.Eagerly, IdleTestbeeldStore.DEFAULT)
+
+    /** Nobody is touching the remote: a good moment for the catalog. */
+    fun quiet() = catalog.refreshIfStale()
 }
 
 /**
@@ -41,6 +47,7 @@ fun IdleTestbeeldHost(allowed: Boolean, vm: IdleTestbeeldViewModel = hiltViewMod
         while (true) {
             val left = minutes * 60_000L - IdleClock.idleMs()
             if (left <= 0) {
+                vm.quiet()
                 up = true
                 return@LaunchedEffect
             }
