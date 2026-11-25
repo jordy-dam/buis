@@ -431,7 +431,11 @@ private fun TasteRow(title: String, items: List<Taste.Suggestion>, onLearn: () -
             listOfNotNull(
                 Taste.displayTitle(f.film.title, f.film.year),
                 Taste.ratingLabel(f.film.rating),
-                f.because?.let { "omdat je ${Taste.displayTitle(it)} leuk vond" },
+                when {
+                    f.sequelOf != null -> "vervolg op ${Taste.displayTitle(f.sequelOf)}"
+                    f.wanted -> "je wilde deze zien"
+                    else -> f.because?.let { "omdat je ${Taste.displayTitle(it)} leuk vond" }
+                },
             ).joinToString(" · ")
         }
             ?: if (items.isEmpty()) "Zeg van tien ${if (series) "series" else "films"} of je ze leuk vindt, dan zoekt BUIS er ${if (series) "series" else "films"} bij." else " ",

@@ -8,7 +8,7 @@ import nl.jordy.iptv.ui.settings.SettingRow
 import androidx.compose.foundation.layout.size
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Block
-import androidx.compose.material.icons.filled.Bookmark
+import androidx.compose.material.icons.filled.AutoAwesome
 import androidx.compose.material.icons.filled.CalendarMonth
 import androidx.compose.material.icons.filled.Favorite
 import androidx.compose.material.icons.filled.TheaterComedy
@@ -87,7 +87,7 @@ fun TasteProfileScreen(onLearn: () -> Unit, onSearch: (String) -> Unit, vm: Tast
                 Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                     Count(Icons.Filled.ThumbUp, s.likes, "leuk", Modifier.weight(1f))
                     Count(Icons.Filled.ThumbDown, s.dislikes, "niks", Modifier.weight(1f))
-                    Count(Icons.Filled.Bookmark, s.wants, "wil ik zien", Modifier.weight(1f))
+                    Count(Icons.Filled.AutoAwesome, s.wants, "wil ik zien", Modifier.weight(1f))
                 }
             }
             Row(horizontalArrangement = Arrangement.spacedBy(16.dp), modifier = Modifier.padding(top = 4.dp)) {

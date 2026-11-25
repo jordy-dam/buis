@@ -25,7 +25,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.KeyboardArrowLeft
 import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
-import androidx.compose.material.icons.filled.BookmarkAdd
+import androidx.compose.material.icons.filled.AutoAwesome
 import androidx.compose.material.icons.filled.KeyboardArrowDown
 import androidx.compose.material.icons.filled.KeyboardArrowUp
 import androidx.compose.material.icons.filled.VisibilityOff
@@ -109,13 +109,13 @@ class TasteViewModel @Inject constructor(savedState: SavedStateHandle, private v
         val s = _state.value
         val f = s.current ?: return
         _state.value = s.copy(index = s.index + 1, last = vote, liked = s.liked + if (vote == Taste.LIKE || vote == Taste.WANT) 1 else 0)
-        viewModelScope.launch { taste.vote(f.streamId, f.title, vote, f.key, type, f.posterUrl) }
+        viewModelScope.launch { taste.vote(f.streamId, f.title, vote, f.key, type) }
     }
 }
 
 /**
  * "Leer mijn smaak": ten known films, one at a time. Right = leuk, Left = niks, Up = wil ik zien
- * (to Favorieten), Down = ken ik niet.
+ * (shows in "voor jou" until watched, not in Favorieten), Down = ken ik niet.
  * Every answer is saved at once, so Back halfway keeps what was answered.
  */
 @Composable
@@ -135,8 +135,8 @@ fun TasteScreen(onDone: () -> Unit, vm: TasteViewModel = hiltViewModel()) {
                 Column(Modifier.padding(top = 12.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
                     KeyHint(Icons.AutoMirrored.Filled.KeyboardArrowRight, Icons.Filled.ThumbUp, "Leuk")
                     KeyHint(Icons.AutoMirrored.Filled.KeyboardArrowLeft, Icons.Filled.ThumbDown, "Niks voor mij")
-                    KeyHint(Icons.Filled.KeyboardArrowUp, Icons.Filled.BookmarkAdd, "Wil ik zien", "naar Favorieten")
-                    KeyHint(Icons.Filled.KeyboardArrowDown, Icons.Filled.VisibilityOff, "Ken ik niet")
+                    KeyHint(Icons.Filled.KeyboardArrowUp, Icons.Filled.AutoAwesome, "Wil ik zien", "komt bij voor jou")
+                    KeyHint(Icons.Filled.KeyboardArrowDown, Icons.Filled.VisibilityOff, "Ken ik niet", "sla over")
                 }
             }
         }

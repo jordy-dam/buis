@@ -10,7 +10,6 @@ import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.mapLatest
 import kotlinx.coroutines.withContext
 import nl.jordy.iptv.data.db.AppDatabase
-import nl.jordy.iptv.data.db.FavoriteEntity
 import nl.jordy.iptv.data.db.TasteFilmRow
 import nl.jordy.iptv.data.db.TasteVoteEntity
 import nl.jordy.iptv.data.profile.ProfileRepository
@@ -31,12 +30,17 @@ import kotlin.random.Random
  * 95 min, lang over 140) and period (decade, "voor 1980" before that) weigh 0.5 each, and only
  * nudge: a film needs a liked genre, director or actor to be suggested at all, so "also from the
  * nineties" alone never is a reason.
+ *
+ * Old films (before [OLD_BEFORE]) only come when the profile liked two or more from that period: one
+ * liked classic would otherwise pull its director's and actors' whole filmography from that time.
+ * Ahead of the taste ranking: the next parts of a series of films the profile saw or liked
+ * ("Toy Story" seen → "Toy Story 2", "Toy Story 3"), then what it marked "Wil ik zien".
  */
 object Taste {
     const val LIKE = 1
     const val DISLIKE = -1
     const val UNKNOWN = 0
-    /** "Wil ik zien": heard of it, looks good, can't judge it yet. Goes to Favorieten, weighs a third of a thumb. */
+    /** "Wil ik zien": heard of it, looks good, can't judge it yet. Shows in "voor jou" until watched, weighs a third of a thumb. */
     const val WANT = 2
 
     private const val LIKE_WEIGHT = 3.0
@@ -68,7 +72,8 @@ object Taste {
 
     data class Vote(val film: Film, val vote: Int)
 
-    data class Suggestion(val film: Film, val score: Double, val because: String?)
+    /** [because]: the liked film it resembles; [sequelOf]: the part before it that was seen; [wanted]: marked "Wil ik zien". */
+    data class Suggestion(val film: Film, val score: Double, val because: String?, val sequelOf: String? = null, val wanted: Boolean = false)
 
     /** "kort", "lang" or null for the middle (and unknown). */
     fun length(secs: Int?): String? = when {
@@ -124,13 +129,23 @@ object Taste {
      * a genre, director or actor the profile liked: with nothing to go on there is no suggestion.
      */
     fun suggest(candidates: List<Film>, votes: List<Vote>, exclude: Set<String>, limit: Int = 20): List<Suggestion> {
-        if (votes.none { it.vote == LIKE || it.vote == WANT }) return emptyList()
+        val voted = votes.mapTo(HashSet()) { it.film.key }
+        val sequels = sequels(candidates, votes, exclude)
+        val taken = sequels.mapTo(HashSet()) { it.film.key }
+        // Marked "Wil ik zien" and not watched yet: this is where they can be found again. Only in
+        // its own row: a wanted film is no series suggestion.
+        val own = candidates.mapTo(HashSet()) { it.key }
+        val wanted = votes.asSequence().filter { it.vote == WANT && it.film.key in own && it.film.key !in exclude && it.film.key !in taken }
+            .take(MAX_WANTED).map { Suggestion(it.film, 0.0, null, wanted = true) }.toList()
+        taken += wanted.map { it.film.key }
+        if (votes.none { it.vote == LIKE || it.vote == WANT }) return (sequels + wanted).take(limit)
         // Only a real thumb up is named as the reason: "omdat je X leuk vond" isn't true of a "wil ik zien".
         val liked = votes.filter { it.vote == LIKE }.map { it.film }
         val weights = weights(votes)
-        val voted = votes.mapTo(HashSet()) { it.film.key }
-        return candidates.asSequence()
-            .filter { it.key !in voted && it.key !in exclude }
+        val likedPeriods = votes.filter { it.vote == LIKE || it.vote == WANT }.mapNotNull { period(it.film.year) }.groupingBy { it }.eachCount()
+        val byTaste = candidates.asSequence()
+            .filter { it.key !in voted && it.key !in exclude && it.key !in taken }
+            .filter { f -> f.year == null || f.year >= OLD_BEFORE || (likedPeriods[period(f.year)] ?: 0) >= OLD_LIKES }
             .mapNotNull { f ->
                 val positive = features(f).entries.filter { isCore(it.key) }.sumOf { (k, s) -> ((weights[k] ?: 0.0) * s).coerceAtLeast(0.0) }
                 if (positive <= 0.0) return@mapNotNull null
@@ -138,10 +153,67 @@ object Taste {
                 if (s <= 0.0) null else f to s
             }
             .sortedByDescending { it.second }
+            // Variety: one liked Clint Eastwood film must not fill the row with his filmography.
+            .let { ranked -> val perDirector = HashMap<String, Int>(); ranked.filter { (f, _) -> f.directors.none { (perDirector[it.lowercase()] ?: 0) >= PER_DIRECTOR }.also { ok -> if (ok) f.directors.forEach { d -> perDirector.merge(d.lowercase(), 1, Int::plus) } } } }
             .take(limit)
             .map { (f, s) -> Suggestion(f, s, because(f, liked)) }
             .toList()
+        return (sequels + wanted + byTaste).take(limit)
     }
+
+    /**
+     * Later parts of film series the profile watched (in [exclude]) or liked, not seen yet, lowest
+     * part first, at most [MAX_PARTS] per series. A series with a part someone disliked is left alone.
+     */
+    fun sequels(candidates: List<Film>, votes: List<Vote>, exclude: Set<String>): List<Suggestion> {
+        val voted = votes.associate { it.film.key to it.vote }
+        val seen = candidates.filter { it.key in exclude } + votes.filter { it.vote == LIKE }.map { it.film }
+        if (seen.isEmpty()) return emptyList()
+        // Per series: the parts seen, and the title of the first one, for the reason line.
+        val seenParts = HashMap<String, MutableMap<Int, String>>()
+        seen.forEach { f -> part(f.title, f.year)?.let { (base, n) -> seenParts.getOrPut(base) { sortedMapOf() }[n] = f.title } }
+        val disliked = votes.filter { it.vote == DISLIKE }.mapNotNullTo(HashSet()) { part(it.film.title, it.film.year)?.first }
+        return candidates.asSequence()
+            .filter { it.key !in exclude && voted[it.key] != DISLIKE && voted[it.key] != LIKE }
+            .mapNotNull { f -> part(f.title, f.year)?.let { (base, n) -> Triple(f, base, n) } }
+            .filter { (_, base, n) -> base !in disliked && seenParts[base]?.let { parts -> n > parts.keys.min() && n !in parts } == true }
+            .groupBy { it.second }.values
+            .flatMap { parts -> parts.sortedBy { it.third }.distinctBy { it.third }.take(MAX_PARTS) }
+            .map { (f, base, _) -> Suggestion(f, 0.0, null, sequelOf = seenParts.getValue(base).values.first()) }
+            .toList()
+    }
+
+    /**
+     * "Toy Story 2" → ("toy story", 2), "The Godfather Part II" → ("the godfather", 2), "Kill Bill:
+     * Vol. 1" → ("kill bill", 1), "Dune: Part Two" → ("dune", 2); a title without a number is part 1.
+     * Numbers over [MAX_PART] aren't parts ("Blade Runner 2049"). Null for a title too short to match on.
+     */
+    fun part(title: String, year: Int?): Pair<String, Int>? {
+        val t = displayTitle(title, year).lowercase().trim()
+        partPattern.matchEntire(t)?.let { m ->
+            val base = m.groupValues[1].trim(' ', ':', '-', ',', '.', '–')
+            val n = m.groupValues[2].let { it.toIntOrNull() ?: partWords[it] }
+            if (n != null && n in 1..MAX_PART && base.length >= MIN_BASE) return base to n
+        }
+        return t.takeIf { it.length >= MIN_BASE }?.let { it to 1 }
+    }
+
+    private val partWords = mapOf(
+        "i" to 1, "ii" to 2, "iii" to 3, "iv" to 4, "v" to 5, "vi" to 6, "vii" to 7, "viii" to 8, "ix" to 9,
+        "one" to 1, "two" to 2, "three" to 3, "four" to 4, "five" to 5, "een" to 1, "twee" to 2, "drie" to 3,
+    )
+    private val partPattern = Regex(
+        """^(.+?)[\s:,.\-–]+(?:part|deel|chapter|hoofdstuk|vol\.?|volume|episode)?\s*(\d{1,2}|viii|vii|vi|iv|ix|v|iii|ii|i|one|two|three|four|five|een|twee|drie)(?:\s*[:\-–]\s*.+)?$""",
+    )
+    private const val MAX_PART = 12
+    private const val MIN_BASE = 3
+    private const val MAX_PARTS = 3
+    private const val MAX_WANTED = 5
+    /** At most this many films by one director in the taste ranking. */
+    private const val PER_DIRECTOR = 2
+    /** Films from before this year need [OLD_LIKES] liked films from their period to be suggested. */
+    const val OLD_BEFORE = 1990
+    private const val OLD_LIKES = 2
 
     /** The liked film this one has most in common with (genre, director, actors), for "Omdat je X leuk vond". */
     fun because(f: Film, liked: List<Film>): String? {
@@ -315,7 +387,7 @@ class TasteRepository @Inject constructor(
     ) { id, p, v, _, _ -> Triple(id, p, v) }
         .mapLatest { (id, p, v) ->
             withContext(Dispatchers.Default) {
-                if (v.none { it.vote == Taste.LIKE }) return@withContext emptyList()
+                // No thumbs yet still gives the next parts of what was watched.
                 Taste.suggest(candidates(type, p.preferredCountries.toList(), p.hideAdult), voted(v), watched(type, id))
             }
         }
@@ -330,12 +402,11 @@ class TasteRepository @Inject constructor(
         )
     }
 
-    suspend fun vote(id: Int, title: String, vote: Int, key: String? = null, type: ContentType = ContentType.MOVIE, imageUrl: String? = null) {
+    suspend fun vote(id: Int, title: String, vote: Int, key: String? = null, type: ContentType = ContentType.MOVIE) {
         val profile = profiles.currentId()
         val k = key ?: keyOf(type, id) ?: return
+        // "Wil ik zien" stays out of Favorieten (Jordy, 2026-11-25): it shows in "voor jou" until watched.
         dao.upsert(TasteVoteEntity(profile, k, id, title, vote, System.currentTimeMillis(), type))
-        // "Wil ik zien" is a watchlist too: Favorieten is where this household keeps those.
-        if (vote == Taste.WANT) db.favorites().upsert(FavoriteEntity(profile, type, id, title, imageUrl, System.currentTimeMillis()))
     }
 
     suspend fun hasVoted(id: Int, type: ContentType = ContentType.MOVIE): Boolean {
@@ -354,7 +425,7 @@ class TasteRepository @Inject constructor(
         }
     }
 
-    /** "Smaak wissen": every thumb of the watching profile. Favorieten from "Wil ik zien" stay. */
+    /** "Smaak wissen": every thumb of the watching profile, "Wil ik zien" included. */
     suspend fun reset() = dao.clear(profiles.currentId())
 
     private suspend fun keyOf(type: ContentType, id: Int) = if (type == ContentType.SERIES) dao.seriesKey(id) else dao.filmKey(id)

@@ -72,9 +72,11 @@ class TasteTest {
     fun `wil ik zien pulls a little, but is never named as liked`() {
         val wanted = film("Wanted series", listOf("Misdaad"))
         val crime = film("Crime film", listOf("Misdaad"))
-        val got = Taste.suggest(listOf(crime), listOf(Taste.Vote(wanted, Taste.WANT)), emptySet())
-        assertEquals(listOf("Crime film"), got.map { it.film.key })
-        assertEquals("no 'omdat je Wanted series leuk vond': it wasn't seen", null, got.first().because)
+        val got = Taste.suggest(listOf(crime, wanted), listOf(Taste.Vote(wanted, Taste.WANT)), emptySet())
+        assertEquals("the wanted one itself first, so it can be found again", listOf("Wanted series", "Crime film"), got.map { it.film.key })
+        assertTrue(got.first().wanted)
+        assertEquals("not in the other type's row", listOf("Crime film"), Taste.suggest(listOf(crime), listOf(Taste.Vote(wanted, Taste.WANT)), emptySet()).map { it.film.key })
+        assertEquals("no 'omdat je Wanted series leuk vond': it wasn't seen", null, got.last().because)
         val w = Taste.weights(listOf(Taste.Vote(wanted, Taste.WANT), Taste.Vote(inception, LIKE)))
         assertTrue("a third of a thumb", w.getValue("g:misdaad") < w.getValue("g:sciencefiction"))
     }
@@ -230,5 +232,66 @@ class TasteTest {
         assertEquals(listOf("Christopher Nolan", "Emma Thomas"), Taste.names("Christopher Nolan, Emma Thomas"))
         assertEquals(listOf("A B", "C D"), Taste.names("A B / C D"))
         assertTrue(Taste.names(null).isEmpty())
+    }
+
+    // Vervolgdelen: who saw part 1 wants to know part 2 is there, before any taste guess.
+
+    @Test
+    fun `seeing part one brings the next parts first, in order, and not the ones already seen`() {
+        val one = film("Toy Story", listOf("Animatie"), year = 1995)
+        val two = film("Toy Story 2", listOf("Animatie"), year = 1999)
+        val three = film("Toy Story 3", listOf("Animatie"), year = 2010)
+        val four = film("Toy Story 4 (2019)", listOf("Animatie"), year = 2019)
+        val inceptionFan = Taste.Vote(inception, LIKE)
+        val got = Taste.suggest(listOf(four, interstellar, three, two, one), listOf(inceptionFan), exclude = setOf("Toy Story", "Toy Story 3"))
+        assertEquals(listOf("Toy Story 2", "Toy Story 4 (2019)"), got.take(2).map { it.film.key })
+        assertEquals("Toy Story", got.first().sequelOf)
+        assertEquals("then the taste ranking", "Interstellar", got[2].film.key)
+    }
+
+    @Test
+    fun `parts also follow without any thumbs, and a disliked part stops the series`() {
+        val one = film("Rocky", listOf("Drama"), year = 1976)
+        val two = film("Rocky II", listOf("Drama"), year = 1979)
+        assertEquals(listOf("Rocky II"), Taste.suggest(listOf(one, two), emptyList(), exclude = setOf("Rocky")).map { it.film.key })
+        val three = film("Rocky III", listOf("Drama"), year = 1982)
+        val got = Taste.suggest(listOf(one, two, three), listOf(Taste.Vote(two, DISLIKE)), exclude = setOf("Rocky"))
+        assertTrue(got.none { it.sequelOf != null })
+    }
+
+    @Test
+    fun `part numbers in the ways providers write them`() {
+        assertEquals("toy story" to 2, Taste.part("Toy Story 2", 1999))
+        assertEquals("the godfather" to 2, Taste.part("The Godfather Part II", 1974))
+        assertEquals("kill bill" to 1, Taste.part("Kill Bill: Vol. 1", 2003))
+        assertEquals("dune" to 2, Taste.part("Dune: Part Two 4K", 2024))
+        assertEquals("home alone" to 2, Taste.part("Home Alone 2: Lost in New York", 1992))
+        assertEquals("a year is no part", "blade runner 2049" to 1, Taste.part("Blade Runner 2049", 2017))
+        assertEquals("inception" to 1, Taste.part("Inception - 2010", 2010))
+    }
+
+    // One liked classic must not turn the row into its director's 1970s filmography.
+
+    @Test
+    fun `one liked old film does not bring old films, two from that time do`() {
+        val godfather = film("The Godfather", listOf("Misdaad", "Drama"), "Francis Ford Coppola", listOf("Al Pacino"), year = 1972)
+        val conversation = film("The Conversation", listOf("Misdaad", "Drama"), "Francis Ford Coppola", year = 1974)
+        val newCrime = film("New crime", listOf("Misdaad"), year = 2019)
+        val one = Taste.suggest(listOf(conversation, newCrime), listOf(Taste.Vote(godfather, LIKE)), emptySet()).map { it.film.key }
+        assertEquals(listOf("New crime"), one)
+
+        val serpico = film("Serpico", listOf("Misdaad", "Drama"), "Sidney Lumet", listOf("Al Pacino"), year = 1973)
+        val two = Taste.suggest(listOf(conversation, newCrime), listOf(Taste.Vote(godfather, LIKE), Taste.Vote(serpico, LIKE)), emptySet()).map { it.film.key }
+        assertEquals(listOf("The Conversation", "New crime"), two)
+    }
+
+    @Test
+    fun `one liked Eastwood film brings at most two more of his, and room for others`() {
+        val granTorino = film("Gran Torino", listOf("Drama"), "Clint Eastwood", listOf("Clint Eastwood"), year = 2008)
+        val eastwood = (1..5).map { film("Eastwood $it", listOf("Drama"), "Clint Eastwood", listOf("Clint Eastwood"), year = 2000 + it) }
+        val otherDrama = film("Other drama", listOf("Drama"), "Someone Else", year = 2015)
+        val got = Taste.suggest(eastwood + otherDrama, listOf(Taste.Vote(granTorino, LIKE)), emptySet()).map { it.film.key }
+        assertEquals(2, got.count { it.startsWith("Eastwood") })
+        assertTrue("Other drama" in got)
     }
 }
