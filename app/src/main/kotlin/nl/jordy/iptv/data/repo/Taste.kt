@@ -42,8 +42,14 @@ object Taste {
     const val UNKNOWN = 0
     /** "Wil ik zien": heard of it, looks good, can't judge it yet. Shows in "voor jou" until watched, weighs a third of a thumb. */
     const val WANT = 2
+    /** "Superleuk": a favourite of favourites. Weighs more than a thumb and is named first as the reason. */
+    const val SUPER = 3
+
+    /** A thumb up, ordinary or super. */
+    fun isLike(vote: Int) = vote == LIKE || vote == SUPER
 
     private const val LIKE_WEIGHT = 3.0
+    private const val SUPER_WEIGHT = 5.0
     private const val DISLIKE_WEIGHT = -2.0
     private const val WANT_WEIGHT = 1.0
     private const val DIRECTOR = 1.5
@@ -109,6 +115,7 @@ object Taste {
         for (v in votes) {
             val sign = when (v.vote) {
                 LIKE -> LIKE_WEIGHT
+                SUPER -> SUPER_WEIGHT
                 DISLIKE -> DISLIKE_WEIGHT
                 WANT -> WANT_WEIGHT
                 else -> continue
@@ -138,11 +145,12 @@ object Taste {
         val wanted = votes.asSequence().filter { it.vote == WANT && it.film.key in own && it.film.key !in exclude && it.film.key !in taken }
             .take(MAX_WANTED).map { Suggestion(it.film, 0.0, null, wanted = true) }.toList()
         taken += wanted.map { it.film.key }
-        if (votes.none { it.vote == LIKE || it.vote == WANT }) return (sequels + wanted).take(limit)
+        if (votes.none { isLike(it.vote) || it.vote == WANT }) return (sequels + wanted).take(limit)
         // Only a real thumb up is named as the reason: "omdat je X leuk vond" isn't true of a "wil ik zien".
-        val liked = votes.filter { it.vote == LIKE }.map { it.film }
+        // Superleuk first: on a tie in common features, that one is named.
+        val liked = votes.filter { isLike(it.vote) }.sortedByDescending { it.vote == SUPER }.map { it.film }
         val weights = weights(votes)
-        val likedPeriods = votes.filter { it.vote == LIKE || it.vote == WANT }.mapNotNull { period(it.film.year) }.groupingBy { it }.eachCount()
+        val likedPeriods = votes.filter { isLike(it.vote) || it.vote == WANT }.mapNotNull { period(it.film.year) }.groupingBy { it }.eachCount()
         val byTaste = candidates.asSequence()
             .filter { it.key !in voted && it.key !in exclude && it.key !in taken }
             .filter { f -> f.year == null || f.year >= OLD_BEFORE || (likedPeriods[period(f.year)] ?: 0) >= OLD_LIKES }
@@ -167,14 +175,14 @@ object Taste {
      */
     fun sequels(candidates: List<Film>, votes: List<Vote>, exclude: Set<String>): List<Suggestion> {
         val voted = votes.associate { it.film.key to it.vote }
-        val seen = candidates.filter { it.key in exclude } + votes.filter { it.vote == LIKE }.map { it.film }
+        val seen = candidates.filter { it.key in exclude } + votes.filter { isLike(it.vote) }.map { it.film }
         if (seen.isEmpty()) return emptyList()
         // Per series: the parts seen, and the title of the first one, for the reason line.
         val seenParts = HashMap<String, MutableMap<Int, String>>()
         seen.forEach { f -> part(f.title, f.year)?.let { (base, n) -> seenParts.getOrPut(base) { sortedMapOf() }[n] = f.title } }
         val disliked = votes.filter { it.vote == DISLIKE }.mapNotNullTo(HashSet()) { part(it.film.title, it.film.year)?.first }
         return candidates.asSequence()
-            .filter { it.key !in exclude && voted[it.key] != DISLIKE && voted[it.key] != LIKE }
+            .filter { it.key !in exclude && voted[it.key].let { v -> v == null || v == WANT || v == UNKNOWN } }
             .mapNotNull { f -> part(f.title, f.year)?.let { (base, n) -> Triple(f, base, n) } }
             .filter { (_, base, n) -> base !in disliked && seenParts[base]?.let { parts -> n > parts.keys.min() && n !in parts } == true }
             .groupBy { it.second }.values
@@ -319,7 +327,7 @@ object Taste {
             .sortedBy { if (positive) -it.value else it.value }
             .take(n).map { label(it.key.removePrefix(prefix)) }
         return Summary(
-            likes = votes.count { it.vote == LIKE },
+            likes = votes.count { isLike(it.vote) },
             dislikes = votes.count { it.vote == DISLIKE },
             wants = votes.count { it.vote == WANT },
             genres = top("g:", 5),
@@ -407,6 +415,26 @@ class TasteRepository @Inject constructor(
         val k = key ?: keyOf(type, id) ?: return
         // "Wil ik zien" stays out of Favorieten (Jordy, 2026-11-25): it shows in "voor jou" until watched.
         dao.upsert(TasteVoteEntity(profile, k, id, title, vote, System.currentTimeMillis(), type))
+    }
+
+    /** Takes back the thumb on this film or series (pressing the lit thumb again). */
+    suspend fun clearVote(id: Int, type: ContentType = ContentType.MOVIE) {
+        val k = keyOf(type, id) ?: return
+        dao.delete(profiles.currentId(), k)
+    }
+
+    /** The watching profile's thumb on this film (any of its versions), live; null when none. */
+    @OptIn(ExperimentalCoroutinesApi::class)
+    fun voteFor(id: Int, type: ContentType = ContentType.MOVIE): Flow<Int?> = votes.mapLatest { v ->
+        val k = keyOf(type, id) ?: return@mapLatest null
+        v.firstOrNull { it.filmKey == k }?.vote
+    }
+
+    /** Thumbs for many films at once, by stream id: the watch history's rows. */
+    @OptIn(ExperimentalCoroutinesApi::class)
+    fun votesFor(ids: Flow<List<Int>>): Flow<Map<Int, Int>> = combine(ids, votes) { i, v -> i to v }.mapLatest { (ids, v) ->
+        val byKey = v.filter { it.type == ContentType.MOVIE }.associate { it.filmKey to it.vote }
+        ids.distinct().mapNotNull { id -> keyOf(ContentType.MOVIE, id)?.let { k -> byKey[k]?.let { id to it } } }.toMap()
     }
 
     suspend fun hasVoted(id: Int, type: ContentType = ContentType.MOVIE): Boolean {

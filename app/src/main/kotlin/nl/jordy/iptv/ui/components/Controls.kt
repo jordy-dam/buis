@@ -21,11 +21,16 @@ import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.runtime.Composable
+import androidx.compose.material.icons.filled.ThumbDown
+import androidx.compose.material.icons.filled.ThumbUp
+import androidx.compose.material.icons.filled.Whatshot
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.focus.focusRequester
+import androidx.compose.material.icons.outlined.ThumbUp
 import androidx.compose.ui.focus.FocusDirection
 import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.graphics.SolidColor
@@ -277,3 +282,78 @@ fun FavoriteButton(favorite: Boolean, onToggle: () -> Unit, modifier: Modifier =
     modifier,
     tint = if (favorite) ({ nl.jordy.iptv.ui.theme.Heart }) else null,
 )
+
+/**
+ * Rating a film for "Voor jou" as one button next to the heart: it shows the thumb given, gold for
+ * leuk and superleuk (red is the heart's: favoriet), grey for niks (an empty
+ * thumb when none), OK opens a small row of niks / leuk / superleuk under it. Picking the lit one
+ * again takes it back ([onVote] with null); Back closes the row.
+ */
+@Composable
+fun RatingButton(vote: Int?, onVote: (Int?) -> Unit, modifier: Modifier = Modifier) {
+    val taste = nl.jordy.iptv.data.repo.Taste
+    var open by remember { mutableStateOf(false) }
+    Box(modifier) {
+        IconButton(
+            when (vote) {
+                taste.DISLIKE -> androidx.compose.material.icons.Icons.Filled.ThumbDown
+                taste.LIKE -> androidx.compose.material.icons.Icons.Filled.ThumbUp
+                taste.SUPER -> androidx.compose.material.icons.Icons.Filled.Whatshot
+                else -> androidx.compose.material.icons.Icons.Outlined.ThumbUp
+            },
+            when (vote) {
+                taste.DISLIKE -> "Niks voor mij"
+                taste.LIKE -> "Leuk"
+                taste.SUPER -> "Superleuk"
+                else -> "Beoordelen"
+            },
+            { open = true },
+            fill = when (vote) {
+                taste.DISLIKE -> ({ nl.jordy.iptv.ui.theme.TextSecondary })
+                taste.LIKE -> ({ nl.jordy.iptv.ui.theme.Live })
+                taste.SUPER -> ({ nl.jordy.iptv.ui.theme.Live })
+                else -> null
+            },
+        )
+        if (open) {
+            val below = with(androidx.compose.ui.platform.LocalDensity.current) { 58.dp.roundToPx() }
+            androidx.compose.ui.window.Popup(
+                offset = androidx.compose.ui.unit.IntOffset(-12, below),
+                onDismissRequest = { open = false },
+                properties = androidx.compose.ui.window.PopupProperties(focusable = true),
+            ) {
+                val focus = remember { androidx.compose.ui.focus.FocusRequester() }
+                androidx.compose.runtime.LaunchedEffect(Unit) { runCatching { focus.requestFocus() } }
+                Box(Modifier.background(nl.jordy.iptv.ui.theme.SurfaceColor, RoundedCornerShape(16.dp)).padding(12.dp)) {
+                    RatingButtons(vote, { onVote(it); open = false }, focus = focus)
+                }
+            }
+        }
+    }
+}
+
+/**
+ * Niks, leuk, superleuk for a film, for "Voor jou": the one given is filled; pressing it again takes
+ * it back ([onVote] with null). [vote] is a [nl.jordy.iptv.data.repo.Taste] value or null.
+ */
+@Composable
+fun RatingButtons(vote: Int?, onVote: (Int?) -> Unit, modifier: Modifier = Modifier, large: Boolean = false, focus: androidx.compose.ui.focus.FocusRequester? = null) {
+    val taste = nl.jordy.iptv.data.repo.Taste
+    fun pick(v: Int) = onVote(if (vote == v) null else v)
+    // Focus lands on the thumb given, else on leuk.
+    fun at(v: Int) = if (focus != null && (vote ?: taste.LIKE) == v) Modifier.focusRequester(focus) else Modifier
+    androidx.compose.foundation.layout.Row(modifier, horizontalArrangement = androidx.compose.foundation.layout.Arrangement.spacedBy(12.dp)) {
+        IconButton(
+            androidx.compose.material.icons.Icons.Filled.ThumbDown, if (vote == taste.DISLIKE) "Niks voor mij · gegeven" else "Niks voor mij",
+            { pick(taste.DISLIKE) }, at(taste.DISLIKE), large = large, fill = if (vote == taste.DISLIKE) ({ nl.jordy.iptv.ui.theme.TextSecondary }) else null,
+        )
+        IconButton(
+            androidx.compose.material.icons.Icons.Filled.ThumbUp, if (vote == taste.LIKE) "Leuk · gegeven" else "Leuk",
+            { pick(taste.LIKE) }, at(taste.LIKE), large = large, fill = if (vote == taste.LIKE) ({ nl.jordy.iptv.ui.theme.Live }) else null,
+        )
+        IconButton(
+            androidx.compose.material.icons.Icons.Filled.Whatshot, if (vote == taste.SUPER) "Superleuk · gegeven" else "Superleuk",
+            { pick(taste.SUPER) }, at(taste.SUPER), large = large, fill = if (vote == taste.SUPER) ({ nl.jordy.iptv.ui.theme.Live }) else null,
+        )
+    }
+}

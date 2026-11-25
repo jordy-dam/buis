@@ -73,8 +73,18 @@ class MovieDetailViewModel @Inject constructor(
     savedState: SavedStateHandle,
     private val db: AppDatabase,
     private val library: LibraryRepository,
+    private val taste: nl.jordy.iptv.data.repo.TasteRepository,
 ) : ViewModel() {
     private val opened = savedState.toRoute<MovieDetailRoute>().streamId
+
+    /** This profile's thumb on the film, whichever version it was given on. */
+    val vote = taste.voteFor(opened).stateIn(viewModelScope, SharingStarted.Eagerly, null)
+
+    /** A thumb afterwards, for "Voor jou"; null takes it back. */
+    fun rate(v: Int?) = viewModelScope.launch {
+        val m = movie.value ?: return@launch
+        if (v == null) taste.clearVote(selected.value) else taste.vote(selected.value, m.name, v)
+    }
 
     val movie = MutableStateFlow<MovieEntity?>(null)
     val info = MutableStateFlow<MovieInfo?>(null)
@@ -124,6 +134,7 @@ fun MovieDetailScreen(onPlay: (PlayerRoute) -> Unit, vm: MovieDetailViewModel = 
     val favorite by vm.isFavorite.collectAsStateWithLifecycle()
     val versions by vm.versions.collectAsStateWithLifecycle()
     val selected by vm.selected.collectAsStateWithLifecycle()
+    val vote by vm.vote.collectAsStateWithLifecycle()
     val m = movie ?: return
     val primary = remember { FocusRequester() }
     LaunchedEffect(Unit) { runCatching { primary.requestFocus() } }
@@ -158,6 +169,8 @@ fun MovieDetailScreen(onPlay: (PlayerRoute) -> Unit, vm: MovieDetailViewModel = 
                     FavoriteButton(favorite, vm::toggleFavorite)
                     // Next to the heart: seen by itself at 70%, or set here by hand.
                     nl.jordy.iptv.ui.components.WatchedButton(watched, { vm.setWatched(!watched) })
+                    // Afterwards too, not only on the card at the credits: what someone thought of it counts most for "Voor jou".
+                    nl.jordy.iptv.ui.components.RatingButton(vote, vm::rate)
                 }
             }
         },

@@ -341,7 +341,7 @@ interface PlaybackDao {
     suspend fun watchedNames(profileId: Long): List<WatchedName>
 
     /** "Verder kijken": finished items are already deleted by the resume policy. */
-    @Query("SELECT * FROM playback_position WHERE profileId = :profileId ORDER BY updatedAt DESC LIMIT :limit")
+    @Query("SELECT * FROM playback_position WHERE profileId = :profileId AND $NOT_ADULT ORDER BY updatedAt DESC LIMIT :limit")
     fun recent(profileId: Long, limit: Int): Flow<List<PlaybackPositionEntity>>
 }
 
@@ -442,6 +442,13 @@ interface MovieInfoDao {
 const val SERIES_KEY = "('series:' || lower(s.name) || '|' || IFNULL(s.year, ''))"
 
 /** One film across its language versions: the TMDB id when known, else title and year (tables `m` and `i`). */
+/**
+ * For a row with `type` and `itemId`: not a channel or film from an adult category. Kept out of the
+ * watch log and Verder kijken, so "what was watched" never shows them (Jordy, 2026-11-25).
+ */
+const val NOT_ADULT = "NOT ((type = 'LIVE' AND itemId IN (SELECT l.streamId FROM live_channel l JOIN category c ON c.type = 'LIVE' AND c.id = l.categoryId WHERE c.adult = 1)) " +
+    "OR (type = 'MOVIE' AND itemId IN (SELECT m.streamId FROM movie m JOIN category c ON c.type = 'MOVIE' AND c.id = m.categoryId WHERE c.adult = 1)))"
+
 const val FILM_KEY = "COALESCE(CAST(m.tmdbId AS TEXT), CAST(i.tmdbId AS TEXT), lower(m.name) || '|' || IFNULL(m.year, ''))"
 
 data class WatchedName(val filmKey: String, val at: Long, val name: String?)
@@ -576,10 +583,15 @@ data class CalendarNext(val url: String, val start: Long, val title: String)
 @Dao
 interface WatchLogDao {
     @Insert suspend fun insert(item: WatchLogEntity)
-    @Query("SELECT * FROM watch_log WHERE profileId = :profileId AND startedAt >= :since ORDER BY startedAt DESC")
+    @Query("SELECT * FROM watch_log WHERE profileId = :profileId AND startedAt >= :since AND $NOT_ADULT ORDER BY startedAt DESC")
     fun since(profileId: Long, since: Long): Flow<List<WatchLogEntity>>
     @Query("DELETE FROM watch_log WHERE startedAt < :before")
     suspend fun prune(before: Long)
+    /** Adult channels and films never belong in the history: written before this rule, or before their category was known as adult. */
+    @Query("DELETE FROM watch_log WHERE NOT $NOT_ADULT")
+    suspend fun pruneAdult()
+    @Query("SELECT NOT $NOT_ADULT FROM (SELECT :type AS type, :itemId AS itemId)")
+    suspend fun isAdult(type: ContentType, itemId: Int): Boolean
 }
 
 /** Zenderstatus: live sessions and chosen replacements. */
@@ -634,6 +646,9 @@ interface TasteDao {
 
     @Query("SELECT COUNT(*) FROM taste_vote WHERE profileId = :profileId AND filmKey = :filmKey")
     suspend fun count(profileId: Long, filmKey: String): Int
+
+    @Query("DELETE FROM taste_vote WHERE profileId = :profileId AND filmKey = :filmKey")
+    suspend fun delete(profileId: Long, filmKey: String)
 
     /** The key one version of a film shares with its other versions. */
     @Query("SELECT $FILM_KEY FROM movie m LEFT JOIN movie_info i ON i.streamId = m.streamId WHERE m.streamId = :streamId LIMIT 1")

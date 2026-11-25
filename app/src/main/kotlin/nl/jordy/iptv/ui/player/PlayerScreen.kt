@@ -113,6 +113,7 @@ import nl.jordy.iptv.ui.components.factsLine
 import nl.jordy.iptv.ui.components.CornerCard
 import androidx.compose.material.icons.filled.ThumbDown
 import androidx.compose.material.icons.filled.ThumbUp
+import androidx.compose.material.icons.filled.Whatshot
 import nl.jordy.iptv.data.repo.Taste
 import nl.jordy.iptv.ui.components.CornerFade
 import nl.jordy.iptv.ui.components.BottomFade
@@ -1196,8 +1197,10 @@ internal fun formatTime(ms: Long): String {
 private fun ThumbsCard(main: FocusRequester, onVote: (Int) -> Unit, modifier: Modifier) {
     Column(modifier, horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(20.dp)) {
         Row(horizontalArrangement = Arrangement.spacedBy(24.dp)) {
-            IconButton(Icons.Filled.ThumbUp, "Leuk", { onVote(Taste.LIKE) }, Modifier.focusRequester(main), large = true)
+            // Leuk keeps the first focus; Right goes on to superleuk, Left to niks.
             IconButton(Icons.Filled.ThumbDown, "Niks", { onVote(Taste.DISLIKE) }, large = true)
+            IconButton(Icons.Filled.ThumbUp, "Leuk", { onVote(Taste.LIKE) }, Modifier.focusRequester(main), large = true)
+            IconButton(Icons.Filled.Whatshot, "Superleuk", { onVote(Taste.SUPER) }, large = true)
         }
         Text("Wat vond jij?", style = MaterialTheme.typography.headlineMedium)
     }

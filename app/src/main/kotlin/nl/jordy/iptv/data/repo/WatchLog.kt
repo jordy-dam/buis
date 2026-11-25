@@ -55,10 +55,16 @@ class WatchLog @Inject constructor(private val db: AppDatabase, private val prof
     /** The live channel the player shows now, null outside it: a reminder for what's already on stays away. */
     val onAir = MutableStateFlow<Int?>(null)
 
-    /** Survives the player closing: the last stretch is written while its screen goes away. */
+    init {
+        // Adult rows written before they were kept out.
+        detached.launch { runCatching { db.watchLog().pruneAdult() } }
+    }
+
+    /** Survives the player closing: the last stretch is written while its screen goes away. Adult channels and films aren't. */
     fun record(item: WatchItem, startedAt: Long, playedMs: Long) {
         if (playedMs < MIN_SECONDS * 1000L) return
         detached.launch {
+            if (db.watchLog().isAdult(item.type, item.itemId)) return@launch
             val profile = profiles.currentId()
             db.watchLog().insert(
                 WatchLogEntity(

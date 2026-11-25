@@ -51,6 +51,9 @@ import nl.jordy.iptv.data.repo.WeekSummary
 import nl.jordy.iptv.data.xtream.ContentType
 import nl.jordy.iptv.ui.PlayerRoute
 import nl.jordy.iptv.ui.settings.SettingRow
+import nl.jordy.iptv.ui.components.RatingButton
+import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.launch
 import nl.jordy.iptv.ui.theme.Background
 import nl.jordy.iptv.ui.theme.FocusBar
 import nl.jordy.iptv.ui.theme.Live
@@ -71,11 +74,19 @@ import kotlin.math.sqrt
 data class HistoryData(val rows: List<WatchLogEntity>, val categories: Map<String, String>)
 
 @HiltViewModel
-class HistoryViewModel @Inject constructor(watchLog: WatchLog, db: AppDatabase) : ViewModel() {
+class HistoryViewModel @Inject constructor(watchLog: WatchLog, db: AppDatabase, private val taste: nl.jordy.iptv.data.repo.TasteRepository) : ViewModel() {
     /** Five calendar weeks back, so the grid is full; this week and the one before give the comparison. */
     val data = combine(watchLog.recent(days = CALENDAR_WEEKS * 7 + 1), db.catalog().liveCategories()) { rows, cats ->
         HistoryData(rows, cats.associate { it.id to it.name })
     }.stateIn(viewModelScope, SharingStarted.Eagerly, null)
+
+    /** The thumbs on the films in the history, by stream id. */
+    val votes = taste.votesFor(data.map { d -> d?.rows.orEmpty().filter { it.type == ContentType.MOVIE }.map { it.itemId } })
+        .stateIn(viewModelScope, SharingStarted.Eagerly, emptyMap())
+
+    fun rate(r: WatchLogEntity, v: Int?) = viewModelScope.launch {
+        if (v == null) taste.clearVote(r.itemId) else taste.vote(r.itemId, r.title, v)
+    }
 }
 
 private const val CALENDAR_WEEKS = 5
@@ -97,6 +108,7 @@ private val KindShades = listOf(1f, 0.72f, 0.5f, 0.34f, 0.22f, 0.14f)
 @Composable
 fun HistoryScreen(onPlay: (PlayerRoute) -> Unit, vm: HistoryViewModel = hiltViewModel()) {
     val data by vm.data.collectAsStateWithLifecycle()
+    val votes by vm.votes.collectAsStateWithLifecycle()
     val (rows, categories) = data ?: return
     val today = remember { LocalDate.now() }
     val stats = remember(data) { WatchStats.of(rows, categories, today) }
@@ -135,13 +147,17 @@ fun HistoryScreen(onPlay: (PlayerRoute) -> Unit, vm: HistoryViewModel = hiltView
             } else {
                 LazyColumn(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(6.dp)) {
                     items(dayRows, key = { it.id }) { r ->
-                        SettingRow(
-                            r.title,
-                            listOfNotNull(time.format(Instant.ofEpochMilli(r.startedAt)), r.detail ?: kind(r)).joinToString(" · "),
-                            value = WeekSummary.duration(r.seconds),
-                            onClick = { onPlay(route(r)) },
-                            modifier = if (r == dayRows.first()) Modifier.focusRequester(listFocus) else Modifier,
-                        )
+                        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                            SettingRow(
+                                r.title,
+                                listOfNotNull(time.format(Instant.ofEpochMilli(r.startedAt)), r.detail ?: kind(r)).joinToString(" · "),
+                                value = WeekSummary.duration(r.seconds),
+                                onClick = { onPlay(route(r)) },
+                                modifier = Modifier.weight(1f).then(if (r == dayRows.first()) Modifier.focusRequester(listFocus) else Modifier),
+                            )
+                            // A film can be rated here afterwards: Right from its row.
+                            if (r.type == ContentType.MOVIE) RatingButton(votes[r.itemId], { vm.rate(r, it) })
+                        }
                     }
                 }
             }

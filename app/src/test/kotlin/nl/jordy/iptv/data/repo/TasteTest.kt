@@ -294,4 +294,21 @@ class TasteTest {
         assertEquals(2, got.count { it.startsWith("Eastwood") })
         assertTrue("Other drama" in got)
     }
+
+    // Superleuk: a favourite of favourites pulls harder and is the one named.
+
+    @Test
+    fun `superleuk pulls harder than leuk and is named first as the reason`() {
+        val heat = film("Heat", listOf("Misdaad"), "Michael Mann", year = 1995)
+        val drive = film("Drive", listOf("Misdaad"), "Nicolas Winding Refn", year = 2011)
+        val manns = film("Mann thriller", listOf("Misdaad"), "Michael Mann", year = 2015)
+        val refns = film("Refn thriller", listOf("Misdaad"), "Nicolas Winding Refn", year = 2016)
+        val got = Taste.suggest(listOf(refns, manns), listOf(Taste.Vote(drive, LIKE), Taste.Vote(heat, Taste.SUPER)), emptySet())
+        assertEquals("Mann thriller", got.first().film.key)
+        val w = Taste.weights(listOf(Taste.Vote(drive, LIKE), Taste.Vote(heat, Taste.SUPER)))
+        assertTrue(w.getValue("d:michael mann") > w.getValue("d:nicolas winding refn"))
+        val crime = film("Crime", listOf("Misdaad"), year = 2018)
+        assertEquals("on a tie the superleuk film is the reason", "Heat",
+            Taste.suggest(listOf(crime), listOf(Taste.Vote(drive, LIKE), Taste.Vote(heat, Taste.SUPER)), emptySet()).single().because)
+    }
 }
